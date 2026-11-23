@@ -13,5 +13,6 @@ RUN pip install --no-cache-dir -r /app/orchestra/requirements.txt
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY agent_progress.py /app/agent_progress.py
+COPY scientific_audit.py /app/scientific_audit.py
 COPY runner.py /app/runner.py
 CMD ["python", "/app/runner.py"]
