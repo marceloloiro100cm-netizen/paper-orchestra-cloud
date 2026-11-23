@@ -21,6 +21,7 @@ REGION = os.getenv("REGION", "us-east4")
 BUCKET = os.environ["RESEARCH_BUCKET"]
 ALLOWED_EMAILS = {x.strip().lower() for x in os.getenv("ALLOWED_EMAILS", "").split(",") if x.strip()}
 JOB_NAME = f"projects/{PROJECT}/locations/{REGION}/jobs/paper-orchestra-worker"
+NEON_REVIEW_ENABLED = os.getenv("NEON_REVIEW_ENABLED", "false").lower() == "true"
 
 if not ALLOWED_EMAILS:
     raise RuntimeError("ALLOWED_EMAILS vazio: por segurança, a API não inicia.")
@@ -42,6 +43,7 @@ class NewResearch(BaseModel):
     # Permite avaliar um manuscrito com modelo diferente do usado na redação.
     reflection_model: Literal["gemini-3.1-pro-preview", "gemini-3-flash-preview"] | None = None
     plotting: bool = False
+    neon_review: bool = False
     # Idioma do manuscrito solicitado, sem alterar o template LaTeX.
     language: Literal["en", "pt-BR"] = "en"
     source_ids: list[str] = Field(default_factory=list, max_length=MAX_SELECTED_SOURCES)
@@ -93,6 +95,8 @@ def serializable(record: dict) -> dict:
         "reflection_model": record.get("reflection_model") or record.get("model", ""),
         "language": record.get("language", "en"),
         "audit_status": record.get("audit_status", "not_available"),
+        "neon_review_requested": record.get("neon_review_requested", False),
+        "neon_review_status": record.get("neon_review_status", "not_available"),
         "reference_status": record.get("reference_status", "not_available"),
         "references_checked": record.get("references_checked"),
         "references_skipped": record.get("references_skipped"),
@@ -109,6 +113,11 @@ def serializable(record: dict) -> dict:
 def health():
     return {"ok": True, "version": "v1"}
 
+@app.get("/api/capabilities")
+def capabilities(user: User):
+    return {"neon_review": NEON_REVIEW_ENABLED, "neon_model": "gemini-4-neon"}
+
+
 
 @app.get("/api/jobs")
 def list_researches(user: User):
@@ -122,6 +131,8 @@ def list_researches(user: User):
 @app.post("/api/jobs", status_code=202)
 def create_research(payload: NewResearch, user: User):
     owner_uid = user["uid"]
+    if payload.neon_review and not NEON_REVIEW_ENABLED:
+        raise HTTPException(status_code=409, detail="Revisão Neon indisponível até validar o acesso do worker.")
     # Proteção de custos: uma geração por vez por conta.
     docs = db.collection("research_jobs").where("owner_uid", "==", owner_uid).limit(200).stream()
     for s in docs:
@@ -157,6 +168,8 @@ def create_research(payload: NewResearch, user: User):
         "reflection_model": payload.reflection_model or payload.model,
         "plotting": payload.plotting,
         "language": payload.language,
+        "neon_review_requested": payload.neon_review,
+        "neon_review_status": "pending" if payload.neon_review else "disabled",
         "sources": sources,
         "audit_status": "pending",
         "reference_status": "pending",
@@ -199,7 +212,7 @@ def get_status(job_id: str, user: User):
 
 
 @app.get("/api/jobs/{job_id}/download/{file_kind}")
-def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "references"], user: User):
+def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "references", "neon"], user: User):
     item = get_research(job_id, user)
     if item["status"] != "completed" and not (file_kind == "log" and item["status"] == "failed"):
         raise HTTPException(status_code=409, detail="Pesquisa ainda não concluída")
@@ -207,7 +220,8 @@ def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "re
                "latex": ("latex_source.zip", "application/zip"),
                "log": ("execution.log", "text/plain; charset=utf-8"),
                "audit": ("scientific_audit.json", "application/json"),
-               "references": ("reference_verification.json", "application/json")}
+               "references": ("reference_verification.json", "application/json"),
+               "neon": ("neon_critical_review.json", "application/json")}
     filename, content_type = filemap[file_kind]
     blob_path = f"research/{user['uid']}/{job_id}/output/{filename}"
     blob = bucket.blob(blob_path)

@@ -40,6 +40,11 @@
     .scientific-audit-report p{margin:7px 0 11px;font-size:.87rem}
     .audit-finding{padding:10px 0;border-top:1px solid #dce4ed}
     .audit-finding small{display:block;color:#5f6c80;margin-top:6px;overflow-wrap:anywhere}
+    .neon-report{border:1px solid #bdcde2;border-radius:10px;background:#f8fbff;padding:12px;margin:12px 0}
+    .neon-report h4{font-size:.9rem;margin:12px 0 5px}
+    .neon-report p,.neon-report li{font-size:.87rem}
+    .neon-report ul{padding-left:20px}
+
     .reference-item{border-top:1px solid #dce4ed;padding:10px 0;max-width:100%;overflow-wrap:anywhere}
     .reference-item summary{cursor:pointer;font-weight:600;color:#21466f;font-size:.88rem}
     .reference-item small{display:block;color:#64748b;margin-top:7px}
@@ -118,6 +123,9 @@
           </select>
           <p class="subtle">Os agentes já estão integrados. Escolher um modelo mais avançado pode aumentar o custo das revisões.</p></div>
         <div class="check"><input id="plotting" type="checkbox"><label for="plotting">Gerar gráficos com IA (mais chamadas e custo)</label></div>
+        <div class="check hidden" id="neon-panel"><input id="neon-review" type="checkbox">
+          <label for="neon-review">Revisão crítica adicional com Gemini 4 Neon (opcional, chamada paga)</label></div>
+        <p class="subtle hidden" id="neon-explanation">Após a geração do PDF, o Neon faz um parecer independente sobre argumentos e evidências. Uma chamada extra por manuscrito, com nível de raciocínio Low. Não altera o texto e não substitui a revisão humana.</p>
         <div class="warning" style="margin-top:18px"><strong>Aviso acadêmico:</strong> o PaperOrchestra estrutura e escreve, mas não comprova métricas, experimentos ou citações. O teste inicial gerou alegações de verificação sem evidências de validação. Revise sempre antes de utilizar o conteúdo.</div>
         <div class="warning" style="margin-top:18px">A geração pode levar dezenas de minutos e gerar cobrança das APIs. É possível fechar o navegador e acompanhar depois; o trabalho continua no Cloud Run Job.</div>
         <div class="actions"><button type="submit" class="btn" id="submit">Iniciar geração</button><span id="submit-status" class="subtle" role="status"></span></div>

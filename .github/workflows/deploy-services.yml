@@ -30,7 +30,7 @@ jobs:
       - name: Testes e validação inicial
         run: |
           python -m pip install -q requests fastapi
-          python -m compileall -q api/main.py worker/runner.py worker/agent_progress.py worker/scientific_audit.py worker/reference_verification.py api/library.py worker/source_materials.py
+          python -m compileall -q api/main.py worker/runner.py worker/agent_progress.py worker/scientific_audit.py worker/reference_verification.py api/library.py worker/source_materials.py worker/neon_review.py
           python -m unittest discover -s tests -v
 
       - name: Autenticar no Google Cloud por OIDC
@@ -70,7 +70,7 @@ jobs:
           WORKER_IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/paper-orchestra/worker:agents-${GITHUB_SHA}"
           # Update de imagem somente: preservar variáveis de ambiente, serviços, IAM e Storage.
           gcloud run jobs update paper-orchestra-worker --image="$WORKER_IMAGE" --region="$REGION" --project="$PROJECT" --quiet
-          gcloud run services update paper-orchestra-api --image="$API_IMAGE" --region="$REGION" --project="$PROJECT" --quiet
+          gcloud run services update paper-orchestra-api --image="$API_IMAGE" --update-env-vars="NEON_REVIEW_ENABLED=true" --region="$REGION" --project="$PROJECT" --quiet
 
       - name: Verificar que a API continua respondendo
         shell: bash
