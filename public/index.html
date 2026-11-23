@@ -36,6 +36,11 @@
     .agent-completed{color:#166534}.agent-running{color:#1d4e89}
     .agent-waiting,.agent-disabled{color:#66758b}.agent-failed{color:#b42318}
     .scientific-warning{display:block;color:#8a5a00!important;margin:10px 0!important}
+    .scientific-audit-report{margin:14px 0;padding:14px;border:1px solid #c8d4e3;border-radius:10px;background:#f7fafc}
+    .scientific-audit-report p{margin:7px 0 11px;font-size:.87rem}
+    .audit-finding{padding:10px 0;border-top:1px solid #dce4ed}
+    .audit-finding small{display:block;color:#5f6c80;margin-top:6px;overflow-wrap:anywhere}
+
 
     .hidden{display:none!important}#identity{font-size:.85rem;color:#d5deec;overflow-wrap:anywhere}
     .loading{opacity:.7}.check{display:flex;gap:8px;align-items:center;margin-top:13px}.check label{margin:0}
@@ -62,6 +67,13 @@
         <div class="columns">
           <div><label for="idea">Ideia de pesquisa</label><textarea id="idea" required minlength="40" maxlength="150000" placeholder="Problema, hipótese, perguntas, método e contexto..."></textarea></div>
           <div><label for="log">Registros e resultados reais</label><textarea id="log" required minlength="40" maxlength="150000" placeholder="Descrição de dados, observações, resultados verificáveis e limitações..."></textarea></div>
+        </div>
+        <div><label for="language">Idioma do manuscrito</label>
+          <select id="language">
+            <option value="en">Inglês (padrão do PaperOrchestra original)</option>
+            <option value="pt-BR">Português brasileiro (experimental)</option>
+          </select>
+          <p class="subtle">Português é uma preferência de redação, não uma garantia de tradução integral. Os modelos ICLR/CVPR continuam os originais; ainda não implementamos um template ABNT.</p>
         </div>
         <div class="columns">
           <div><label for="template">Modelo de artigo</label><select id="template"><option value="iclr2025">ICLR 2025</option><option value="cvpr2025">CVPR 2025</option></select></div>
