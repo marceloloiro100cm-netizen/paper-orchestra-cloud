@@ -26,5 +26,6 @@ RUN kpsewhich abntex2.cls && kpsewhich abntex2cite.sty && \
        || (cat /tmp/abnt-smoke.log && exit 1); \
     done
 
+COPY source_materials.py /app/source_materials.py
 COPY runner.py /app/runner.py
 CMD ["python", "/app/runner.py"]
