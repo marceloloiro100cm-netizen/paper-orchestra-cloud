@@ -5,7 +5,7 @@ __pycache__/
 *.pyc
 .venv/
 node_modules/
-public/config.js
+# public/config.js contém apenas dados públicos do Web App Firebase e é versionado.
 .DS_Store
 *.pdf
 *.zip
