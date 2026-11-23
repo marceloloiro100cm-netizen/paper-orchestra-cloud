@@ -2,7 +2,7 @@
 // Copie para config.js e substitua pelos valores do Firebase Console > Configurações do projeto > Seu app Web.
 window.PAPER_FIREBASE_CONFIG = {
   apiKey: "SUBSTITUIR",
-  authDomain: "SEU_PROJETO.firebaseapp.com",
-  projectId: "SEU_PROJETO",
+  authDomain: "paperorchestra-mestrado.firebaseapp.com",
+  projectId: "paperorchestra-mestrado",
   appId: "SUBSTITUIR"
 };
