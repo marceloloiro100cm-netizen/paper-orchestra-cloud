@@ -5,6 +5,12 @@ set -euo pipefail
 # Exemplo: PROJECT_ID=paper-orchestra-mestrado-123 bash scripts/deploy-cloud-shell.sh
 PROJECT_ID="${PROJECT_ID:?Informe PROJECT_ID do projeto NOVO, não use cormyr}"
 REGION="us-east4"
+# Por padrão, o worker usa Vertex AI via identidade Cloud Run (sem chaves persistentes).
+# Alternativa: AI_PROVIDER=gemini_api para usar chave Gemini via Secret Manager.
+AI_PROVIDER="${AI_PROVIDER:-vertex}"
+if [[ "$AI_PROVIDER" != "vertex" && "$AI_PROVIDER" != "gemini_api" ]]; then
+  echo 'AI_PROVIDER deve ser vertex ou gemini_api.' >&2; exit 2
+fi
 BUCKET="${PROJECT_ID}-paper-storage"
 REPO="paper-orchestra"
 API_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/api:initial"
@@ -38,7 +44,7 @@ gcloud config set project "$PROJECT_ID" >/dev/null
 gcloud services enable \
   run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
   secretmanager.googleapis.com firestore.googleapis.com storage.googleapis.com \
-  iam.googleapis.com --project="$PROJECT_ID"
+  iam.googleapis.com aiplatform.googleapis.com --project="$PROJECT_ID"
 
 if ! gcloud artifacts repositories describe "$REPO" --location="$REGION" --project="$PROJECT_ID" >/dev/null 2>&1; then
   gcloud artifacts repositories create "$REPO" --repository-format=docker --location="$REGION" \
@@ -60,17 +66,27 @@ for SA in "$API_SA" "$WORKER_SA"; do
     --member="serviceAccount:$SA" --role="roles/storage.objectAdmin" --quiet >/dev/null
 done
 
-if ! gcloud secrets describe paper-orchestra-gemini --project="$PROJECT_ID" >/dev/null 2>&1; then
-  gcloud secrets create paper-orchestra-gemini --replication-policy=automatic --project="$PROJECT_ID"
+# O motor original aceita credenciais ADC do Vertex via VERTEX_AI_PROJECT/LOCATION.
+WORKER_AI_ENV="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},RESEARCH_BUCKET=${BUCKET}"
+WORKER_SECRETS_FLAG=()
+if [[ "$AI_PROVIDER" == "vertex" ]]; then
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$WORKER_SA" \
+    --role="roles/aiplatform.user" --quiet >/dev/null
+  WORKER_AI_ENV="${WORKER_AI_ENV},VERTEX_AI_PROJECT=${PROJECT_ID},VERTEX_AI_LOCATION=global"
+  echo 'Vertex AI selecionado. Nenhuma chave Gemini API necessária.'
+else
+  if ! gcloud secrets describe paper-orchestra-gemini --project="$PROJECT_ID" >/dev/null 2>&1; then
+    gcloud secrets create paper-orchestra-gemini --replication-policy=automatic --project="$PROJECT_ID"
+  fi
+  read -r -s -p 'Cole a chave Gemini (não será mostrada): ' GEMINI_API_KEY; echo
+  if [[ -z "$GEMINI_API_KEY" ]]; then echo 'Chave vazia.' >&2; exit 2; fi
+  printf '%s' "$GEMINI_API_KEY" | gcloud secrets versions add paper-orchestra-gemini --data-file=- --project="$PROJECT_ID" >/dev/null
+  unset GEMINI_API_KEY
+  gcloud secrets add-iam-policy-binding paper-orchestra-gemini \
+    --member="serviceAccount:$WORKER_SA" --role="roles/secretmanager.secretAccessor" \
+    --project="$PROJECT_ID" --quiet >/dev/null
+  WORKER_SECRETS_FLAG=(--set-secrets="GEMINI_API_KEY=paper-orchestra-gemini:latest")
 fi
-read -r -s -p 'Cole a chave Gemini (não será mostrada): ' GEMINI_API_KEY; echo
-if [[ -z "$GEMINI_API_KEY" ]]; then echo 'Chave vazia.' >&2; exit 2; fi
-printf '%s' "$GEMINI_API_KEY" | gcloud secrets versions add paper-orchestra-gemini --data-file=- --project="$PROJECT_ID" >/dev/null
-unset GEMINI_API_KEY
-
-gcloud secrets add-iam-policy-binding paper-orchestra-gemini \
-  --member="serviceAccount:$WORKER_SA" --role="roles/secretmanager.secretAccessor" \
-  --project="$PROJECT_ID" --quiet >/dev/null
 
 echo 'Construindo imagem API...'
 gcloud builds submit api --tag="$API_IMAGE" --project="$PROJECT_ID"
@@ -82,8 +98,8 @@ gcloud run jobs deploy paper-orchestra-worker \
   --image="$WORKER_IMAGE" --region="$REGION" --project="$PROJECT_ID" \
   --service-account="$WORKER_SA" --memory=4Gi --cpu=2 \
   --tasks=1 --parallelism=1 --max-retries=0 --task-timeout=180m \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},RESEARCH_BUCKET=${BUCKET}" \
-  --set-secrets="GEMINI_API_KEY=paper-orchestra-gemini:latest" --quiet
+  --set-env-vars="$WORKER_AI_ENV" \
+  "${WORKER_SECRETS_FLAG[@]}" --quiet
 
 # Permissão restrita a ESTE Job, não aos demais projetos.
 gcloud run jobs add-iam-policy-binding paper-orchestra-worker \
