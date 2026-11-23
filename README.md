@@ -126,3 +126,20 @@ A interface permite escolher um modelo Gemini para o rascunho e, opcionalmente, 
 A busca bibliográfica do PaperOrchestra usa a API pública do Semantic Scholar; uma chave dedicada `SEMANTIC_SCHOLAR_API_KEY` é opcional e não foi configurada neste ambiente. Sem ela, aplicam-se os limites de acesso da API pública. O motor de IA usa Vertex AI, não depende de uma chave Google AI Studio.
 
 Atualização de API/worker: PR revisado → merge em `main` → workflow **Atualizar API e agentes PaperOrchestra** constrói duas imagens e atualiza as revisões do Cloud Run preservando as identidades e os dados. A atualização do Hosting é feita por workflow separado. Não reiniciar geração em andamento durante operações de implantação.
+
+
+## Triagem científica e idioma (terceira fase, 23/11/2026)
+
+Novas gerações podem escolher `pt-BR` como preferência experimental, sem mudar o template LaTeX original ICLR/CVPR. Isso **não garante** tradução perfeita nem atende automaticamente às normas ABNT. Os arquivos de entrada originais permanecem no Cloud Storage.
+
+Após um manuscrito terminar, o worker produz `scientific_audit.json` no mesmo espaço privado da pesquisa. O relatório usa uma inspeção determinística (não consome Gemini) para sinalizar:
+- percentuais quando os dados de entrada declaram não ter ocorrido experimentos;
+- alegações específicas de verificação/auditoria que precisam de evidência;
+- comandos `\\cite*` cujas chaves não constam do `references.bib`;
+- ausência de entradas BibTeX.
+
+No celular, **Histórico de pesquisas → Ver auditoria** aparece apenas para trabalhos novos em que o JSON foi produzido. O relatório é acessado pelo backend com o mesmo token de acesso e autorização por UID que protege os PDFs. Manuscritos anteriores continuam disponíveis, mas sem auditoria retroativa.
+
+**Atenção:** o relatório NÃO valida DOI, títulos, autores, existência real de fontes, percentuais, desenho experimental ou verdade das afirmações. Alertas heurísticos têm falsos positivos e não substituem leitura crítica e busca nas fontes originais. `audit_status=unavailable` explicita qualquer falha na geração do relatório, sem bloquear a entrega do PDF.
+
+O original PaperOrchestra usa Semantic Scholar para busca bibliográfica. Uma chave de acesso dedicada é opcional e ainda não foi cadastrada nesta instalação. Nunca publique chaves no repositório; configurar somente por Secret Manager, após obter uma chave legítima.
