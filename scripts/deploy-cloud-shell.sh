@@ -112,6 +112,12 @@ for SA in "$API_SA" "$WORKER_SA"; do
   grant_bucket_access_with_retry "$SA"
 done
 
+# A verificação de tokens com check_revoked=True consulta o usuário no Firebase Auth.
+# A conta da API precisa de leitura em Authentication, nunca de Auth Admin.
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$API_SA" --role="roles/firebaseauth.viewer" \
+  --quiet >/dev/null
+
 # O motor original aceita credenciais ADC do Vertex via VERTEX_AI_PROJECT/LOCATION.
 WORKER_AI_ENV="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},RESEARCH_BUCKET=${BUCKET}"
 WORKER_SECRETS_FLAG=()
