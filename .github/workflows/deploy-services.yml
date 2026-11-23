@@ -29,7 +29,8 @@ jobs:
 
       - name: Testes e validação inicial
         run: |
-          python -m compileall -q api/main.py worker/runner.py worker/agent_progress.py worker/scientific_audit.py
+          python -m pip install -q requests
+          python -m compileall -q api/main.py worker/runner.py worker/agent_progress.py worker/scientific_audit.py worker/reference_verification.py
           python -m unittest discover -s tests -v
 
       - name: Autenticar no Google Cloud por OIDC

@@ -36,7 +36,7 @@ class NewResearch(BaseModel):
     title: str = Field(min_length=3, max_length=120)
     idea: str = Field(min_length=40, max_length=150_000)
     experimental_log: str = Field(min_length=40, max_length=150_000)
-    template: Literal["cvpr2025", "iclr2025"] = "iclr2025"
+    template: Literal["cvpr2025", "iclr2025", "abnt-artigo", "abnt-dissertacao"] = "iclr2025"
     model: Literal["gemini-3.1-pro-preview", "gemini-3-flash-preview"] = "gemini-3-flash-preview"
     # Permite avaliar um manuscrito com modelo diferente do usado na redação.
     reflection_model: Literal["gemini-3.1-pro-preview", "gemini-3-flash-preview"] | None = None
@@ -88,6 +88,9 @@ def serializable(record: dict) -> dict:
         "reflection_model": record.get("reflection_model") or record.get("model", ""),
         "language": record.get("language", "en"),
         "audit_status": record.get("audit_status", "not_available"),
+        "reference_status": record.get("reference_status", "not_available"),
+        "references_checked": record.get("references_checked"),
+        "references_skipped": record.get("references_skipped"),
         "audit_findings": record.get("audit_findings"),
         "error": record.get("error", ""),
         "created_at": record.get("created_at", ""),
@@ -130,6 +133,7 @@ def create_research(payload: NewResearch, user: User):
         "plotting": payload.plotting,
         "language": payload.language,
         "audit_status": "pending",
+        "reference_status": "pending",
         # Etapas efetivas serão atualizadas pelo worker por evidências no disco.
         "agents": {
             "outline": "waiting", "literature": "waiting",
@@ -169,14 +173,15 @@ def get_status(job_id: str, user: User):
 
 
 @app.get("/api/jobs/{job_id}/download/{file_kind}")
-def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit"], user: User):
+def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "references"], user: User):
     item = get_research(job_id, user)
     if item["status"] != "completed" and not (file_kind == "log" and item["status"] == "failed"):
         raise HTTPException(status_code=409, detail="Pesquisa ainda não concluída")
     filemap = {"pdf": ("final_paper.pdf", "application/pdf"),
                "latex": ("latex_source.zip", "application/zip"),
                "log": ("execution.log", "text/plain; charset=utf-8"),
-               "audit": ("scientific_audit.json", "application/json")}
+               "audit": ("scientific_audit.json", "application/json"),
+               "references": ("reference_verification.json", "application/json")}
     filename, content_type = filemap[file_kind]
     blob_path = f"research/{user['uid']}/{job_id}/output/{filename}"
     blob = bucket.blob(blob_path)

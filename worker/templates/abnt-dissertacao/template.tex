@@ -1,0 +1,63 @@
+% ESTRUTURA INICIAL DE DISSERTAÇÃO - EXPERIMENTAL.
+% Não submeter como versão final sem adaptar ao manual da universidade.
+\documentclass[12pt,oneside,a4paper,brazil]{abntex2}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{lmodern}
+\usepackage{graphicx,amsmath,amssymb,booktabs}
+\usepackage{hyperref,url}
+\usepackage[alf]{abntex2cite}
+\providecommand{\citep}[1]{\cite{#1}}
+\providecommand{\citet}[1]{\citeonline{#1}}
+\providecommand{\citealp}[1]{\cite{#1}}
+\providecommand{\citealt}[1]{\citeonline{#1}}
+\providecommand{\citeauthor}[1]{\citeonline{#1}}
+\providecommand{\citeyear}[1]{\cite{#1}}
+\titulo{Título provisório da dissertação}
+\autor{Pesquisador(a) — informar nome}
+\orientador{Professor(a) orientador(a) — informar}
+\instituicao{Instituição e Programa de Pós-Graduação — informar}
+\tipotrabalho{Dissertação (rascunho)}
+\preambulo{Estrutura preliminar para organização de uma pesquisa de mestrado, pendente de adequação às orientações institucionais.}
+\local{Brasil}
+\data{\the\year}
+\begin{document}
+\selectlanguage{brazil}
+\imprimircapa
+\imprimirfolhaderosto*
+\begin{resumo}
+Este rascunho apresenta a proposta de estudo. Não apresente dados empíricos que não existam.
+\vspace{\onelineskip}
+\noindent\textbf{Palavras-chave:} pesquisa; metodologia; revisão bibliográfica.
+\end{resumo}
+\tableofcontents*
+\textual
+\chapter{Introdução}
+\label{sec:intro}
+%%%%%%%%% INTRODUÇÃO %%%%%%%%%
+Apresente problema, perguntas e objetivos.
+%%%%%%%%% INTRODUÇÃO %%%%%%%%%
+\chapter{Referencial teórico}
+\label{sec:related_work}
+%%%%%%%%% REVISÃO %%%%%%%%%
+Discussão bibliográfica sustentada por fontes verificáveis.
+%%%%%%%%% REVISÃO %%%%%%%%%
+\chapter{Procedimentos metodológicos}
+\label{sec:method}
+%%%%%%%%% MÉTODO %%%%%%%%%
+Descreva os procedimentos, o corpus, o tratamento e as limitações.
+%%%%%%%%% MÉTODO %%%%%%%%%
+\chapter{Análise e discussão}
+\label{sec:experiments}
+%%%%%%%%% RESULTADOS %%%%%%%%%
+Se não houver coleta/análise concluída, declare as limitações; não invente dados.
+%%%%%%%%% RESULTADOS %%%%%%%%%
+\chapter{Considerações finais}
+\label{sec:conclusion}
+%%%%%%%%% CONCLUSÃO %%%%%%%%%
+Indique síntese e trabalhos futuros sem alegar resultados inexistentes.
+%%%%%%%%% CONCLUSÃO %%%%%%%%%
+\postextual
+\bibliography{references}
+\end{document}

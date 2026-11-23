@@ -40,6 +40,11 @@
     .scientific-audit-report p{margin:7px 0 11px;font-size:.87rem}
     .audit-finding{padding:10px 0;border-top:1px solid #dce4ed}
     .audit-finding small{display:block;color:#5f6c80;margin-top:6px;overflow-wrap:anywhere}
+    .reference-item{border-top:1px solid #dce4ed;padding:10px 0;max-width:100%;overflow-wrap:anywhere}
+    .reference-item summary{cursor:pointer;font-weight:600;color:#21466f;font-size:.88rem}
+    .reference-item small{display:block;color:#64748b;margin-top:7px}
+    .reference-item a{display:inline-block;font-size:.87rem;margin-bottom:10px;color:#205f9b}
+
 
 
     .hidden{display:none!important}#identity{font-size:.85rem;color:#d5deec;overflow-wrap:anywhere}
@@ -73,10 +78,12 @@
             <option value="en">Inglês (padrão do PaperOrchestra original)</option>
             <option value="pt-BR">Português brasileiro (experimental)</option>
           </select>
-          <p class="subtle">Português é uma preferência de redação, não uma garantia de tradução integral. Os modelos ICLR/CVPR continuam os originais; ainda não implementamos um template ABNT.</p>
+          <p class="subtle">Português é uma preferência de redação e não garante tradução integral. Os modelos brasileiros são rascunhos experimentais e exigem revisão do manual da universidade; nenhuma conformidade normativa é certificada automaticamente.</p>
         </div>
         <div class="columns">
-          <div><label for="template">Modelo de artigo</label><select id="template"><option value="iclr2025">ICLR 2025</option><option value="cvpr2025">CVPR 2025</option></select></div>
+          <div><label for="template">Modelo de artigo</label><select id="template"><option value="iclr2025">ICLR 2025</option><option value="cvpr2025">CVPR 2025</option>
+                  <option value="abnt-artigo">Brasil — Artigo (abnTeX2 experimental)</option>
+                  <option value="abnt-dissertacao">Brasil — Estrutura de dissertação (experimental)</option></select></div>
           <div><label for="model">Modelo de IA</label><select id="model"><option value="gemini-3-flash-preview">Gemini 3 Flash (teste econômico)</option><option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (maior capacidade)</option></select></div>
         </div>
         <div><label for="reflection-model">Modelo para o agente de revisão</label>

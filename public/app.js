@@ -97,6 +97,66 @@ async function showScientificAudit(id, target) {
   }
 }
 
+async function showReferenceVerification(id, target) {
+  const old = target.querySelector('.reference-report');
+  if (old) { old.remove(); return; }
+  const box = document.createElement('section');
+  box.className = 'scientific-audit-report reference-report';
+  box.textContent = 'Consultando relatório bibliográfico...';
+  target.append(box);
+  try {
+    const response = await request(`/jobs/${id}/download/references`);
+    const report = await response.json();
+    box.replaceChildren();
+    const heading = document.createElement('strong');
+    heading.textContent = 'Conferência de metadados bibliográficos';
+    box.append(heading);
+    const description = document.createElement('p');
+    description.textContent = 'Fontes: Crossref, OpenAlex e Semantic Scholar. Metadados compatíveis NÃO provam que a fonte sustenta a afirmação citada.';
+    box.append(description);
+    const count = document.createElement('p');
+    count.textContent = `Consultadas: ${report.checked ?? 0} de ${report.total_bibtex_entries ?? 0} referências. Não consultadas por limite: ${report.skipped_by_limit ?? 0}.`;
+    box.append(count);
+    const labels = {
+      metadata_match: 'Metadados compatíveis — conferir a publicação',
+      metadata_conflict: 'Possível divergência de metadados',
+      possible_match: 'Correspondência provável por título',
+      not_found: 'Não localizada nas consultas',
+      inconclusive: 'Consulta inconclusiva / base indisponível',
+      insufficient_metadata: 'Metadados insuficientes'
+    };
+    for (const item of (report.items || []).slice(0, 20)) {
+      const detail = document.createElement('details');
+      detail.className = 'reference-item';
+      const summary = document.createElement('summary');
+      const ref = item.reference || {};
+      summary.textContent = (ref.title || ref.key || 'Referência sem título') + ' — ' + (labels[item.classification] || 'Verificar manualmente');
+      detail.append(summary);
+      const meta = document.createElement('small');
+      meta.textContent = `BibTeX: ${ref.key || ''} · ano: ${ref.year || '?'} · DOI: ${ref.doi || 'não informado'}`;
+      detail.append(meta);
+      for (const [provider, data] of Object.entries(item.sources || {})) {
+        const line = document.createElement('p');
+        line.textContent = provider + ': ' + (data.status === 'ok' ? (data.title || 'Metadados encontrados') : data.status === 'not_found' ? 'não localizado' : 'indisponível / limite de API');
+        detail.append(line);
+        if (typeof data.url === 'string') {
+          try {
+            const parsed = new URL(data.url);
+            const allowed = ['doi.org','openalex.org','www.semanticscholar.org','semanticscholar.org'];
+            if (parsed.protocol === 'https:' && allowed.includes(parsed.hostname)) {
+              const a = document.createElement('a');
+              a.href = data.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+              a.textContent = 'Abrir registro em ' + provider;
+              detail.append(a);
+            }
+          } catch (_) { /* sem endereço confiável */ }
+        }
+      }
+      box.append(detail);
+    }
+  } catch (error) { box.textContent = 'Não foi possível acessar a conferência: ' + error.message; }
+}
+
 function statusLabel(value) {
   return ({queued:'Na fila',running:'Em execução',completed:'Concluído',failed:'Falhou'})[value] || value;
 }
@@ -159,6 +219,12 @@ async function loadJobs() {
         warning.textContent = 'PDF gerado: números, resultados, referências e alegações de validação precisam de conferência humana.';
         info.append(warning);
       }
+      if (entry.reference_status === 'completed_with_limitations') {
+        const refStatus = document.createElement('small');
+        refStatus.className = 'scientific-warning';
+        refStatus.textContent = 'Metadados bibliográficos consultados em bases externas; confira cada referência antes de citar.';
+        info.append(refStatus);
+      }
       if (entry.audit_status === 'human_review_required') {
         const aud = document.createElement('small');
         aud.className = 'scientific-warning';
@@ -176,8 +242,8 @@ async function loadJobs() {
         const available = entry.status === 'failed' ? ['log'] : entry.files;
         for (const kind of available) {
           const button = document.createElement('button'); button.type='button';
-          button.textContent=kind==='pdf'?'Baixar PDF':kind==='latex'?'Baixar LaTeX':kind==='audit'?'Ver auditoria':'Logs';
-          button.addEventListener('click', ()=>kind==='audit' ? showScientificAudit(entry.id, info) : download(entry.id,kind));
+          button.textContent=kind==='pdf'?'Baixar PDF':kind==='latex'?'Baixar LaTeX':kind==='audit'?'Ver auditoria':kind==='references'?'Conferir referências':'Logs';
+          button.addEventListener('click', ()=>kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : download(entry.id,kind));
           files.append(button);
         }
         info.append(files);

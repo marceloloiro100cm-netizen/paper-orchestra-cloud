@@ -15,6 +15,7 @@ from pathlib import Path
 from google.cloud import firestore, storage
 from agent_progress import current_stage, inspect_agents
 from scientific_audit import audit_pdf
+from reference_verification import verify_bibliography
 
 PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
 BUCKET = os.environ["RESEARCH_BUCKET"]
@@ -133,6 +134,29 @@ def main():
         except Exception as exc:
             print("Auditoria local indisponível:", repr(exc), flush=True)
             update(audit_status="unavailable")
+        # Consulta metadados de referências somente depois que o PDF estiver pronto.
+        # Nunca substitui citações nem marca publicações como cientificamente validadas.
+        try:
+            bib_path = output / "latex_writeup" / "references.bib"
+            if bib_path.is_file():
+                reference_report = verify_bibliography(bib_path.read_text(
+                    encoding="utf-8", errors="replace"
+                ))
+                reference_file = root / "reference_verification.json"
+                reference_file.write_text(
+                    json.dumps(reference_report, ensure_ascii=False, indent=2),
+                    encoding="utf-8"
+                )
+                put(reference_file, "reference_verification.json", "application/json")
+                files.append("references")
+                update(reference_status="completed_with_limitations",
+                       references_checked=reference_report["checked"],
+                       references_skipped=reference_report["skipped_by_limit"])
+            else:
+                update(reference_status="unavailable")
+        except Exception as exc:
+            print("Conferência bibliográfica externa indisponível:", repr(exc), flush=True)
+            update(reference_status="unavailable")
         latex_workdir = output / "latex_writeup"
         final_tex = output / "content_refinement_workdir" / "final_refined_paper.tex"
         if latex_workdir.is_dir() and final_tex.exists():
