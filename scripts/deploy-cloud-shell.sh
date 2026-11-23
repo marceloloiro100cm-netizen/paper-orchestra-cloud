@@ -40,7 +40,15 @@ if ! gcloud billing projects describe "$PROJECT_ID" --format='value(billingEnabl
   echo 'Vincule este novo projeto à conta de faturamento já usada no Google Cloud.' >&2; exit 2
 fi
 
-read -r -p 'Email Google autorizado para o acesso (ex.: voce@gmail.com): ' ADMIN_EMAIL
+# Via GitHub Actions, ADMIN_EMAIL chega pelo formulário de execução.
+# Via terminal interativo, perguntar somente se a variável estiver vazia.
+ADMIN_EMAIL="${ADMIN_EMAIL:-}"
+if [[ -z "$ADMIN_EMAIL" ]]; then
+  if [[ ! -t 0 ]]; then
+    echo 'Informe ADMIN_EMAIL para implantação não interativa (GitHub Actions).' >&2; exit 2
+  fi
+  read -r -p 'Email Google autorizado para o acesso (ex.: voce@gmail.com): ' ADMIN_EMAIL
+fi
 if [[ ! "$ADMIN_EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]]; then
   echo 'Email inválido.' >&2; exit 2
 fi
