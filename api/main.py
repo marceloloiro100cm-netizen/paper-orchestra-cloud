@@ -38,6 +38,8 @@ class NewResearch(BaseModel):
     experimental_log: str = Field(min_length=40, max_length=150_000)
     template: Literal["cvpr2025", "iclr2025"] = "iclr2025"
     model: Literal["gemini-3.1-pro-preview", "gemini-3-flash-preview"] = "gemini-3-flash-preview"
+    # Permite avaliar um manuscrito com modelo diferente do usado na redação.
+    reflection_model: Literal["gemini-3.1-pro-preview", "gemini-3-flash-preview"] | None = None
     plotting: bool = False
 
     @field_validator("idea", "experimental_log")
@@ -79,6 +81,9 @@ def serializable(record: dict) -> dict:
         "title": record["title"],
         "status": record["status"],
         "stage": record.get("stage", ""),
+        "agents": record.get("agents"),
+        "model": record.get("model", ""),
+        "reflection_model": record.get("reflection_model") or record.get("model", ""),
         "error": record.get("error", ""),
         "created_at": record.get("created_at", ""),
         "finished_at": record.get("finished_at", ""),
@@ -115,7 +120,17 @@ def create_research(payload: NewResearch, user: User):
     record = {
         "id": job_id, "owner_uid": owner_uid,
         "title": payload.title, "status": "queued", "stage": "Preparando materiais",
-        "template": payload.template, "model": payload.model, "plotting": payload.plotting,
+        "template": payload.template, "model": payload.model,
+        "reflection_model": payload.reflection_model or payload.model,
+        "plotting": payload.plotting,
+        # Etapas efetivas serão atualizadas pelo worker por evidências no disco.
+        "agents": {
+            "outline": "waiting", "literature": "waiting",
+            "plotting": "waiting" if payload.plotting else "disabled",
+            "writing": "waiting", "refinement": "waiting",
+        },
+        # A produção do manuscrito não significa validação dos dados científicos.
+        "scientific_verification": "manual_required",
         "created_at": now, "finished_at": "", "files": [], "error": "",
     }
     ref.set(record)
