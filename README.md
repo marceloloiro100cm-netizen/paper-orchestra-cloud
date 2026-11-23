@@ -13,7 +13,7 @@
 
 A conta de faturamento Google Cloud que você já usa pode pagar **outro projeto Firebase**, separado do Cormyr. Isso NÃO significa uso ilimitado gratuito: consumo do Gemini, Cloud Run Jobs, Storage, Build e demais APIs pode ser cobrado.
 
-> **Status (23/11/2026):** código publicado, plano Blaze confirmado, ID Firebase `paperorchestra-mestrado` identificado, aplicativo Web registrado e configuração pública `public/config.js` publicada no GitHub. A autenticação Google e o Firestore `(default)` na região `southamerica-east1` foram confirmados em capturas. A implantação real ainda depende de executar o script no Cloud Shell; nenhum serviço Cloud Run/Hosting em produção foi validado. Esta versão ainda não passou por testes integrados em produção. O PaperOrchestra original não é um produto Google oficialmente suportado.
+> **Status (23/11/2026):** Firebase Hosting, login Google, API e Cloud Run Job implantados. Uma pesquisa demonstrativa concluiu e gerou PDF/LaTeX. A versão com painel de agentes e modelo de revisão independente foi incorporada ao `main`; verifique o workflow [Atualizar API e agentes](https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/actions/workflows/deploy-services.yml) para saber se a atualização de infraestrutura foi concluída. Este sistema não certifica resultados científicos. O PaperOrchestra original não é um produto Google oficialmente suportado.
 
 ## Como colocar no ar — primeira implantação
 
@@ -114,3 +114,15 @@ Documentação oficial: https://docs.cloud.google.com/iam/docs/workload-identity
 O registro de `public/config.js` contém somente a configuração pública do Web App Firebase; nunca adicione tokens privados, credenciais JSON, senhas ou chaves Gemini ao repositório. O uso do workflow no GitHub **não libera administração irrestrita** nem dispensa a conexão IAM inicial no Google Cloud.
 
 > Observação (23/11/2026): o ID do provedor exibido no Google Cloud é `github-actions` e o workflow `.github/workflows/deploy-manual.yml` foi alinhado a `projects/201655574048/locations/global/workloadIdentityPools/github-actions/providers/github-actions`. Antes de salvar o provedor, mapear `google.subject` → `assertion.sub`, `attribute.repository` → `assertion.repository` e restringir a condição ao repositório `marceloloiro100cm-netizen/paper-orchestra-cloud` na branch `refs/heads/main`.
+
+## Painel de agentes (segunda fase)
+
+Os cinco módulos do PaperOrchestra original já são orquestrados automaticamente: planejamento, literatura, redação, refinamento e, quando solicitado, gráficos. Em novas pesquisas, o worker registra no Firestore o avanço **a partir dos arquivos efetivamente produzidos**, sem inventar porcentagens. Para acompanhar: **Histórico de pesquisas → Acompanhar agentes**. Trabalhos anteriores à nova versão não possuem histórico retroativo por agente.
+
+A interface permite escolher um modelo Gemini para o rascunho e, opcionalmente, outro para o agente de refinamento. Modelos Pro podem gerar custo superior ao Flash. O gráfico continua opcional.
+
+**Limitação acadêmica importante:** O PDF do teste de infraestrutura exibiu percentuais de "integridade" e descrições de módulos de verificação sem documentação dos respectivos testes. Um arquivo produzido com sucesso não prova validade de afirmações, referências, estatísticas nem conformidade científica. Sempre revisar referências originais e remover ou sinalizar métricas não suportadas.
+
+A busca bibliográfica do PaperOrchestra usa a API pública do Semantic Scholar; uma chave dedicada `SEMANTIC_SCHOLAR_API_KEY` é opcional e não foi configurada neste ambiente. Sem ela, aplicam-se os limites de acesso da API pública. O motor de IA usa Vertex AI, não depende de uma chave Google AI Studio.
+
+Atualização de API/worker: PR revisado → merge em `main` → workflow **Atualizar API e agentes PaperOrchestra** constrói duas imagens e atualiza as revisões do Cloud Run preservando as identidades e os dados. A atualização do Hosting é feita por workflow separado. Não reiniciar geração em andamento durante operações de implantação.
