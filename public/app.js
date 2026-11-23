@@ -51,6 +51,52 @@ async function download(id, kind) {
   } catch (e) { alert(e.message); }
 }
 
+async function showScientificAudit(id, target) {
+  const old = target.querySelector('.scientific-audit-report');
+  if (old) { old.remove(); return; }
+  const box = document.createElement('section');
+  box.className = 'scientific-audit-report';
+  box.textContent = 'Carregando a auditoria...';
+  target.append(box);
+  try {
+    const r = await request(`/jobs/${id}/download/audit`);
+    const report = await r.json();
+    box.replaceChildren();
+    const heading = document.createElement('strong');
+    heading.textContent = 'Triagem científica — revisão humana necessária';
+    box.append(heading);
+    const limitations = document.createElement('p');
+    limitations.textContent = 'Triagem automática local. Não verifica DOI, existência de fontes nem correção factual.';
+    box.append(limitations);
+    const summary = document.createElement('p');
+    const counts = report.summary || {};
+    summary.textContent = `Referências BibTeX: ${counts.bibliography_keys_found ?? '?'}; chaves sem correspondência: ${counts.citation_keys_missing ?? '?'}; alertas: ${counts.findings ?? '?'}.`;
+    box.append(summary);
+    for (const finding of (report.findings || []).slice(0, 30)) {
+      const part = document.createElement('div');
+      part.className = 'audit-finding';
+      const title = document.createElement('strong');
+      title.textContent = finding.title || finding.code || 'Verificação recomendada';
+      const desc = document.createElement('p');
+      desc.textContent = finding.detail || '';
+      part.append(title, desc);
+      for (const sample of (finding.examples || []).slice(0, 3)) {
+        const quote = document.createElement('small');
+        quote.textContent = String(sample);
+        part.append(quote);
+      }
+      box.append(part);
+    }
+    if (!(report.findings || []).length) {
+      const note = document.createElement('p');
+      note.textContent = 'Nenhum alerta heurístico encontrado. Isso NÃO significa que as afirmações foram verificadas.';
+      box.append(note);
+    }
+  } catch (err) {
+    box.textContent = 'Não foi possível ler a auditoria: ' + err.message;
+  }
+}
+
 function statusLabel(value) {
   return ({queued:'Na fila',running:'Em execução',completed:'Concluído',failed:'Falhou'})[value] || value;
 }
@@ -113,14 +159,25 @@ async function loadJobs() {
         warning.textContent = 'PDF gerado: números, resultados, referências e alegações de validação precisam de conferência humana.';
         info.append(warning);
       }
+      if (entry.audit_status === 'human_review_required') {
+        const aud = document.createElement('small');
+        aud.className = 'scientific-warning';
+        aud.textContent = 'Triagem científica disponível' + (typeof entry.audit_findings === 'number' ? ` · ${entry.audit_findings} alerta(s)` : '') + '. A revisão humana continua obrigatória.';
+        info.append(aud);
+      } else if (entry.audit_status === 'unavailable') {
+        const aud = document.createElement('small');
+        aud.className = 'scientific-warning';
+        aud.textContent = 'A auditoria não pôde ser gerada; confira manualmente o artigo.';
+        info.append(aud);
+      }
       if (entry.error) {const err=document.createElement('small'); err.textContent=entry.error; info.append(err);}
       if (entry.status === 'completed' || entry.status === 'failed') {
         const files = document.createElement('div'); files.className='downloads';
         const available = entry.status === 'failed' ? ['log'] : entry.files;
         for (const kind of available) {
           const button = document.createElement('button'); button.type='button';
-          button.textContent=kind==='pdf'?'Baixar PDF':kind==='latex'?'Baixar LaTeX':'Logs';
-          button.addEventListener('click', ()=>download(entry.id,kind));
+          button.textContent=kind==='pdf'?'Baixar PDF':kind==='latex'?'Baixar LaTeX':kind==='audit'?'Ver auditoria':'Logs';
+          button.addEventListener('click', ()=>kind==='audit' ? showScientificAudit(entry.id, info) : download(entry.id,kind));
           files.append(button);
         }
         info.append(files);
@@ -141,6 +198,7 @@ $('new-paper').addEventListener('submit', async (event) => {
       experimental_log:$('log').value, template:$('template').value,
       model:$('model').value,
       reflection_model:$('reflection-model').value || null,
+      language:$('language').value,
       plotting:$('plotting').checked
     };
     await request('/jobs', {method:'POST',body:JSON.stringify(payload)});

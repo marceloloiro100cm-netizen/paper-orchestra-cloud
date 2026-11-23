@@ -41,6 +41,8 @@ class NewResearch(BaseModel):
     # Permite avaliar um manuscrito com modelo diferente do usado na redação.
     reflection_model: Literal["gemini-3.1-pro-preview", "gemini-3-flash-preview"] | None = None
     plotting: bool = False
+    # Idioma do manuscrito solicitado, sem alterar o template LaTeX.
+    language: Literal["en", "pt-BR"] = "en"
 
     @field_validator("idea", "experimental_log")
     @classmethod
@@ -84,6 +86,9 @@ def serializable(record: dict) -> dict:
         "agents": record.get("agents"),
         "model": record.get("model", ""),
         "reflection_model": record.get("reflection_model") or record.get("model", ""),
+        "language": record.get("language", "en"),
+        "audit_status": record.get("audit_status", "not_available"),
+        "audit_findings": record.get("audit_findings"),
         "error": record.get("error", ""),
         "created_at": record.get("created_at", ""),
         "finished_at": record.get("finished_at", ""),
@@ -123,6 +128,8 @@ def create_research(payload: NewResearch, user: User):
         "template": payload.template, "model": payload.model,
         "reflection_model": payload.reflection_model or payload.model,
         "plotting": payload.plotting,
+        "language": payload.language,
+        "audit_status": "pending",
         # Etapas efetivas serão atualizadas pelo worker por evidências no disco.
         "agents": {
             "outline": "waiting", "literature": "waiting",
@@ -162,13 +169,14 @@ def get_status(job_id: str, user: User):
 
 
 @app.get("/api/jobs/{job_id}/download/{file_kind}")
-def download(job_id: str, file_kind: Literal["pdf", "latex", "log"], user: User):
+def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit"], user: User):
     item = get_research(job_id, user)
     if item["status"] != "completed" and not (file_kind == "log" and item["status"] == "failed"):
         raise HTTPException(status_code=409, detail="Pesquisa ainda não concluída")
     filemap = {"pdf": ("final_paper.pdf", "application/pdf"),
                "latex": ("latex_source.zip", "application/zip"),
-               "log": ("execution.log", "text/plain; charset=utf-8")}
+               "log": ("execution.log", "text/plain; charset=utf-8"),
+               "audit": ("scientific_audit.json", "application/json")}
     filename, content_type = filemap[file_kind]
     blob_path = f"research/{user['uid']}/{job_id}/output/{filename}"
     blob = bucket.blob(blob_path)
