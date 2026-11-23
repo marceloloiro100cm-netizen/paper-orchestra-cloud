@@ -3,6 +3,7 @@
 Nenhum manuscrito depende do disco efêmero da instância após a execução.
 """
 import os
+import json
 import shutil
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
@@ -13,6 +14,7 @@ from pathlib import Path
 
 from google.cloud import firestore, storage
 from agent_progress import current_stage, inspect_agents
+from scientific_audit import audit_pdf
 
 PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
 BUCKET = os.environ["RESEARCH_BUCKET"]
@@ -52,6 +54,16 @@ def main():
         raw.mkdir(); output.mkdir()
         for filename in ("idea_sparse.md", "experimental_log.md"):
             bucket.blob(f"{prefix}/input/{filename}").download_to_filename(str(raw / filename))
+        # Preferência aplicada somente aos dados temporários, não aos originais salvos.
+        if data.get("language") == "pt-BR":
+            with (raw / "idea_sparse.md").open("a", encoding="utf-8") as text:
+                text.write(
+                    "\n\n## Preferência de idioma\n"
+                    "Redija o manuscrito em português brasileiro, incluindo resumo, títulos "
+                    "e seções. Mantenha títulos de publicações, DOI e nomes próprios. "
+                    "Não invente dados, citações ou resultados. "
+                    "O template ICLR/CVPR continua o original e não é ABNT.\n"
+                )
         command = [
             "python", "-u", "paper_writing_cli.py",
             "--raw_materials_dir", str(raw),
@@ -105,6 +117,22 @@ def main():
             pdf = matches[0]
         put(pdf, "final_paper.pdf", "application/pdf")
         files = ["pdf", "log"]
+        # Auditoria local não gera texto ou evidências novas.
+        try:
+            refined_tex = output / "content_refinement_workdir" / "final_refined_paper.tex"
+            raw_tex = output / "latex_writeup" / "raw_draft_paper.tex"
+            bib = output / "latex_writeup" / "references.bib"
+            report = audit_pdf(pdf, refined_tex if refined_tex.is_file() else raw_tex,
+                               bib, raw / "experimental_log.md")
+            report_file = root / "scientific_audit.json"
+            report_file.write_text(json.dumps(report, ensure_ascii=False, indent=2),
+                                   encoding="utf-8")
+            put(report_file, "scientific_audit.json", "application/json")
+            files.append("audit")
+            update(audit_status=report["status"], audit_findings=report["summary"]["findings"])
+        except Exception as exc:
+            print("Auditoria local indisponível:", repr(exc), flush=True)
+            update(audit_status="unavailable")
         latex_workdir = output / "latex_writeup"
         final_tex = output / "content_refinement_workdir" / "final_refined_paper.tex"
         if latex_workdir.is_dir() and final_tex.exists():
