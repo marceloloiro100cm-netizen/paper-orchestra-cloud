@@ -44,6 +44,15 @@
     .reference-item summary{cursor:pointer;font-weight:600;color:#21466f;font-size:.88rem}
     .reference-item small{display:block;color:#64748b;margin-top:7px}
     .reference-item a{display:inline-block;font-size:.87rem;margin-bottom:10px;color:#205f9b}
+    .library-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .library-item{border-top:1px solid #e0e7ef;padding:12px 0;display:flex;align-items:flex-start;gap:12px;justify-content:space-between;overflow-wrap:anywhere}
+    .library-item label{margin:0;display:flex;gap:8px;align-items:flex-start;font-weight:600}
+    .library-meta{font-size:.79rem;color:#596d83;margin-top:5px}
+    .library-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+    .library-actions button{border:1px solid #afc2d9;border-radius:7px;background:white;color:#21436d;padding:6px 9px;font-size:.8rem}
+    .library-note{font-size:.83rem;color:#57667d}
+    @media(max-width:700px){.library-grid{grid-template-columns:1fr}.library-item{flex-direction:column}}
+
 
 
 
@@ -63,8 +72,23 @@
     <p id="auth-status" class="subtle"></p>
   </section>
   <div id="workspace" class="hidden">
+    <section class="panel" id="library-panel">
+      <div class="head"><h2>Biblioteca acadêmica permanente</h2><button class="btn alt" type="button" id="refresh-library">Atualizar</button></div>
+      <p class="subtle">Guarde PDFs, DOCX, BibTeX, RIS ou TXT na sua conta. Arquivos e bibliografias não entram no GitHub. Selecione até oito fontes para a próxima pesquisa; documentos anexados são contexto, não resultados verificados.</p>
+      <div class="library-grid">
+        <div><label for="library-file">Arquivo</label><input id="library-file" type="file" accept=".pdf,.docx,.bib,.ris,.txt" /></div>
+        <div><label for="library-collection">Coleção (assunto ou capítulo)</label><input id="library-collection" type="text" maxlength="60" value="Geral" placeholder="Ex.: Revisão bibliográfica"/></div>
+      </div>
+      <label for="library-description">Descrição opcional</label>
+      <input id="library-description" type="text" maxlength="300" placeholder="Por que este documento é relevante?"/>
+      <div class="actions"><button class="btn" type="button" id="upload-library">Guardar na biblioteca</button><span id="library-message" role="status" class="subtle"></span></div>
+      <label for="library-filter">Buscar na biblioteca</label>
+      <input id="library-filter" type="text" placeholder="Filtrar por nome, coleção ou descrição"/>
+      <p id="selected-count" class="library-note">0 fonte(s) selecionada(s) para a próxima pesquisa</p>
+      <div id="library-list" role="status">Carregando biblioteca…</div>
+    </section>
     <section class="panel">
-      <h2>Nova pesquisa</h2>
+      <h2>Nova pesquisa</h2><p class="library-note">Você pode anexar documentos marcando-os na biblioteca acima. O original permanecerá guardado independentemente da geração do artigo.</p>
       <p class="subtle">O PaperOrchestra organiza e redige o manuscrito a partir de <b>materiais reais</b>. Não invente resultados para completar o formulário. Os dados são armazenados de modo privado.</p>
       <form id="new-paper">
         <label for="title">Nome interno do projeto</label>
