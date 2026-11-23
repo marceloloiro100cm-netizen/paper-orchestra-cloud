@@ -1,0 +1,76 @@
+name: Atualizar site Firebase Hosting
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - public/config.js
+      - public/app.js
+      - public/index.html
+      - firebase.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: paper-orchestra-hosting
+  cancel-in-progress: false
+
+jobs:
+  publicar-site:
+    name: Atualizar apenas o site (sem rebuild da API)
+    if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+
+      - name: Conferir configuração e projeto
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f public/config.js
+          grep -q 'projectId: "paperorchestra-mestrado"' public/config.js
+          ! grep -q 'SUBSTITUIR' public/config.js
+          node --check public/config.js
+
+      - name: Autenticar no Google Cloud (OIDC)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/201655574048/locations/global/workloadIdentityPools/github-actions/providers/github-actions
+          service_account: paper-orchestra-deployer@paperorchestra-mestrado.iam.gserviceaccount.com
+          project_id: paperorchestra-mestrado
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar Firebase CLI
+        run: npm install --global firebase-tools@latest
+
+      - name: Publicar somente Hosting
+        run: firebase deploy --only hosting --project paperorchestra-mestrado --non-interactive
+
+      - name: Confirmar versão pública
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5 6; do
+            curl --fail --silent --show-error --max-time 15 \
+              -o /tmp/live-paper-config.js \
+              "https://paperorchestra-mestrado.web.app/config.js?revision=${GITHUB_SHA}" || true
+            if cmp -s public/config.js /tmp/live-paper-config.js; then
+              echo "Firebase Hosting atualizado; versão confirmada."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "A nova versão não pôde ser confirmada no Hosting." >&2
+          exit 1
