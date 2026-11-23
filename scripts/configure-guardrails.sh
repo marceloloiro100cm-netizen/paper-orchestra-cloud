@@ -42,6 +42,12 @@ gcloud storage buckets add-iam-policy-binding "gs://$SOURCE" \
 gcloud storage buckets add-iam-policy-binding "gs://$DEST" \
   --member="$PRINCIPAL" --role="roles/storage.objectAdmin" --quiet >/dev/null
 
+# Permite ler metadados dos buckets após remover Storage Admin global.
+for storage_bucket in "$SOURCE" "$DEST"; do
+  gcloud storage buckets add-iam-policy-binding "gs://$storage_bucket" \
+    --member="$PRINCIPAL" --role="roles/storage.legacyBucketReader" --quiet >/dev/null
+done
+
 # Concessão de backup agendado, temporária até a redução final de IAM.
 gcloud projects add-iam-policy-binding "$PROJECT" \
   --member="$PRINCIPAL" --role="roles/datastore.backupSchedulesAdmin" --quiet >/dev/null
