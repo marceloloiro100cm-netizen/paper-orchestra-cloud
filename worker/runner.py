@@ -17,6 +17,7 @@ from agent_progress import current_stage, inspect_agents
 from scientific_audit import audit_pdf
 from reference_verification import verify_bibliography
 from source_materials import compose_library_context
+from neon_review import generate_review
 
 PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
 BUCKET = os.environ["RESEARCH_BUCKET"]
@@ -187,6 +188,24 @@ def main():
         except Exception as exc:
             print("Conferência bibliográfica externa indisponível:", repr(exc), flush=True)
             update(reference_status="unavailable")
+        # Parecer Neon totalmente opcional, isolado do pipeline original.
+        # Falhas não invalidam PDF já gerado nem disparam múltiplas cobranças.
+        if data.get("neon_review_requested"):
+            update(stage="Revisão crítica opcional com Gemini Neon", neon_review_status="running")
+            try:
+                review = generate_review(
+                    pdf, raw / "idea_sparse.md", raw / "experimental_log.md"
+                )
+                review_path = root / "neon_critical_review.json"
+                review_path.write_text(
+                    json.dumps(review, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+                put(review_path, "neon_critical_review.json", "application/json")
+                files.append("neon")
+                update(neon_review_status="completed")
+            except Exception as exc:
+                print("Revisão Neon indisponível:", repr(exc), flush=True)
+                update(neon_review_status="unavailable")
         latex_workdir = output / "latex_writeup"
         final_tex = output / "content_refinement_workdir" / "final_refined_paper.tex"
         if latex_workdir.is_dir() and final_tex.exists():
