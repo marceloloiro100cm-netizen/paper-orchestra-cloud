@@ -266,6 +266,62 @@ async function showReferenceVerification(id, target) {
   } catch (error) { box.textContent = 'Não foi possível acessar a conferência: ' + error.message; }
 }
 
+async function showNeonReport(id, target) {
+  const old = target.querySelector('.neon-report');
+  if (old) {old.remove();return;}
+  const box=document.createElement('section');box.className='neon-report';
+  box.textContent='Carregando parecer crítico…';target.append(box);
+  try {
+    const r=await request('/jobs/'+id+'/download/neon');
+    const data=await r.json();
+    box.replaceChildren();
+    const header=document.createElement('strong');
+    header.textContent='Parecer crítico — Gemini 4 Neon';box.append(header);
+    const warning=document.createElement('p');
+    warning.textContent='Revisão assistida por IA. Não comprova referências, dados nem resultados científicos.';
+    box.append(warning);
+    if(data.sintese){const p=document.createElement('p');p.textContent=data.sintese;box.append(p);}
+    const sections={
+      pontos_fortes:'Pontos fortes',
+      riscos_argumentativos:'Riscos argumentativos',
+      afirmacoes_sem_evidencia:'Afirmações que exigem evidência',
+      questoes_para_o_pesquisador:'Questões para o pesquisador',
+      limitacoes_da_revisao:'Limitações da revisão'
+    };
+    for(const [key,label] of Object.entries(sections)){
+      const items=Array.isArray(data[key])?data[key]:[];
+      if(!items.length)continue;
+      const heading=document.createElement('h4');heading.textContent=label;box.append(heading);
+      const ul=document.createElement('ul');
+      for(const item of items.slice(0,20)){
+        const li=document.createElement('li');li.textContent=String(item);ul.append(li);
+      }
+      box.append(ul);
+    }
+    if(data.consumo_tokens){
+      const c=document.createElement('small');
+      c.textContent='Tokens desta revisão: entrada '+(data.consumo_tokens.entrada??'?')
+        +' · saída '+(data.consumo_tokens.saida??'?')
+        +' · raciocínio '+(data.consumo_tokens.raciocinio??'?');
+      box.append(c);
+    }
+  } catch(e) {box.textContent='Não foi possível abrir o parecer Neon: '+e.message;}
+}
+
+async function loadCapabilities() {
+  $('neon-panel').classList.add('hidden');
+  $('neon-explanation').classList.add('hidden');
+  $('neon-review').checked=false;
+  try {
+    const r=await request('/capabilities');
+    const caps=await r.json();
+    if(caps.neon_review === true) {
+      $('neon-panel').classList.remove('hidden');
+      $('neon-explanation').classList.remove('hidden');
+    }
+  } catch(_) { /* opção permanece oculta caso a API seja anterior */ }
+}
+
 function statusLabel(value) {
   return ({queued:'Na fila',running:'Em execução',completed:'Concluído',failed:'Falhou'})[value] || value;
 }
@@ -334,6 +390,12 @@ async function loadJobs() {
         refStatus.textContent = 'Metadados bibliográficos consultados em bases externas; confira cada referência antes de citar.';
         info.append(refStatus);
       }
+      if (entry.neon_review_requested && entry.neon_review_status === 'unavailable') {
+        const warning = document.createElement('small');
+        warning.className = 'scientific-warning';
+        warning.textContent = 'A revisão adicional com Neon falhou. O PDF principal continua disponível.';
+        info.append(warning);
+      }
       if (entry.audit_status === 'human_review_required') {
         const aud = document.createElement('small');
         aud.className = 'scientific-warning';
@@ -351,8 +413,8 @@ async function loadJobs() {
         const available = entry.status === 'failed' ? ['log'] : entry.files;
         for (const kind of available) {
           const button = document.createElement('button'); button.type='button';
-          button.textContent=kind==='pdf'?'Baixar PDF':kind==='latex'?'Baixar LaTeX':kind==='audit'?'Ver auditoria':kind==='references'?'Conferir referências':'Logs';
-          button.addEventListener('click', ()=>kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : download(entry.id,kind));
+          button.textContent=kind==='pdf'?'Baixar PDF':kind==='latex'?'Baixar LaTeX':kind==='audit'?'Ver auditoria':kind==='references'?'Conferir referências':kind==='neon'?'Parecer Neon':'Logs';
+          button.addEventListener('click', ()=>kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : kind==='neon' ? showNeonReport(entry.id, info) : download(entry.id,kind));
           files.append(button);
         }
         info.append(files);
@@ -375,7 +437,8 @@ $('new-paper').addEventListener('submit', async (event) => {
       reflection_model:$('reflection-model').value || null,
       language:$('language').value,
       source_ids:[...selectedSourceIds],
-      plotting:$('plotting').checked
+      plotting:$('plotting').checked,
+      neon_review:$('neon-review').checked
     };
     await request('/jobs', {method:'POST',body:JSON.stringify(payload)});
     $('submit-status').textContent='Pesquisa enviada. Você pode fechar o navegador.';
@@ -391,6 +454,6 @@ onAuthStateChanged(auth, async (current) => {
   $('logout').classList.toggle('hidden', !user);
   $('identity').textContent=user?.email || '';
   if (refreshInterval) clearInterval(refreshInterval);
-  if (user) { await Promise.all([loadJobs(),loadLibrary()]); refreshInterval=setInterval(loadJobs, 12000); }
+  if (user) { await Promise.all([loadJobs(),loadLibrary(),loadCapabilities()]); refreshInterval=setInterval(loadJobs, 12000); }
   else { libraryItems=[];selectedSourceIds.clear();updateSelectedCount(); }
 });
