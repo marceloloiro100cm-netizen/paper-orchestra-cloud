@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # EXECUTAR somente no Cloud Shell do NOVO projeto, a partir da raiz do repositório.
-# Exemplo: PROJECT_ID=paper-orchestra-mestrado-123 bash scripts/deploy-cloud-shell.sh
-PROJECT_ID="${PROJECT_ID:?Informe PROJECT_ID do projeto NOVO, não use cormyr}"
+# Projeto padrão: paperorchestra-mestrado. Pode confirmar com PROJECT_ID=paperorchestra-mestrado bash scripts/deploy-cloud-shell.sh
+PROJECT_ID="${PROJECT_ID:-paperorchestra-mestrado}"
 REGION="us-east4"
 # Por padrão, o worker usa Vertex AI via identidade Cloud Run (sem chaves persistentes).
 # Alternativa: AI_PROVIDER=gemini_api para usar chave Gemini via Secret Manager.
