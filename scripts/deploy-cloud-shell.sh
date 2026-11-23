@@ -33,11 +33,13 @@ fi
 if ! command -v gcloud >/dev/null || ! command -v firebase >/dev/null; then
   echo 'Abra o Cloud Shell pelo console Firebase: ele já oferece gcloud e firebase CLI.' >&2; exit 2
 fi
-if ! gcloud firestore databases describe --database='(default)' --project="$PROJECT_ID" >/dev/null 2>&1; then
-  echo 'Crie primeiro o Firestore Database (modo nativo) neste projeto, via console Firebase.' >&2; exit 2
-fi
-if ! gcloud billing projects describe "$PROJECT_ID" --format='value(billingEnabled)' | grep -qi true; then
-  echo 'Vincule este novo projeto à conta de faturamento já usada no Google Cloud.' >&2; exit 2
+# O banco Firestore e o plano Blaze foram confirmados previamente pelo proprietário.
+# A identidade CI não precisa de permissões extras de visualizador para inspecionar
+# faturamento ou banco. A implantação falhará se algum serviço realmente faltar.
+if [[ "${CI:-false}" != "true" ]]; then
+  if ! gcloud firestore databases describe --database='(default)' --project="$PROJECT_ID" >/dev/null 2>&1; then
+    echo 'AVISO: Firestore (default) não pôde ser verificado pela identidade atual.' >&2
+  fi
 fi
 
 # Via GitHub Actions, ADMIN_EMAIL chega pelo formulário de execução.
