@@ -97,3 +97,18 @@ bash scripts/deploy-cloud-shell.sh
 ```
 
 O script opera exclusivamente em `paperorchestra-mestrado`. Solicitará o e-mail Google autorizado. Ele cria recursos que podem gerar custos e usa Vertex AI por padrão. Não confirme mensagens ou compartilhe tokens se o terminal indicar outro projeto. Se houver falha de IAM/Cloud Build, não repita o script cegamente: verifique o erro e ajuste as permissões específicas antes de tentar novamente.
+
+## Instalação alternativa sem Cloud Shell (celular)
+
+O GitHub tem o workflow manual [Publicar PaperOrchestra (manual)](https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/actions/workflows/deploy-manual.yml). Ele **não** está pronto para execução até que o Google Cloud autorize a identidade GitHub.
+
+1. No projeto `paperorchestra-mestrado`, abra Google Cloud Console → IAM e administrador → Contas de serviço. Crie uma conta de serviço com ID `paper-orchestra-deployer`. **Não crie chave JSON.**
+2. No Google Cloud Console → IAM e administrador → Federação de identidade da carga de trabalho, crie o pool `github-actions` e o provedor OIDC `github`, com emissor `https://token.actions.githubusercontent.com`. Mapeie `google.subject=assertion.sub` e `attribute.repository=assertion.repository`. Restrinja por condição de atributo ao repositório exato `marceloloiro100cm-netizen/paper-orchestra-cloud` e branch `refs/heads/main`; não permita acesso genérico a todos os repositórios do GitHub.
+3. Conceda à identidade federada desse repositório a função **Workload Identity User** na conta de serviço `paper-orchestra-deployer`. Configure as permissões de implantação estritamente necessárias para criar/atualizar Cloud Run, Cloud Build, Artifact Registry, Storage e Firebase no próprio projeto, analisando separadamente operações iniciais de bootstrap que modificam políticas IAM. Não conceda Owner ao workflow de forma permanente.
+4. Só depois disso abra Actions → Publicar PaperOrchestra (manual) → Run workflow. Insira o e-mail Google autorizado e acompanhe o log. Esse workflow usa credenciais temporárias sem chaves JSON.
+5. O workflow atual é um **ponto de partida não homologado**. A primeira instalação ainda pode revelar ajustes em IAM, Cloud Build e credenciais ADC do Firebase CLI. Não execute repetidamente em caso de falha; avalie os logs e os custos primeiro.
+
+Documentação oficial: https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines
+
+### Cautela de segurança
+O registro de `public/config.js` contém somente a configuração pública do Web App Firebase; nunca adicione tokens privados, credenciais JSON, senhas ou chaves Gemini ao repositório. O uso do workflow no GitHub **não libera administração irrestrita** nem dispensa a conexão IAM inicial no Google Cloud.
