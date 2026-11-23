@@ -75,11 +75,41 @@ for name in paper-orchestra-api paper-orchestra-worker; do
     gcloud iam service-accounts create "$name" --display-name="$name" --project="$PROJECT_ID"
   fi
 done
+# IAM/Storage propagam contas de serviço de forma eventual: logo após criar uma
+# conta, o bucket pode responder "Service account ... does not exist".
+# Aguardar exclusivamente esse erro transitório, sem encobrir falhas de permissão.
+grant_bucket_access_with_retry() {
+  local sa="$1"
+  local attempt=1
+  local max_attempts=10
+  local output=""
+  local delay=5
+  while (( attempt <= max_attempts )); do
+    if output="$(gcloud storage buckets add-iam-policy-binding "gs://${BUCKET}" \
+      --member="serviceAccount:${sa}" --role="roles/storage.objectAdmin" \
+      --project="$PROJECT_ID" --quiet 2>&1)"; then
+      echo "Permissão de armazenamento aplicada: ${sa}"
+      return 0
+    fi
+    if [[ "$output" != *"does not exist"* && "$output" != *"not found"* ]]; then
+      echo "Falha não transitória ao autorizar ${sa}: $output" >&2
+      return 1
+    fi
+    if (( attempt == max_attempts )); then
+      echo "Conta ${sa} ainda não propagada após ${max_attempts} tentativas: $output" >&2
+      return 1
+    fi
+    echo "Aguardando propagação IAM de ${sa} (tentativa ${attempt}/${max_attempts}; ${delay}s)..."
+    sleep "$delay"
+    (( attempt += 1 ))
+    if (( delay < 30 )); then (( delay += 5 )); fi
+  done
+}
+
 for SA in "$API_SA" "$WORKER_SA"; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" \
     --role="roles/datastore.user" --quiet >/dev/null
-  gcloud storage buckets add-iam-policy-binding "gs://${BUCKET}" \
-    --member="serviceAccount:$SA" --role="roles/storage.objectAdmin" --quiet >/dev/null
+  grant_bucket_access_with_retry "$SA"
 done
 
 # O motor original aceita credenciais ADC do Vertex via VERTEX_AI_PROJECT/LOCATION.
