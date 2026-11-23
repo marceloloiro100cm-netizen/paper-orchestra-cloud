@@ -5,12 +5,14 @@ Nenhum manuscrito depende do disco efêmero da instância após a execução.
 import os
 import shutil
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 import tempfile
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
 from google.cloud import firestore, storage
+from agent_progress import current_stage, inspect_agents
 
 PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
 BUCKET = os.environ["RESEARCH_BUCKET"]
@@ -56,17 +58,37 @@ def main():
             "--output_dir", str(output),
             "--latex_template_dir", str(BASE / "templates" / data["template"]),
             "--writer_model_name", data["model"],
-            "--reflection_model_name", data["model"],
+            "--reflection_model_name", data.get("reflection_model") or data["model"],
             "--use_plotting", "true" if data["plotting"] else "false",
         ]
         if data["plotting"]:
             command += ["--plotting_model_name", data["model"], "--image_model_name", "gemini-3-pro-image-preview"]
-        update(stage="Escrevendo e revisando o artigo")
+        update(stage="Iniciando agentes", agents=inspect_agents(output, bool(data["plotting"])))
         logpath = root / "execution.log"
-        # Sem shell=True: nenhuma interpolação de texto do usuário é executada como comando.
+        # Executa o motor original sem alterar sua ordem de agentes. A cada
+        # intervalo, observa os artefatos reais produzidos no disco e atualiza
+        # somente as mudanças de etapa (não inventa porcentagens de progresso).
         try:
             with open(logpath, "w", encoding="utf-8") as log:
-                process = subprocess.run(command, cwd=str(BASE), stdout=log, stderr=subprocess.STDOUT, timeout=10400, check=False)
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(
+                        subprocess.run, command, cwd=str(BASE), stdout=log,
+                        stderr=subprocess.STDOUT, timeout=10400, check=False
+                    )
+                    last_agents = None
+                    while True:
+                        agents = inspect_agents(output, bool(data["plotting"]))
+                        if agents != last_agents:
+                            update(agents=agents, stage=current_stage(agents))
+                            last_agents = agents
+                        try:
+                            process = future.result(timeout=12)
+                            break
+                        except FutureTimeout:
+                            continue
+                    final_agents = inspect_agents(output, bool(data["plotting"]))
+                    if final_agents != last_agents:
+                        update(agents=final_agents, stage=current_stage(final_agents))
         finally:
             # Preserva o registro mesmo que o motor falhe ou exceda o timeout.
             if logpath.exists():
@@ -92,7 +114,7 @@ def main():
             zipfile = shutil.make_archive(str(root / "latex_source"), "zip", str(assembled))
             put(Path(zipfile), "latex_source.zip", "application/zip")
             files.append("latex")
-        update(status="completed", stage="Concluído", finished_at=now(), files=files)
+        update(status="completed", stage="Concluído", agents=inspect_agents(output, bool(data["plotting"])), finished_at=now(), files=files)
 
 
 if __name__ == "__main__":
