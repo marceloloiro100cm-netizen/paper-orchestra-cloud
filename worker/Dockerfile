@@ -27,5 +27,6 @@ RUN kpsewhich abntex2.cls && kpsewhich abntex2cite.sty && \
     done
 
 COPY source_materials.py /app/source_materials.py
+COPY neon_review.py /app/neon_review.py
 COPY runner.py /app/runner.py
 CMD ["python", "/app/runner.py"]
