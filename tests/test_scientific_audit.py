@@ -11,7 +11,7 @@ class ScientificAuditTests(unittest.TestCase):
     def test_flags_unproven_percentage_and_verification(self):
         report = audit_text(
             "O Verification Oracle alcançou 100% de integridade. A taxa de erro foi 12%.",
-            r"Resultados com referência \\citep{a2026} e \\cite{missing}.",
+            r"Resultados com referência \citep{a2026} e \cite{missing}.",
             "@article{a2026, title={Estudo}}",
             "Nenhum experimento científico foi realizado.",
         )
@@ -28,7 +28,7 @@ class ScientificAuditTests(unittest.TestCase):
     def test_reference_keys_matching_not_truth_verification(self):
         report = audit_text(
             "Texto teórico sem percentuais.",
-            r"Veja \\citet{doe2024}.",
+            r"Veja \citet{doe2024}.",
             "@article{doe2024, title={Título}}",
             "Revisão teórica sem dados quantitativos.",
         )
