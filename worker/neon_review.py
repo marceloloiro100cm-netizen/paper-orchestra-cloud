@@ -72,7 +72,8 @@ def generate_review(pdf_path: Path, idea_path: Path, log_path: Path) -> dict:
         raise RuntimeError("Projeto não autorizado para o Neon")
 
     with fitz.open(str(pdf_path)) as pdf:
-        pages = min(len(pdf), 35)
+        total_pages = len(pdf)
+        pages = min(total_pages, 35)
         paper = "\n\n".join(pdf[i].get_text("text") for i in range(pages))
     prompt = build_review_prompt(
         paper,
@@ -98,7 +99,7 @@ def generate_review(pdf_path: Path, idea_path: Path, log_path: Path) -> dict:
                 "saida": getattr(usage, "candidates_token_count", None),
                 "raciocinio": getattr(usage, "thoughts_token_count", None),
             }
-        report["manuscrito_truncado"] = (len(paper) > MAX_PAPER_CHARS or len(pdf) > 35)
+        report["manuscrito_truncado"] = (len(paper) > MAX_PAPER_CHARS or total_pages > 35)
         return report
     finally:
         client.close()
