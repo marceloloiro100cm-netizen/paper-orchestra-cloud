@@ -39,3 +39,10 @@
 4. Opcionalmente solicitar chaves de API dedicadas e configurá-las no Secret Manager para reduzir rate limiting.
 
 **Dados anteriores preservados:** o deploy apenas atualiza imagens, frontend e versão de código; não altera ou apaga pesquisas armazenadas.
+
+
+## Referência institucional brasileira identificada (opcional)
+
+O Sistema de Bibliotecas do **IFRS** mantém o [Manual para elaboração de trabalhos acadêmicos, 2ª edição revisada (2024)](https://ifrs.edu.br/ensino/bibliotecas/servicos/), divulgado para a comunidade acadêmica de diferentes campi e níveis de formação. Também existem templates de dissertação de programas específicos. **Não foi confirmada nesta configuração qual é a instituição/programa atual do usuário**; por isso nenhum preset IFRS é marcado como conforme ou ativado automaticamente.
+
+A verificação de conformidade deve comparar o template com as normas vigentes e com a edição aplicável do manual institucional. Alterações posteriores nas normas bibliográficas, particularmente NBR 6023:2025, podem demandar ajustes além do manual de 2024.
