@@ -13,14 +13,14 @@
 
 A conta de faturamento Google Cloud que você já usa pode pagar **outro projeto Firebase**, separado do Cormyr. Isso NÃO significa uso ilimitado gratuito: consumo do Gemini, Cloud Run Jobs, Storage, Build e demais APIs pode ser cobrado.
 
-> **Status (23/11/2026):** código publicado, plano Blaze confirmado, ID Firebase `paperorchestra-mestrado` identificado e `.firebaserc` configurado. A implantação real ainda depende de registrar o aplicativo Web, habilitar Firestore/Authentication e executar o deploy. Nenhum serviço em produção foi validado. Esta versão ainda não passou por testes integrados em produção. O PaperOrchestra original não é um produto Google oficialmente suportado.
+> **Status (23/11/2026):** código publicado, plano Blaze confirmado, ID Firebase `paperorchestra-mestrado` identificado, aplicativo Web registrado e configuração pública `public/config.js` publicada no GitHub. A implantação real ainda depende de habilitar Firestore/Authentication e executar o deploy. Nenhum serviço em produção foi validado. Esta versão ainda não passou por testes integrados em produção. O PaperOrchestra original não é um produto Google oficialmente suportado.
 
 ## Como colocar no ar — primeira implantação
 
 1. O repositório GitHub público destinado ao código é `marceloloiro100cm-netizen/paper-orchestra-cloud`. O projeto é independente do Cormyr.
 2. Em [Firebase Console](https://console.firebase.google.com/), selecione o projeto **PaperOrchestra Mestrado** recém-criado. O **ID do projeto** já foi confirmado: `paperorchestra-mestrado`. O plano **Blaze** já foi confirmado. Mantenha o projeto independente de `cormyr`. Não altere o projeto `cormyr`.
 3. Ative Firestore (database padrão, modo nativo), Firebase Authentication > Google, e registre um **Web App** nas configurações do projeto.
-4. Copie `public/config.js.example` para `public/config.js`, preenchendo `apiKey`, `authDomain`, `projectId` e `appId` da configuração **pública do Web App Firebase**. Estes dados não são a chave Gemini e podem estar no repositório (mas o exemplo ignora o arquivo por padrão).
+4. O aplicativo Web Firebase já foi registrado, e `public/config.js` já foi versionado com os valores públicos de configuração. **Não insira chaves do Gemini, credenciais IAM ou tokens privados nesse arquivo.**
 5. Entre no [Google Cloud Shell](https://shell.cloud.google.com/) com o novo projeto e clone o novo repositório: `git clone https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud.git && cd paper-orchestra-cloud`.
 6. Crie `public/config.js` no Cloud Shell (ex.: `nano public/config.js`) com o conteúdo configurado, e rode:
 
@@ -80,4 +80,4 @@ O motor original aceita `VERTEX_AI_PROJECT` e `VERTEX_AI_LOCATION`. Nesta instal
 
 ## Próxima configuração manual no Firebase
 
-No projeto `paperorchestra-mestrado`, na tela **Configurações do projeto → Geral → Seus aplicativos**, clique no ícone **Web (`</>`)**, cadastre o apelido `PaperOrchestra Web` e copie os valores `apiKey` e `appId` do objeto de configuração (`firebaseConfig`). Depois habilite **Authentication → Google** e **Firestore Database (modo nativo)**. `apiKey` do Web App é configuração pública do Firebase e NÃO é uma chave Gemini; não divulgue chaves Gemini, tokens de conta de serviço ou arquivos JSON privados.
+O aplicativo Web `PaperOrchestra Web` já foi registrado; as configurações públicas estão em `public/config.js`. Agora habilite **Authentication → Google** (e-mail de suporte definido) e crie o **Firestore Database padrão `(default)` em modo nativo/Standard**, preferencialmente na região `us-east4` para ficar perto dos serviços. Escolha regras iniciais de produção; nosso `firestore.rules` nega acesso direto do navegador. Depois será necessário executar o deploy a partir do Cloud Shell. `apiKey` do Web App é configuração pública do Firebase e NÃO é uma chave Gemini; não divulgue chaves Gemini, tokens de conta de serviço ou arquivos JSON privados.
