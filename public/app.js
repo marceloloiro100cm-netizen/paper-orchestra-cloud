@@ -12,6 +12,9 @@ const auth = getAuth(initializeApp(config));
 const provider = new GoogleAuthProvider();
 let user = null;
 let refreshInterval = null;
+let libraryItems = [];
+let selectedSourceIds = new Set();
+
 
 async function request(path, options = {}) {
   if (!user) throw new Error('Não autenticado');
@@ -39,6 +42,112 @@ $('login').addEventListener('click', async () => {
 });
 getRedirectResult(auth).catch(e => { $('auth-status').textContent = e.message; });
 $('logout').addEventListener('click', () => signOut(auth));
+
+
+function libraryMessage(text) { $('library-message').textContent = text; }
+
+function updateSelectedCount() {
+  $('selected-count').textContent = selectedSourceIds.size + ' fonte(s) selecionada(s) para a próxima pesquisa (máximo de 8).';
+}
+
+function displayLibrary() {
+  const target = $('library-list');
+  target.replaceChildren();
+  const filter = $('library-filter').value.trim().toLowerCase();
+  const items = libraryItems.filter((i) =>
+    [i.name, i.collection, i.description].some((v) => String(v || '').toLowerCase().includes(filter))
+  );
+  if (!items.length) {target.textContent='Nenhum documento encontrado. Adicione PDFs, DOCX ou bibliografias para começar.';return;}
+  for (const item of items) {
+    const line = document.createElement('div'); line.className = 'library-item';
+    const body = document.createElement('div');
+    const label = document.createElement('label');
+    const check = document.createElement('input'); check.type='checkbox';
+    check.checked = selectedSourceIds.has(item.id);
+    check.setAttribute('aria-label','Usar fonte ' + item.name + ' na próxima pesquisa');
+    check.addEventListener('change', () => {
+      if (check.checked && selectedSourceIds.size >= 8) {
+        check.checked=false;libraryMessage('Máximo de 8 fontes por pesquisa.');return;
+      }
+      if(check.checked) selectedSourceIds.add(item.id);
+      else selectedSourceIds.delete(item.id);
+      libraryMessage('');updateSelectedCount();
+    });
+    const name = document.createElement('span'); name.textContent = item.name;
+    label.append(check, name);body.append(label);
+    const meta = document.createElement('div');meta.className='library-meta';
+    meta.textContent = (item.collection||'Geral') + ' · ' + String(item.format||'').toUpperCase() +
+      ' · ' + (item.size / 1024).toFixed(0) + ' KB';
+    body.append(meta);
+    if (item.description) {
+      const desc = document.createElement('p');desc.className='library-note';
+      desc.textContent=item.description;body.append(desc);
+    }
+    const actions = document.createElement('div');actions.className='library-actions';
+    const down = document.createElement('button');down.type='button';down.textContent='Baixar original';
+    down.addEventListener('click', async()=>{
+      try{
+        const r=await request('/library/items/'+item.id+'/download');
+        const blob=await r.blob();
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');a.href=url;a.download=item.name;
+        document.body.append(a);a.click();a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),5000);
+      }catch(e){libraryMessage(e.message)}
+    });
+    const archive = document.createElement('button');archive.type='button';archive.textContent='Arquivar';
+    archive.addEventListener('click',async()=>{
+      archive.disabled=true;
+      try{await request('/library/items/'+item.id+'/archive',{method:'POST'});
+        selectedSourceIds.delete(item.id);await loadLibrary();
+      }catch(e){libraryMessage(e.message);archive.disabled=false}
+    });
+    actions.append(down,archive);body.append(actions);line.append(body);target.append(line);
+  }
+}
+
+async function loadLibrary() {
+  if(!user)return;
+  try{
+    const r=await request('/library/items');
+    const data=await r.json();
+    libraryItems=data.items||[];
+    const activeIds=new Set(libraryItems.map(i=>i.id));
+    selectedSourceIds=new Set([...selectedSourceIds].filter(id=>activeIds.has(id)));
+    updateSelectedCount();displayLibrary();
+  }catch(e){$('library-list').textContent='Não foi possível consultar a biblioteca: '+e.message;}
+}
+
+$('refresh-library').addEventListener('click',loadLibrary);
+$('library-filter').addEventListener('input',displayLibrary);
+$('upload-library').addEventListener('click',async()=>{
+  const file=$('library-file').files[0];
+  if(!file){libraryMessage('Escolha um arquivo PDF, DOCX, BIB, RIS ou TXT.');return}
+  const max=/\.(pdf|docx)$/i.test(file.name)?8*1024*1024:2*1024*1024;
+  if(file.size>max){libraryMessage('Arquivo acima do limite permitido.');return}
+  const btn=$('upload-library');btn.disabled=true;libraryMessage('Enviando arquivo…');
+  try{
+    const token=await user.getIdToken();
+    const params=new URLSearchParams({
+      filename:file.name,
+      collection:$('library-collection').value||'Geral',
+      description:$('library-description').value||''
+    });
+    const res=await fetch('/api/library/items?'+params,{
+      method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/octet-stream'},
+      body:file
+    });
+    if(!res.ok){
+      let message='Erro HTTP '+res.status;
+      try{const j=await res.json();message=typeof j.detail==='string'?j.detail:message}catch(_){}
+      throw new Error(message)
+    }
+    $('library-file').value='';$('library-description').value='';
+    libraryMessage('Documento guardado na biblioteca.');
+    await loadLibrary();
+  }catch(e){libraryMessage('Falha no envio: '+e.message)}
+  finally{btn.disabled=false;}
+});
 
 async function download(id, kind) {
   try {
@@ -265,11 +374,12 @@ $('new-paper').addEventListener('submit', async (event) => {
       model:$('model').value,
       reflection_model:$('reflection-model').value || null,
       language:$('language').value,
+      source_ids:[...selectedSourceIds],
       plotting:$('plotting').checked
     };
     await request('/jobs', {method:'POST',body:JSON.stringify(payload)});
     $('submit-status').textContent='Pesquisa enviada. Você pode fechar o navegador.';
-    $('new-paper').reset(); await loadJobs();
+    $('new-paper').reset();selectedSourceIds.clear();updateSelectedCount();displayLibrary();await loadJobs();
   } catch (e) { $('submit-status').textContent=e.message; }
   finally {button.disabled=false;}
 });
@@ -281,5 +391,6 @@ onAuthStateChanged(auth, async (current) => {
   $('logout').classList.toggle('hidden', !user);
   $('identity').textContent=user?.email || '';
   if (refreshInterval) clearInterval(refreshInterval);
-  if (user) { await loadJobs(); refreshInterval=setInterval(loadJobs, 12000); }
+  if (user) { await Promise.all([loadJobs(),loadLibrary()]); refreshInterval=setInterval(loadJobs, 12000); }
+  else { libraryItems=[];selectedSourceIds.clear();updateSelectedCount(); }
 });
