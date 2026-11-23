@@ -3,7 +3,7 @@ ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git ca-certificates gcc g++ libgl1 libglib2.0-0 \
     texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-bibtex-extra texlive-fonts-recommended \
-    texlive-publishers texlive-lang-portuguese \
+    texlive-publishers texlive-lang-portuguese lmodern \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 # Revisão auditada do projeto original. Atualizar somente após testes.
