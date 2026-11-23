@@ -13,7 +13,7 @@
 
 A conta de faturamento Google Cloud que você já usa pode pagar **outro projeto Firebase**, separado do Cormyr. Isso NÃO significa uso ilimitado gratuito: consumo do Gemini, Cloud Run Jobs, Storage, Build e demais APIs pode ser cobrado.
 
-> **Status (23/11/2026):** código publicado, plano Blaze confirmado, ID Firebase `paperorchestra-mestrado` identificado, aplicativo Web registrado e configuração pública `public/config.js` publicada no GitHub. A implantação real ainda depende de habilitar Firestore/Authentication e executar o deploy. Nenhum serviço em produção foi validado. Esta versão ainda não passou por testes integrados em produção. O PaperOrchestra original não é um produto Google oficialmente suportado.
+> **Status (23/11/2026):** código publicado, plano Blaze confirmado, ID Firebase `paperorchestra-mestrado` identificado, aplicativo Web registrado e configuração pública `public/config.js` publicada no GitHub. A autenticação Google e o Firestore `(default)` na região `southamerica-east1` foram confirmados em capturas. A implantação real ainda depende de executar o script no Cloud Shell; nenhum serviço Cloud Run/Hosting em produção foi validado. Esta versão ainda não passou por testes integrados em produção. O PaperOrchestra original não é um produto Google oficialmente suportado.
 
 ## Como colocar no ar — primeira implantação
 
@@ -85,3 +85,15 @@ O aplicativo Web `PaperOrchestra Web` já foi registrado; as configurações pú
 ## Região de armazenamento e processamento
 
 O Firestore `(default)` foi planejado para `southamerica-east1` (São Paulo), região escolhida pelo usuário no console; a criação do banco ainda precisa ser confirmada. O Cloud Run (API e Jobs), o Artifact Registry e o bucket de pesquisa estão configurados na mesma região. A localização de inferência Vertex AI permanece `global`, por compatibilidade com modelos Gemini preview, de modo que as chamadas ao modelo não devem ser tratadas como uma garantia de processamento exclusivamente no Brasil. Os valores podem diferir dos preços dos serviços nos Estados Unidos.
+
+## Implantação após Firestore criado
+
+No Firebase Console, abra o Cloud Shell integrado (ícone terminal `>_`). Execute, na mesma sessão autenticada:
+
+```bash
+git clone https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud.git
+cd paper-orchestra-cloud
+bash scripts/deploy-cloud-shell.sh
+```
+
+O script opera exclusivamente em `paperorchestra-mestrado`. Solicitará o e-mail Google autorizado. Ele cria recursos que podem gerar custos e usa Vertex AI por padrão. Não confirme mensagens ou compartilhe tokens se o terminal indicar outro projeto. Se houver falha de IAM/Cloud Build, não repita o script cegamente: verifique o erro e ajuste as permissões específicas antes de tentar novamente.
