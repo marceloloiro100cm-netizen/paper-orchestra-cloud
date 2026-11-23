@@ -8,17 +8,17 @@
 - **Cloud Run Jobs (worker):** motor original PaperOrchestra em Python 3.11 com LaTeX, executado como tarefa independente do navegador, com timeout de até 180 minutos.
 - **Cloud Firestore:** histórico/status das pesquisas.
 - **Cloud Storage:** ideias, registros experimentais, PDFs, fontes LaTeX e logs persistentes.
-- **Secret Manager:** chave Gemini nunca entra no GitHub nem no navegador.
+- **Vertex AI:** acesso Gemini via conta de serviço sem chave estática (padrão). **Secret Manager:** alternativa protegida para chave Gemini.
 - **GitHub público:** somente código. Manuscritos, dados e credenciais nunca são commitados.
 
 A conta de faturamento Google Cloud que você já usa pode pagar **outro projeto Firebase**, separado do Cormyr. Isso NÃO significa uso ilimitado gratuito: consumo do Gemini, Cloud Run Jobs, Storage, Build e demais APIs pode ser cobrado.
 
-> **Status:** código preparado para o repositório criado; o deploy real depende de identificar o ID do novo projeto Firebase, vinculá-lo ao plano Blaze e configurar credenciais. Esta versão ainda não passou por testes integrados em produção. O PaperOrchestra original não é um produto Google oficialmente suportado.
+> **Status:** código publicado no GitHub e plano Blaze confirmado por captura em 23/11/2026. O deploy real ainda depende do ID do projeto, do aplicativo Web Firebase e da configuração de Firestore/Authentication. Nenhum serviço de produção foi implantado. Esta versão ainda não passou por testes integrados em produção. O PaperOrchestra original não é um produto Google oficialmente suportado.
 
 ## Como colocar no ar — primeira implantação
 
 1. O repositório GitHub público destinado ao código é `marceloloiro100cm-netizen/paper-orchestra-cloud`. O projeto é independente do Cormyr.
-2. Em [Firebase Console](https://console.firebase.google.com/), selecione o projeto **PaperOrchestra Mestrado** recém-criado. Copie o **ID do projeto**, que é diferente do nome exibido. O screenshot mostra o plano **Spark**; antes de usar Cloud Run, faça **Fazer upgrade → Blaze**, escolhendo a mesma conta Cloud Billing já usada. Não altere o projeto `cormyr`.
+2. Em [Firebase Console](https://console.firebase.google.com/), selecione o projeto **PaperOrchestra Mestrado** recém-criado. Copie o **ID do projeto**, que é diferente do nome exibido. O plano **Blaze** já foi confirmado. Mantenha o projeto independente de `cormyr`. Não altere o projeto `cormyr`.
 3. Ative Firestore (database padrão, modo nativo), Firebase Authentication > Google, e registre um **Web App** nas configurações do projeto.
 4. Copie `public/config.js.example` para `public/config.js`, preenchendo `apiKey`, `authDomain`, `projectId` e `appId` da configuração **pública do Web App Firebase**. Estes dados não são a chave Gemini e podem estar no repositório (mas o exemplo ignora o arquivo por padrão).
 5. Entre no [Google Cloud Shell](https://shell.cloud.google.com/) com o novo projeto e clone o novo repositório: `git clone https://github.com/SEU_USUARIO/paper-orchestra-cloud.git && cd paper-orchestra-cloud`.
@@ -28,7 +28,7 @@ A conta de faturamento Google Cloud que você já usa pode pagar **outro projeto
    PROJECT_ID=SEU_NOVO_PROJETO bash scripts/deploy-cloud-shell.sh
    ```
 
-   O script solicita seu email Google autorizado e a chave Gemini **sem mostrá-la na tela**, cria os recursos de Cloud Run/Storage/Secret Manager, constrói duas imagens e publica o Hosting. Para usar a API Gemini, obtenha uma chave no [Google AI Studio](https://aistudio.google.com/apikey). Não cole sua chave em chats nem em arquivos do Git.
+   Por padrão, o script solicita seu email autorizado e usa **Vertex AI com a identidade da conta de serviço do Cloud Run Job**, sem precisar de chave Gemini. Esse caminho depende da disponibilidade e cotas do modelo no novo projeto. Como alternativa, defina `AI_PROVIDER=gemini_api` junto de `PROJECT_ID`; nesse caso o script solicitará uma chave Gemini sem mostrá-la e a gravará no Secret Manager. Nunca cole chaves em chats nem no GitHub.
 
 7. Abra `https://SEU_NOVO_PROJETO.web.app` no Android ou PC. Se necessário, autorize esse domínio na tela Authentication > Settings > Authorized domains.
 8. Faça um primeiro teste com materiais reais, modelo Flash e sem gráficos. Baixe o PDF e confira os logs, referências e resultados.
@@ -73,3 +73,7 @@ firestore.rules       # nega acesso client-side direto
 - Cloud Run Jobs: https://docs.cloud.google.com/run/docs/create-jobs
 - Firebase / contas de faturamento: https://firebase.google.com/docs/projects/billing/firebase-pricing-plans
 - GitHub Actions em repositórios públicos: https://docs.github.com/en/billing/concepts/product-billing/github-actions
+
+## Disponibilidade dos modelos
+
+O motor original aceita `VERTEX_AI_PROJECT` e `VERTEX_AI_LOCATION`. Nesta instalação, os jobs executam em `us-east4`, mas as requisições aos modelos Gemini preview usam o endpoint `global`. Alguns modelos podem exigir cota ou acesso específico; os IDs preview podem ser aposentados durante os dois anos do mestrado, exigindo atualização e reteste. O plano Blaze permite cobrança por uso, mas não garante automaticamente acesso a todos os modelos.
