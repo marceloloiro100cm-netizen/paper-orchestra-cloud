@@ -55,6 +55,41 @@ function statusLabel(value) {
   return ({queued:'Na fila',running:'Em execução',completed:'Concluído',failed:'Falhou'})[value] || value;
 }
 
+const AGENT_LABELS = {
+  outline: 'Planejamento', literature: 'Revisão bibliográfica',
+  plotting: 'Gráficos e diagramas', writing: 'Redação',
+  refinement: 'Revisão e refinamento'
+};
+const AGENT_STATES = {
+  waiting: 'Aguardando', running: 'Executando',
+  completed: 'Etapa concluída', disabled: 'Desativado', failed: 'Falhou'
+};
+
+function agentPanel(states) {
+  if (!states || typeof states !== 'object') return null; // trabalhos legados
+  const detail = document.createElement('details');
+  detail.className = 'agent-detail';
+  const summary = document.createElement('summary');
+  summary.textContent = 'Acompanhar agentes';
+  detail.append(summary);
+  const help = document.createElement('small');
+  help.textContent = 'Etapas detectadas pelos arquivos gerados, não são validação científica.';
+  detail.append(help);
+  for (const [key, title] of Object.entries(AGENT_LABELS)) {
+    const state = states[key] || 'waiting';
+    const line = document.createElement('div');
+    line.className = 'agent-row';
+    const name = document.createElement('span');
+    name.textContent = title;
+    const value = document.createElement('span');
+    value.className = 'agent-state agent-' + (AGENT_STATES[state] ? state : 'waiting');
+    value.textContent = AGENT_STATES[state] || state;
+    line.append(name, value);
+    detail.append(line);
+  }
+  return detail;
+}
+
 async function loadJobs() {
   if (!user) return;
   const area = $('research-list');
@@ -70,6 +105,14 @@ async function loadJobs() {
       const date = document.createElement('small');
       date.textContent = `Criada em ${new Date(entry.created_at).toLocaleString('pt-BR')} • ${entry.stage || 'Aguardando'}`;
       info.append(date);
+      const agents = agentPanel(entry.agents);
+      if (agents) info.append(agents);
+      if (entry.status === 'completed') {
+        const warning = document.createElement('small');
+        warning.className = 'scientific-warning';
+        warning.textContent = 'PDF gerado: números, resultados, referências e alegações de validação precisam de conferência humana.';
+        info.append(warning);
+      }
       if (entry.error) {const err=document.createElement('small'); err.textContent=entry.error; info.append(err);}
       if (entry.status === 'completed' || entry.status === 'failed') {
         const files = document.createElement('div'); files.className='downloads';
@@ -96,7 +139,9 @@ $('new-paper').addEventListener('submit', async (event) => {
     const payload = {
       title:$('title').value, idea:$('idea').value,
       experimental_log:$('log').value, template:$('template').value,
-      model:$('model').value, plotting:$('plotting').checked
+      model:$('model').value,
+      reflection_model:$('reflection-model').value || null,
+      plotting:$('plotting').checked
     };
     await request('/jobs', {method:'POST',body:JSON.stringify(payload)});
     $('submit-status').textContent='Pesquisa enviada. Você pode fechar o navegador.';
