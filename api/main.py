@@ -7,6 +7,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from typing import Annotated, Literal
+from library import make_library_router, MAX_SELECTED_SOURCES
 
 import firebase_admin
 from firebase_admin import auth
@@ -43,6 +44,7 @@ class NewResearch(BaseModel):
     plotting: bool = False
     # Idioma do manuscrito solicitado, sem alterar o template LaTeX.
     language: Literal["en", "pt-BR"] = "en"
+    source_ids: list[str] = Field(default_factory=list, max_length=MAX_SELECTED_SOURCES)
 
     @field_validator("idea", "experimental_log")
     @classmethod
@@ -66,6 +68,9 @@ def current_user(authorization: Annotated[str | None, Header()] = None):
 
 
 User = Annotated[dict, Depends(current_user)]
+
+# Biblioteca própria privada, separada das pesquisas já concluídas.
+app.include_router(make_library_router(db, bucket, current_user))
 
 
 def get_research(job_id: str, user: dict) -> dict:
@@ -96,6 +101,7 @@ def serializable(record: dict) -> dict:
         "created_at": record.get("created_at", ""),
         "finished_at": record.get("finished_at", ""),
         "files": record.get("files", []),
+        "sources": [{k: entry.get(k) for k in ("id", "name", "format", "sha256")} for entry in record.get("sources", [])],
     }
 
 
@@ -121,6 +127,25 @@ def create_research(payload: NewResearch, user: User):
     for s in docs:
         if s.to_dict().get("status") in ("queued", "running"):
             raise HTTPException(status_code=409, detail="Há uma pesquisa em execução. Finalize-a antes de iniciar outra.")
+    # Validar propriedade antes de iniciar tarefas caras ou armazenar a solicitação.
+    source_ids = list(dict.fromkeys(payload.source_ids))
+    if len(source_ids) > MAX_SELECTED_SOURCES:
+        raise HTTPException(status_code=422, detail="Máximo de 8 fontes por pesquisa.")
+    sources = []
+    for item_id in source_ids:
+        if not re.fullmatch(r"[0-9a-f]{32}", item_id):
+            raise HTTPException(status_code=422, detail="Identificador de fonte inválido.")
+        snap = db.collection("library_items").document(item_id).get()
+        if not snap.exists:
+            raise HTTPException(status_code=404, detail="Fonte não encontrada.")
+        record = snap.to_dict()
+        if record.get("owner_uid") != owner_uid or record.get("status") != "active":
+            raise HTTPException(status_code=404, detail="Fonte indisponível para esta conta.")
+        if not str(record.get("object_path", "")).startswith(f"library/{owner_uid}/{item_id}/"):
+            raise HTTPException(status_code=422, detail="Caminho da fonte inválido.")
+        sources.append({k: record.get(k) for k in (
+            "id", "name", "format", "sha256", "size", "object_path"
+        )})
     job_id = uuid.uuid4().hex
     prefix = f"research/{owner_uid}/{job_id}"
     ref = db.collection("research_jobs").document(job_id)
@@ -132,6 +157,7 @@ def create_research(payload: NewResearch, user: User):
         "reflection_model": payload.reflection_model or payload.model,
         "plotting": payload.plotting,
         "language": payload.language,
+        "sources": sources,
         "audit_status": "pending",
         "reference_status": "pending",
         # Etapas efetivas serão atualizadas pelo worker por evidências no disco.

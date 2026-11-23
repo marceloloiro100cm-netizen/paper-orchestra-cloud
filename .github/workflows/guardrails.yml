@@ -1,0 +1,56 @@
+name: Proteção inicial e redução de acessos
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/guardrails.yml
+      - scripts/configure-guardrails.sh
+      - scripts/configure-budget.sh
+      - scripts/reduce-deployer-iam.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: paper-orchestra-deploy-production
+  cancel-in-progress: false
+
+jobs:
+  proteger:
+    name: Backups, alerta financeiro e redução de privilégios
+    if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+      - name: Autenticar no Google Cloud (OIDC, sem chave privada)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/201655574048/locations/global/workloadIdentityPools/github-actions/providers/github-actions
+          service_account: paper-orchestra-deployer@paperorchestra-mestrado.iam.gserviceaccount.com
+          project_id: paperorchestra-mestrado
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Preparar Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: paperorchestra-mestrado
+      - name: Criar e verificar backups reais
+        shell: bash
+        run: bash scripts/configure-guardrails.sh
+      - name: Tentar configurar orçamento de alerta mensal
+        shell: bash
+        run: bash scripts/configure-budget.sh
+      - name: Remover privilégios amplos e preservar deploy normal
+        shell: bash
+        run: bash scripts/reduce-deployer-iam.sh
+      - name: Resumo de segurança
+        run: |
+          echo 'Backups Firestore e bucket secundário: verificados.'
+          echo 'IAM temporário: removido após a confirmação de backups.'
+          echo 'Alertas de orçamento: conferir log da etapa de faturamento; falta de acesso é sinalizada.'
+          echo 'O orçamento não limita automaticamente as cobranças.'
