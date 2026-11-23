@@ -1,5 +1,6 @@
 // Configuração pública do Firebase Web App PaperOrchestra Mestrado.
 // Identificadores de app Firebase, NÃO credenciais privadas de Gemini.
+// Chave pública conferida com a configuração original do Firebase Console.
 window.PAPER_FIREBASE_CONFIG = {
   apiKey: "AIzaSyCNomTU84025QboyDwmnCL0P4_seDJT1E0",
   authDomain: "paperorchestra-mestrado.firebaseapp.com",
