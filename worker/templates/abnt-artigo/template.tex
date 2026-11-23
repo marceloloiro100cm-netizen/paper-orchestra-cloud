@@ -1,0 +1,59 @@
+% RASCUNHO EXPERIMENTAL DE ARTIGO - ABNT. Requer validação da instituição.
+% Base: classe abntex2, não representa certificação das normas mais recentes.
+\documentclass[article,12pt,oneside,a4paper,brazil]{abntex2}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{lmodern}
+\usepackage{graphicx,amsmath,amssymb,booktabs}
+\usepackage{hyperref,url}
+\usepackage[alf]{abntex2cite}
+% Compatibilidade com comandos de citação do motor PaperOrchestra.
+\providecommand{\citep}[1]{\cite{#1}}
+\providecommand{\citet}[1]{\citeonline{#1}}
+\providecommand{\citealp}[1]{\cite{#1}}
+\providecommand{\citealt}[1]{\citeonline{#1}}
+\providecommand{\citeauthor}[1]{\citeonline{#1}}
+\providecommand{\citeyear}[1]{\cite{#1}}
+\titulo{Título provisório do artigo científico}
+\autor{Autor(a) — preencher antes da publicação}
+\local{Brasil}
+\data{\the\year}
+\begin{document}
+\selectlanguage{brazil}
+\maketitle
+\begin{resumo}
+%%%%%%%%% RESUMO %%%%%%%%%
+Esta é uma estrutura preliminar. O resumo deve descrever o objetivo,
+o método e as conclusões sustentadas pelos dados. Não inventar resultados.
+%%%%%%%%% RESUMO %%%%%%%%%
+\end{resumo}
+\textual
+\section{Introdução}
+\label{sec:intro}
+%%%%%%%%% INTRODUÇÃO %%%%%%%%%
+Apresente o problema e a justificativa.
+%%%%%%%%% INTRODUÇÃO %%%%%%%%%
+\section{Referencial teórico}
+\label{sec:related_work}
+%%%%%%%%% REVISÃO %%%%%%%%%
+Discuta a literatura com referências verificadas.
+%%%%%%%%% REVISÃO %%%%%%%%%
+\section{Metodologia}
+\label{sec:method}
+%%%%%%%%% MÉTODO %%%%%%%%%
+Descreva o método realmente utilizado.
+%%%%%%%%% MÉTODO %%%%%%%%%
+\section{Resultados e discussão}
+\label{sec:experiments}
+%%%%%%%%% RESULTADOS %%%%%%%%%
+Se não há dados, declare explicitamente que não houve experimentos.
+%%%%%%%%% RESULTADOS %%%%%%%%%
+\section{Considerações finais}
+\label{sec:conclusion}
+%%%%%%%%% CONCLUSÃO %%%%%%%%%
+Indique conclusões sustentadas pelos materiais.
+%%%%%%%%% CONCLUSÃO %%%%%%%%%
+\postextual
+\bibliography{references}
+\end{document}
