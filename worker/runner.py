@@ -16,6 +16,7 @@ from google.cloud import firestore, storage
 from agent_progress import current_stage, inspect_agents
 from scientific_audit import audit_pdf
 from reference_verification import verify_bibliography
+from source_materials import compose_library_context
 
 PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
 BUCKET = os.environ["RESEARCH_BUCKET"]
@@ -55,6 +56,35 @@ def main():
         raw.mkdir(); output.mkdir()
         for filename in ("idea_sparse.md", "experimental_log.md"):
             bucket.blob(f"{prefix}/input/{filename}").download_to_filename(str(raw / filename))
+        # Fontes próprias anexadas são extraídas como contexto limitado e não confiável.
+        # Não apagamos nem alteramos os originais da biblioteca.
+        if data.get("sources"):
+            sources = data["sources"][:8]
+            safe_sources = [
+                x for x in sources
+                if str(x.get("object_path", "")).startswith(
+                    f"library/{OWNER_UID}/{x.get('id', '')}/"
+                )
+            ]
+            if len(safe_sources) != len(sources):
+                raise ValueError("Referência inválida na biblioteca desta conta")
+            context, manifest = compose_library_context(
+                safe_sources,
+                lambda object_path: bucket.blob(object_path).download_as_bytes(),
+            )
+            if context:
+                with (raw / "idea_sparse.md").open("a", encoding="utf-8") as source_file:
+                    source_file.write(context)
+            manifest_path = root / "source_manifest.json"
+            manifest_path.write_text(
+                json.dumps(manifest, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            put(manifest_path, "source_manifest.json", "application/json")
+            update(source_summary={
+                "selected": len(safe_sources),
+                "included": sum(m["status"] == "included" for m in manifest),
+            })
         # Preferência aplicada somente aos dados temporários, não aos originais salvos.
         if data.get("language") == "pt-BR":
             with (raw / "idea_sparse.md").open("a", encoding="utf-8") as text:
