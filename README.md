@@ -76,8 +76,12 @@ firestore.rules       # nega acesso client-side direto
 
 ## Disponibilidade dos modelos
 
-O motor original aceita `VERTEX_AI_PROJECT` e `VERTEX_AI_LOCATION`. Nesta instalação, os jobs executam em `us-east4`, mas as requisições aos modelos Gemini preview usam o endpoint `global`. Alguns modelos podem exigir cota ou acesso específico; os IDs preview podem ser aposentados durante os dois anos do mestrado, exigindo atualização e reteste. O plano Blaze permite cobrança por uso, mas não garante automaticamente acesso a todos os modelos.
+O motor original aceita `VERTEX_AI_PROJECT` e `VERTEX_AI_LOCATION`. Nesta instalação, os jobs executam em `southamerica-east1`, mas as requisições aos modelos Gemini preview usam o endpoint `global`. Alguns modelos podem exigir cota ou acesso específico; os IDs preview podem ser aposentados durante os dois anos do mestrado, exigindo atualização e reteste. O plano Blaze permite cobrança por uso, mas não garante automaticamente acesso a todos os modelos.
 
 ## Próxima configuração manual no Firebase
 
-O aplicativo Web `PaperOrchestra Web` já foi registrado; as configurações públicas estão em `public/config.js`. Agora habilite **Authentication → Google** (e-mail de suporte definido) e crie o **Firestore Database padrão `(default)` em modo nativo/Standard**, preferencialmente na região `us-east4` para ficar perto dos serviços. Escolha regras iniciais de produção; nosso `firestore.rules` nega acesso direto do navegador. Depois será necessário executar o deploy a partir do Cloud Shell. `apiKey` do Web App é configuração pública do Firebase e NÃO é uma chave Gemini; não divulgue chaves Gemini, tokens de conta de serviço ou arquivos JSON privados.
+O aplicativo Web `PaperOrchestra Web` já foi registrado; as configurações públicas estão em `public/config.js`. Agora habilite **Authentication → Google** (e-mail de suporte definido) e crie o **Firestore Database padrão `(default)` em modo nativo/Standard**, na região `southamerica-east1` para ficar perto dos serviços. Escolha regras iniciais de produção; nosso `firestore.rules` nega acesso direto do navegador. Depois será necessário executar o deploy a partir do Cloud Shell. `apiKey` do Web App é configuração pública do Firebase e NÃO é uma chave Gemini; não divulgue chaves Gemini, tokens de conta de serviço ou arquivos JSON privados.
+
+## Região de armazenamento e processamento
+
+O Firestore `(default)` foi planejado para `southamerica-east1` (São Paulo), região escolhida pelo usuário no console; a criação do banco ainda precisa ser confirmada. O Cloud Run (API e Jobs), o Artifact Registry e o bucket de pesquisa estão configurados na mesma região. A localização de inferência Vertex AI permanece `global`, por compatibilidade com modelos Gemini preview, de modo que as chamadas ao modelo não devem ser tratadas como uma garantia de processamento exclusivamente no Brasil. Os valores podem diferir dos preços dos serviços nos Estados Unidos.
