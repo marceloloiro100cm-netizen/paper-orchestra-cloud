@@ -18,14 +18,20 @@ WORKER_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/worker:initial"
 API_SA="paper-orchestra-api@${PROJECT_ID}.iam.gserviceaccount.com"
 WORKER_SA="paper-orchestra-worker@${PROJECT_ID}.iam.gserviceaccount.com"
 
-if [[ "$PROJECT_ID" == "cormyr" ]]; then
-  echo 'ERRO: não execute dentro do projeto de produção do Cormyr.' >&2; exit 2
+if [[ "$PROJECT_ID" != "paperorchestra-mestrado" ]]; then
+  echo "ERRO: projeto incorreto: $PROJECT_ID. Este script só pode implantar em paperorchestra-mestrado." >&2; exit 2
 fi
 if [[ ! -f firebase.json || ! -f worker/runner.py ]]; then
   echo 'Execute da raiz do repositório.' >&2; exit 2
 fi
 if [[ ! -f public/config.js ]] || grep -q SUBSTITUIR public/config.js; then
-  echo 'Configure public/config.js com os dados do aplicativo Web do Firebase antes de implantar.' >&2; exit 2
+  echo 'O arquivo public/config.js precisa estar configurado com os dados públicos do Firebase.' >&2; exit 2
+fi
+if ! grep -q 'projectId: "paperorchestra-mestrado"' public/config.js; then
+  echo 'ERRO: app Web aponta para outro projeto Firebase. Não é seguro prosseguir.' >&2; exit 2
+fi
+if ! command -v gcloud >/dev/null || ! command -v firebase >/dev/null; then
+  echo 'Abra o Cloud Shell pelo console Firebase: ele já oferece gcloud e firebase CLI.' >&2; exit 2
 fi
 if ! gcloud firestore databases describe --database='(default)' --project="$PROJECT_ID" >/dev/null 2>&1; then
   echo 'Crie primeiro o Firestore Database (modo nativo) neste projeto, via console Firebase.' >&2; exit 2
@@ -115,13 +121,7 @@ gcloud run deploy paper-orchestra-api \
   --quiet
 
 # As regras nunca permitem ao navegador ler Firestore sem autenticação pelo backend.
-if command -v firebase >/dev/null 2>&1; then
-  firebase deploy --only hosting,firestore:rules --project="$PROJECT_ID"
-else
-  echo 'Firebase CLI não encontrado: os serviços Cloud Run foram implantados, mas o Hosting NÃO está publicado.' >&2
-  echo 'Instale: npm install -g firebase-tools; depois execute: firebase deploy --only hosting,firestore:rules --project='"$PROJECT_ID" >&2
-  exit 3
-fi
+firebase deploy --only hosting,firestore:rules --project="$PROJECT_ID"
 cat <<MSG
 
 IMPLANTAÇÃO TERMINADA (se nenhum comando acima falhou).
