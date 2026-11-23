@@ -1,0 +1,82 @@
+name: Atualizar API e agentes PaperOrchestra
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - api/**
+      - worker/**
+      - .github/workflows/deploy-services.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: paper-orchestra-deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Atualizar API e Cloud Run Job sem perder os dados
+    if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+
+      - name: Testes e validação inicial
+        run: |
+          python -m compileall -q api/main.py worker/runner.py worker/agent_progress.py
+          python -m unittest discover -s tests -v
+
+      - name: Autenticar no Google Cloud por OIDC
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/201655574048/locations/global/workloadIdentityPools/github-actions/providers/github-actions
+          service_account: paper-orchestra-deployer@paperorchestra-mestrado.iam.gserviceaccount.com
+          project_id: paperorchestra-mestrado
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Preparar Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: paperorchestra-mestrado
+
+      - name: Construir API e worker sem alterar produção
+        shell: bash
+        env:
+          PROJECT: paperorchestra-mestrado
+          REGION: southamerica-east1
+        run: |
+          set -euo pipefail
+          API_IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/paper-orchestra/api:agents-${GITHUB_SHA}"
+          WORKER_IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/paper-orchestra/worker:agents-${GITHUB_SHA}"
+          gcloud builds submit api --tag="$API_IMAGE" --project="$PROJECT" --timeout=1800
+          gcloud builds submit worker --tag="$WORKER_IMAGE" --project="$PROJECT" --timeout=1800
+
+      - name: Atualizar motor e API sem apagar configuração
+        shell: bash
+        env:
+          PROJECT: paperorchestra-mestrado
+          REGION: southamerica-east1
+        run: |
+          set -euo pipefail
+          API_IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/paper-orchestra/api:agents-${GITHUB_SHA}"
+          WORKER_IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/paper-orchestra/worker:agents-${GITHUB_SHA}"
+          # Update de imagem somente: preservar variáveis de ambiente, serviços, IAM e Storage.
+          gcloud run jobs update paper-orchestra-worker --image="$WORKER_IMAGE" --region="$REGION" --project="$PROJECT" --quiet
+          gcloud run services update paper-orchestra-api --image="$API_IMAGE" --region="$REGION" --project="$PROJECT" --quiet
+
+      - name: Verificar que a API continua respondendo
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 6 --retry-delay 5 \
+            https://paperorchestra-mestrado.web.app/api/health \
+            -o /tmp/paper-health.json
+          python -c "import json; data=json.load(open('/tmp/paper-health.json')); assert data.get('ok') is True, data"
+          echo "Nova versão do serviço implantada. A geração multiagente ainda precisa de novo teste pelo usuário."
