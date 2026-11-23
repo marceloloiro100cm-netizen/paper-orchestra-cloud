@@ -15,10 +15,13 @@ jobs:
         run: |
           python -m json.tool firebase.json >/dev/null
           node --check public/app.js
+          node --check public/config.js
       - name: Check script syntax
         run: bash -n scripts/deploy-cloud-shell.sh
-      - name: No credential files in commit
+      - name: Validate public Firebase config and no private credentials
         run: |
-          test ! -f public/config.js
+          test -f public/config.js
+          grep -q 'projectId: "paperorchestra-mestrado"' public/config.js
+          ! grep -q 'SUBSTITUIR' public/config.js
           test ! -f .env
           test ! -f secrets.json
