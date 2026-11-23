@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#131d2e">
+  <title>PaperOrchestra — Laboratório Acadêmico</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#132235;background:#f5f7fa}
+    *{box-sizing:border-box}body{margin:0}button,input,textarea,select{font:inherit}button{cursor:pointer}
+    header{background:#131d2e;color:white;padding:20px max(20px,calc((100vw - 1120px)/2))}
+    .head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    header h1{font-size:clamp(1.15rem,3vw,1.65rem);margin:0}header p{margin:5px 0 0;color:#bac7d7;font-size:.88rem}
+    main{width:min(1120px,100%);padding:20px;margin:auto}
+    .panel{background:white;border:1px solid #dfe5ed;border-radius:16px;padding:22px;margin-bottom:18px;box-shadow:0 2px 8px #24324f08}
+    h2{font-size:1.14rem;margin:0 0 14px}p{line-height:1.5}.subtle{color:#57667d;font-size:.91rem}
+    .columns{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    label{display:block;font-weight:620;font-size:.88rem;margin:13px 0 6px}
+    input[type=text],textarea,select{width:100%;background:#fff;border:1px solid #bdc8d7;border-radius:9px;padding:12px;color:#17263a}
+    textarea{min-height:170px;resize:vertical}input:focus,textarea:focus,select:focus{outline:2px solid #598ee0;outline-offset:1px}
+    .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
+    .btn{border:1px solid #304e80;background:#254675;color:white;padding:11px 18px;border-radius:9px;font-weight:600}
+    .btn.alt{background:white;color:#254675}.btn:disabled{opacity:.55;cursor:wait}
+    .status{background:#f0f4fa;border-radius:9px;padding:10px 12px;margin:10px 0;color:#1a3658}
+    .warning{background:#fff8e6;border:1px solid #f2dfaa;padding:12px;border-radius:9px;font-size:.91rem}
+    .pill{font-size:.75rem;font-weight:700;border-radius:20px;padding:5px 9px;background:#e6eefb;color:#204779}
+    .item{border-top:1px solid #e6e9ef;padding:15px 0;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    .item strong{display:block;margin-bottom:5px}.item small{display:block;color:#65758a;margin:3px 0}
+    .downloads{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+    .downloads button{border:1px solid #abc1d8;padding:6px 10px;background:#fff;border-radius:6px;color:#254675}
+    .hidden{display:none!important}#identity{font-size:.85rem;color:#d5deec;overflow-wrap:anywhere}
+    .loading{opacity:.7}.check{display:flex;gap:8px;align-items:center;margin-top:13px}.check label{margin:0}
+    footer{text-align:center;padding:12px 24px 30px;color:#728097;font-size:.83rem}
+    @media(max-width:700px){main{padding:12px}.panel{padding:17px}.columns{grid-template-columns:1fr}.head{align-items:flex-start}.item{flex-direction:column}}
+  </style>
+</head>
+<body>
+<header><div class="head"><div><h1>🎻 PaperOrchestra</h1><p>Seu laboratório acadêmico na nuvem</p></div><div style="text-align:right"><div id="identity"></div><button id="logout" class="btn alt hidden" style="margin-top:8px;font-size:.8rem;padding:6px 10px">Sair</button></div></div></header>
+<main>
+  <section id="login-panel" class="panel">
+    <h2>Acesso ao laboratório</h2>
+    <p>Seus projetos e manuscritos permanecem armazenados no Google Cloud. Entre com a conta Google autorizada.</p>
+    <button id="login" class="btn">Entrar com Google</button>
+    <p id="auth-status" class="subtle"></p>
+  </section>
+  <div id="workspace" class="hidden">
+    <section class="panel">
+      <h2>Nova pesquisa</h2>
+      <p class="subtle">O PaperOrchestra organiza e redige o manuscrito a partir de <b>materiais reais</b>. Não invente resultados para completar o formulário. Os dados são armazenados de modo privado.</p>
+      <form id="new-paper">
+        <label for="title">Nome interno do projeto</label>
+        <input id="title" type="text" maxlength="120" minlength="3" required placeholder="Ex.: Perspectivas políticas na leitura por IAs">
+        <div class="columns">
+          <div><label for="idea">Ideia de pesquisa</label><textarea id="idea" required minlength="40" maxlength="150000" placeholder="Problema, hipótese, perguntas, método e contexto..."></textarea></div>
+          <div><label for="log">Registros e resultados reais</label><textarea id="log" required minlength="40" maxlength="150000" placeholder="Descrição de dados, observações, resultados verificáveis e limitações..."></textarea></div>
+        </div>
+        <div class="columns">
+          <div><label for="template">Modelo de artigo</label><select id="template"><option value="iclr2025">ICLR 2025</option><option value="cvpr2025">CVPR 2025</option></select></div>
+          <div><label for="model">Modelo de IA</label><select id="model"><option value="gemini-3-flash-preview">Gemini 3 Flash (teste econômico)</option><option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (maior capacidade)</option></select></div>
+        </div>
+        <div class="check"><input id="plotting" type="checkbox"><label for="plotting">Gerar gráficos com IA (mais chamadas e custo)</label></div>
+        <div class="warning" style="margin-top:18px">A geração pode levar dezenas de minutos e gerar cobrança das APIs. É possível fechar o navegador e acompanhar depois; o trabalho continua no Cloud Run Job.</div>
+        <div class="actions"><button type="submit" class="btn" id="submit">Iniciar geração</button><span id="submit-status" class="subtle" role="status"></span></div>
+      </form>
+    </section>
+    <section class="panel">
+      <div class="head"><h2>Histórico de pesquisas</h2><button id="refresh" class="btn alt">Atualizar</button></div>
+      <p class="subtle">Manuscritos guardados no Cloud Storage. O navegador não precisa permanecer aberto.</p>
+      <div id="research-list" role="status">Carregando…</div>
+    </section>
+  </div>
+</main>
+<footer>Projeto acadêmico independente • Baseado no PaperOrchestra de código aberto • Revise referências e resultados antes de divulgar.</footer>
+<script src="/config.js"></script>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

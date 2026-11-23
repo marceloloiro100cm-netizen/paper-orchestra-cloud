@@ -1,0 +1,24 @@
+name: Check
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Python files
+        run: python -m compileall -q api/main.py worker/runner.py
+      - name: Validate JSON and JS
+        run: |
+          python -m json.tool firebase.json >/dev/null
+          node --check public/app.js
+      - name: Check script syntax
+        run: bash -n scripts/deploy-cloud-shell.sh
+      - name: No credential files in commit
+        run: |
+          test ! -f public/config.js
+          test ! -f .env
+          test ! -f secrets.json

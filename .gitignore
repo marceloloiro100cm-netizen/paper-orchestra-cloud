@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+public/config.js
+.DS_Store
+*.pdf
+*.zip
+run_outputs/
+raw_materials/
