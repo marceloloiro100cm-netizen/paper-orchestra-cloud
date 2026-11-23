@@ -29,6 +29,10 @@ for sa in "$API_SA" "$WORKER_SA"; do
     --project="$PROJECT" --quiet >/dev/null
 done
 
+# Auditoria somente leitura após revogar o papel de administração global.
+gcloud projects add-iam-policy-binding "$PROJECT" \
+  --member="$PRINCIPAL" --role="roles/iam.securityReviewer" --quiet >/dev/null
+
 # Guardar os próprios privilégios atuais para auditar remoção seletiva.
 gcloud projects get-iam-policy "$PROJECT" --format=json >/tmp/paper-iam-before.json
 
