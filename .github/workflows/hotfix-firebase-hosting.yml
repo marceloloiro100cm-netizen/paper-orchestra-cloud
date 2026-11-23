@@ -1,0 +1,67 @@
+name: Atualizar interface Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - public/config.js
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: paper-orchestra-hosting-hotfix
+  cancel-in-progress: false
+
+jobs:
+  publicar-hosting:
+    if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+      - name: Validar configuração do projeto correto
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f public/config.js
+          grep -q 'projectId: "paperorchestra-mestrado"' public/config.js
+          grep -q 'authDomain: "paperorchestra-mestrado.firebaseapp.com"' public/config.js
+          node --check public/config.js
+          python -m json.tool firebase.json >/dev/null
+      - name: Autenticar no Google Cloud sem chave privada
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/201655574048/locations/global/workloadIdentityPools/github-actions/providers/github-actions
+          service_account: paper-orchestra-deployer@paperorchestra-mestrado.iam.gserviceaccount.com
+          project_id: paperorchestra-mestrado
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar Firebase CLI
+        run: npm install --global firebase-tools@latest
+      - name: Publicar somente Firebase Hosting
+        run: firebase deploy --only hosting --project paperorchestra-mestrado --non-interactive
+      - name: Confirmar publicação
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 3 --retry-delay 3 \
+            https://paperorchestra-mestrado.web.app/config.js \
+            -o /tmp/config-published.js
+          # Não imprimir a chave. A comparação confirma que a versão no site é a nova.
+          node - <<'NODE'
+          const fs = require('fs');
+          const current = fs.readFileSync('public/config.js', 'utf8');
+          const deployed = fs.readFileSync('/tmp/config-published.js', 'utf8');
+          if (current.trim() !== deployed.trim()) {
+            throw new Error('O Firebase Hosting ainda não está servindo a configuração mais recente');
+          }
+          console.log('Firebase Hosting está servindo a configuração atualizada.');
+          NODE
