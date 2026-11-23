@@ -49,7 +49,7 @@
         "source": "/api/**",
         "run": {
           "serviceId": "paper-orchestra-api",
-          "region": "us-east4"
+          "region": "southamerica-east1"
         }
       },
       {
