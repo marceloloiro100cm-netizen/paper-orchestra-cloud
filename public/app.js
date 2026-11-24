@@ -530,6 +530,9 @@ $('revoke-researcher').addEventListener('click', () => changeInvite(true));
 
 onAuthStateChanged(auth, async (current) => {
   user=current;
+  window.dispatchEvent(new CustomEvent('scriptorium:library-user-changed', {
+    detail: { uid: current?.uid || null }
+  }));
   $('login-panel').classList.toggle('hidden', !!user);
   $('workspace').classList.toggle('hidden', !user);
   $('logout').classList.toggle('hidden', !user);
