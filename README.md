@@ -35,14 +35,14 @@ A conta de faturamento Google Cloud que você já usa pode pagar **outro projeto
 
 **Atenção:** deploy inicial normalmente precisa de permissões de Cloud Build, Artifact Registry, Cloud Run Admin, Service Account Admin, Secret Manager e IAM; organização com políticas restritivas pode precisar de ajustes. O script termina se alguma pré-condição falhar. Não foi executado na sua conta.
 
-## Limitações conhecidas da V1
+## Limitações conhecidas
 
-- Entrada de **ideia + log experimental** em texto. Upload de PDF e figuras, leitura de obras longas, estilos ABNT e revisão com controle editorial são evoluções futuras.
-- Templates originais ICLR/CVPR; adequação para revista de Ciências Humanas exige um template específico.
+- Entrada de **ideia + log experimental** em texto, mais até 8 fontes da **biblioteca privada** (PDF, DOCX, BIB, RIS ou TXT). O texto extraído é limitado (20 mil caracteres por arquivo, 75 mil por pesquisa) e obras longas são truncadas. Figuras enviadas e revisão com controle editorial são evoluções futuras.
+- Templates disponíveis: ICLR e CVPR originais, e `abnt-artigo` e `abnt-dissertacao` (abnTeX2, experimentais). Os modelos ABNT são rascunhos: não garantem conformidade com NBR 6022, 10520 ou 6023 nem com manuais da instituição ou da revista.
 - Gemini `3.1-pro-preview` e `3-flash-preview` são os nomes presentes na versão do PaperOrchestra aqui fixada; modelos preview podem deixar de existir ou mudar de preço.
-- Não há cancelamento de Job pelo navegador, alertas de orçamento no aplicativo nem controle de custo por chamada. Limite inicial: uma pesquisa ativa por usuário, com uma verificação não transacional, adequada à utilização pessoal; não usar para vários usuários concorrentes sem endurecer essa regra.
+- Não há cancelamento de Job pelo navegador, alertas de orçamento no aplicativo nem controle de custo por chamada. Limite: uma pesquisa ativa por conta, garantida por uma trava transacional no Firestore (`research_owner_state/{uid}`), inclusive contra cliques ou requisições simultâneas.
 - Se o processo original falhar ao compilar, a pesquisa é marcada como falha. A versão inicial não oferece checkpoints dos agentes nem recomeço de uma etapa isolada.
-- O status de um Job interrompido abruptamente antes de atualizar Firestore pode continuar como `running`; a homologação de produção precisa de reconciliação por Cloud Run Executions.
+- Um Job interrompido abruptamente antes de atualizar o Firestore é reconciliado pela API: passados 200 minutos do início (o `task-timeout` do Job é 180 min), a pesquisa é marcada como falha e a conta é liberada. O limite pode ser ajustado pela variável `JOB_STALE_MINUTES` da API; ele deve ficar sempre acima do `task-timeout`. Não há consulta ao Cloud Run Executions, então o motivo exato da interrupção fica só nos logs do Cloud Run.
 - Não foi realizada verificação de cobertura dos testes de integração na infraestrutura real. O projeto é um ponto de partida técnico, não uma implantação homologada.
 
 ## Segurança e retenção

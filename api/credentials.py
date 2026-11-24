@@ -11,6 +11,10 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from pydantic import BaseModel, SecretStr
 
+# Formato aceito para chaves Gemini. Mesmo padrão usado em worker/byok.py;
+# tests/test_credentials.py confere que os dois continuam iguais.
+KEY_PATTERN = r"[A-Za-z0-9_.-]{20,512}"
+
 
 def secret_id(uid: str) -> str:
     # Firebase UID não pode controlar livremente o caminho do segredo.
@@ -37,7 +41,7 @@ class GeminiCredential(BaseModel):
     @property
     def normalized(self) -> str:
         key = self.key.get_secret_value().strip()
-        if not re.fullmatch(r"[A-Za-z0-9_.-]{20,512}", key):
+        if not re.fullmatch(KEY_PATTERN, key):
             raise ValueError("Formato de chave inválido")
         return key
 
@@ -107,6 +111,6 @@ def get_worker_credential(db, project: str, uid: str, *, client=None) -> str:
         "name": secret_path(project, uid) + "/versions/latest",
     })
     key = response.payload.data.decode("utf-8")
-    if not re.fullmatch(r"[A-Za-z0-9_-]{20,512}", key):
+    if not re.fullmatch(KEY_PATTERN, key):
         raise RuntimeError("Credencial do pesquisador inválida")
     return key
