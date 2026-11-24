@@ -89,9 +89,9 @@ def account_model_access(db, uid: str) -> dict:
         return {"status": "no_key", "models": {}, "verified_models": []}
     profile = doc.get("model_access")
     if not isinstance(profile, dict):
-        # Compatibilidade com chaves já cadastradas antes do verificador:
-        # conservar Flash, mas jamais conceder Pro sem confirmação.
-        return {"status": "legacy_unverified", "models": {FLASH_MODEL: "legacy"},
+        # Chaves antigas podem permanecer no Secret Manager, mas não geram
+        # permissões até o pesquisador refazer o teste com sua própria chave.
+        return {"status": "legacy_unverified", "models": {FLASH_MODEL: "not_verified"},
                 "verified_models": []}
     statuses = profile.get("models", {})
     permitted = [m for m in SUPPORTED_MODELS if statuses.get(m) == "supported"]
@@ -104,6 +104,5 @@ def account_model_access(db, uid: str) -> dict:
 
 
 def allowed_models(model_access: dict) -> list[str]:
-    if model_access.get("status") == "legacy_unverified":
-        return [FLASH_MODEL]
+    """Modelo não testado nunca é concedido apenas por haver chave cadastrada."""
     return [m for m in SUPPORTED_MODELS if m in model_access.get("verified_models", ())]

@@ -192,10 +192,8 @@ def save_personal_credential(payload: GeminiCredential, user: User):
     except ConnectionError:
         raise HTTPException(status_code=503, detail="O Google não respondeu à verificação. Tente novamente.") from None
     try:
-        saved = store_credential(db, PROJECT, user["uid"], key)
-        db.collection("research_credentials").document(user["uid"]).update({
-            "model_access": model_access
-        })
+        saved = store_credential(db, PROJECT, user["uid"], key,
+                                  model_access=model_access)
         return {**saved, "model_access": model_access}
     except Exception:
         raise HTTPException(status_code=503, detail="Não foi possível guardar a credencial de IA.") from None
@@ -257,8 +255,10 @@ def create_research(payload: NewResearch, user: User):
             payload.reflection_model and payload.reflection_model not in access_models
         ):
             raise HTTPException(status_code=403, detail="Modelo indisponível para sua chave Gemini. Atualize a chave no painel de acesso.")
-        if payload.plotting and PRO_MODEL not in access_models:
-            raise HTTPException(status_code=403, detail="Ilustrações avançadas não estão liberadas para sua chave.")
+        # O agente de gráficos chama um modelo de imagem distinto do Pro
+        # textual; só liberar após teste próprio desse modelo, ainda pendente.
+        if payload.plotting:
+            raise HTTPException(status_code=403, detail="Gráficos com IA ainda não estão habilitados para esta chave.")
     if payload.neon_review and not access["admin"]:
         raise HTTPException(status_code=403, detail="A revisão Neon não está habilitada para esta conta.")
     if payload.neon_review and not NEON_REVIEW_ENABLED:

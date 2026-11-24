@@ -42,7 +42,7 @@ class GeminiCredential(BaseModel):
         return key
 
 
-def store_credential(db, project: str, uid: str, key: str, *, client=None) -> dict:
+def store_credential(db, project: str, uid: str, key: str, *, client=None, model_access: dict | None = None) -> dict:
     """Armazena nova versão antes de ativar o perfil, sem imprimir o segredo."""
     secret = secret_path(project, uid)
     if client is None:
@@ -66,6 +66,9 @@ def store_credential(db, project: str, uid: str, key: str, *, client=None) -> di
         "provider": "gemini_api",
         "status": "active",
         "secret_resource": secret,
+        # A permissão verificada é gravada junto com o estado ativo; sem janela
+        # em que uma chave antiga pudesse ser confundida com uma chave validada.
+        "model_access": model_access or {"status": "not_verified", "models": {}},
         "updated_at": datetime.now(timezone.utc).isoformat(),
     })
     return {"provider": "gemini_api", "configured": True}

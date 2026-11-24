@@ -422,6 +422,16 @@ $('new-paper').addEventListener('submit', async (event) => {
   event.preventDefault();
   const button=$('submit'); button.disabled=true; $('submit-status').textContent='Salvando e iniciando...';
   try {
+    if (!accountAccess?.research_generation_enabled) {
+      $('submit-status').textContent = 'Primeiro conecte e verifique sua chave Gemini.';
+      return;
+    }
+    if (!accountAccess.admin && $('model').value === 'gemini-3.1-pro-preview') {
+      if (!window.confirm('A pesquisa vai usar Gemini Pro com sua chave. O Google poderá cobrar o uso da API no projeto dessa chave. Deseja continuar?')) {
+        $('submit-status').textContent = 'Pesquisa não iniciada.';
+        return;
+      }
+    }
     const payload = {
       title:$('title').value, idea:$('idea').value,
       experimental_log:$('log').value, template:$('template').value,
@@ -436,7 +446,7 @@ $('new-paper').addEventListener('submit', async (event) => {
     $('submit-status').textContent='Pesquisa enviada. Você pode fechar o navegador.';
     $('new-paper').reset();applyModelAccess();selectedSourceIds.clear();updateSelectedCount();displayLibrary();await loadJobs();
   } catch (e) { $('submit-status').textContent=e.message; }
-  finally {button.disabled=false;}
+  finally {button.disabled = !accountAccess?.research_generation_enabled;}
 });
 
 let accountAccess = null;
@@ -458,7 +468,9 @@ function applyModelAccess() {
   const best = allowed.has(pro) ? pro : (allowed.has(flash) ? flash : '');
   $('model').value = best;
   $('reflection-model').value = '';
-  const canPlot = !!accountAccess?.admin || allowed.has(pro);
+  // O modelo de imagem usado pelo worker é diferente do Pro textual;
+  // não presumir que a chave possa criar imagens só porque gera texto Pro.
+  const canPlot = !!accountAccess?.admin;
   $('plotting').checked = canPlot && $('plotting').checked;
   $('plotting').disabled = !canPlot;
   $('plotting').closest('.switch-row')?.classList.toggle('hidden', !canPlot);
@@ -578,9 +590,11 @@ async function loadAccountAccess() {
         await request('/capabilities', { signal: controller.signal });
         accountAccess = {
           admin: true, byok_ready: false, multiuser_enabled: false,
-          research_generation_enabled: true, legacy_backend: true
+          research_generation_enabled: true, legacy_backend: true,
+          allowed_models: ['gemini-3-flash-preview', 'gemini-3.1-pro-preview']
         };
         $('workspace').classList.remove('access-pending');
+        applyModelAccess();
         $('account-state').textContent = 'Administrador';
         $('account-message').textContent = '';
         $('submit').disabled = false;
@@ -721,6 +735,7 @@ onAuthStateChanged(auth, async (current) => {
   window.dispatchEvent(new CustomEvent('scriptorium:library-user-changed', {
     detail: { uid: current?.uid || null }
   }));
+  if (user) $('workspace').classList.add('access-pending');
   $('login-panel').classList.toggle('hidden', !!user);
   $('workspace').classList.toggle('hidden', !user);
   $('logout').classList.toggle('hidden', !user);
@@ -734,7 +749,7 @@ onAuthStateChanged(auth, async (current) => {
     }
   } else {
     accountAccess = null;
-    $('workspace').classList.remove('access-pending');
+    $('workspace').classList.remove('access-pending', 'access-setup');
     $('account-panel').classList.add('hidden');
     $('access-pending').classList.add('hidden');
     $('guest-credential').classList.add('hidden');
