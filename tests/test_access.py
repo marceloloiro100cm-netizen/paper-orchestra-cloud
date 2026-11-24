@@ -48,9 +48,13 @@ class InvitationTests(unittest.TestCase):
         self.db = FakeDb()
         self.admins = {"admin@example.org"}
 
-    def test_admin_keeps_legacy_access(self):
-        user = {"email": "admin@example.org", "email_verified": True}
+    def test_admin_also_needs_personal_key_for_ai_tokens(self):
+        # Separação de custos (24/11/2026): o projeto paga só a infraestrutura.
+        user = {"uid": "admin-uid", "email": "admin@example.org", "email_verified": True}
         self.assertTrue(is_admin(user, self.admins))
+        self.assertEqual(get_access(self.db, user, self.admins),
+                         {"allowed": True, "admin": True, "byok_ready": False})
+        self.db.collection("research_credentials").document("admin-uid").set({"status": "active"})
         self.assertEqual(get_access(self.db, user, self.admins),
                          {"allowed": True, "admin": True, "byok_ready": True})
 

@@ -206,3 +206,19 @@ Com isso, os 27 módulos do plano têm ao menos uma parte implementada (situaç�
 - **Reranking (M20):** integração com o FlagEmbedding (`BAAI/bge-reranker-v2-m3`) e o InRanker (UNICAMP) pronta, mas desligada (`SCRIPTORIUM_V2_RERANKER=none`). As bibliotecas não estão na imagem do worker: o plano só as adota se a avaliação no corpus de referência mostrar ganho. Para medir: `scripts/eval_retrieval.py --reranker bge` (ver `docs/AVALIACAO-RECUPERACAO.md`).
 - **Verificação iterativa (M22, experimental):** com `SCRIPTORIUM_V2_FIRE=true`, cada afirmação é verificada pelo modelo só com trechos das fontes anexadas. Quando ele não tem certeza, busca mais trechos e tenta de novo, até 3 ciclos e 40 chamadas por pesquisa. Ele só decide com confiança e citando os trechos pelo identificador; atingir o limite nunca conta como "apoiada". Afirmações contrariadas viram alerta alto no escudo.
 - **Revisões humanas (M08, M12, M24):** em "Citações e evidências", "Conferir referências" e "Verificação de afirmações", cada item tem um campo para registrar a sua conclusão (por exemplo, "o trecho apoia" ou "referência correta"). Cada registro é novo e o histórico é preservado.
+
+## Separação de custos: infraestrutura x tokens de IA (24/11/2026)
+
+- **Infraestrutura** (Cloud Run da API e do worker, Cloud Storage, Firestore, Secret Manager, Hosting, Cloud Build): projeto `paperorchestra-mestrado`, pago pela conta de faturamento do administrador.
+- **Tokens de IA** (redação pelo PaperOrchestra, embeddings, diagnóstico, verificação de afirmações, comparação de fontes e parecer Neon): **sempre a chave Gemini pessoal de quem gera a pesquisa**, criada pelo pesquisador com a própria conta Google no Google AI Studio. Isso vale também para o administrador.
+
+Como isso é garantido no código:
+- a API grava `ai_auth_mode=user_gemini` em toda pesquisa nova e exige chave verificada, inclusive do administrador;
+- o worker recusa qualquer pesquisa marcada para usar o Vertex do projeto (`admin_vertex`), a menos que `SCRIPTORIUM_ALLOW_PROJECT_AI=true` esteja definido na API e no worker. Essa exceção existe só para emergência e vem desligada;
+- embeddings, verificação iterativa, comparação de fontes e Neon usam o cliente criado com a chave pessoal; o ambiente do motor original recebe só essa chave (as variáveis do Vertex são removidas).
+
+Consequências práticas:
+- o administrador precisa cadastrar a própria chave em **Minha conta** antes de gerar;
+- Gemini Pro, Neon e limites maiores dependem do nível pago no AI Studio do pesquisador (Set up billing, com pré-pagamento);
+- gráficos com IA ficam indisponíveis com chave pessoal, porque o modelo de imagem ainda não é testado na verificação da chave;
+- pesquisas antigas continuam no histórico, marcadas como "tokens no projeto (anterior à separação)".

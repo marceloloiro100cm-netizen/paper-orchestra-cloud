@@ -33,7 +33,10 @@ def get_access(db, user: dict, admin_emails: set[str]) -> dict:
     if not user.get("email_verified") or not email:
         return {"allowed": False, "admin": False, "byok_ready": False}
     if email in admin_emails:
-        return {"allowed": True, "admin": True, "byok_ready": True}
+        # Separação de custos (24/11/2026): o administrador também gera com a
+        # própria chave Gemini; o projeto do Scriptorium paga só infraestrutura.
+        return {"allowed": True, "admin": True,
+                "byok_ready": bool(credential_state(db, user.get("uid", "")))}
     try:
         key = member_id(email)
     except ValueError:

@@ -62,14 +62,20 @@ def normalize_report(text: str) -> dict:
     return parsed
 
 
-def generate_review(pdf_path: Path, idea_path: Path, log_path: Path) -> dict:
+def generate_review(pdf_path: Path, idea_path: Path, log_path: Path, client=None) -> dict:
+    """`client`: cliente google-genai com a chave pessoal de quem gera a pesquisa.
+
+    Sem `client`, usa o Vertex do projeto (só com SCRIPTORIUM_ALLOW_PROJECT_AI).
+    O gemini-4-neon existe na Gemini API e no Vertex; na API exige nível pago.
+    """
     from pdf_backend import fitz  # PyMuPDF (R37)
     from google import genai
     from google.genai import types
 
-    project = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
-    if project != "paperorchestra-mestrado":
-        raise RuntimeError("Projeto não autorizado para o Neon")
+    if client is None:
+        project = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+        if project != "paperorchestra-mestrado":
+            raise RuntimeError("Projeto não autorizado para o Neon")
 
     with fitz.open(str(pdf_path)) as pdf:
         total_pages = len(pdf)
@@ -80,7 +86,8 @@ def generate_review(pdf_path: Path, idea_path: Path, log_path: Path) -> dict:
         idea_path.read_text(encoding="utf-8", errors="replace"),
         log_path.read_text(encoding="utf-8", errors="replace"),
     )
-    client = genai.Client(enterprise=True, project=project, location="global")
+    if client is None:
+        client = genai.Client(enterprise=True, project=project, location="global")
     try:
         response = client.models.generate_content(
             model=MODEL,
