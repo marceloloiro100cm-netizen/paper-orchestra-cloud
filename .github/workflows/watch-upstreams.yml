@@ -1,0 +1,59 @@
+# Vigia semanal das origens externas (registro em docs/upstreams.json).
+# Consulta GitHub, PyPI e npm; aponta versões novas, licenças divergentes,
+# repositórios movidos ou arquivados e revisões manuais vencidas.
+# O resultado fica numa única issue de rastreio, atualizada a cada semana.
+name: Vigiar upstreams
+
+on:
+  schedule:
+    # Segunda-feira, 08:17 em Brasília.
+    - cron: "17 11 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: watch-upstreams
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validar registro
+        run: python scripts/upstreams.py check
+      - name: Consultar origens
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/upstreams.py watch --output upstream-report.md > watch.log
+          tail -n1 watch.log | python -c 'import json,sys; print("ALERTS=%d" % json.load(sys.stdin)["alertas"])' >> "$GITHUB_ENV"
+          cat upstream-report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Abrir ou atualizar a issue de rastreio
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TITLE="Rastreio de upstreams (vigia semanal)"
+          NUMBER="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --json number,title --jq ".[] | select(.title == \"$TITLE\") | .number" | head -n1)"
+          printf '\n---\nExecução: %s\n' "$RUN_URL" >> upstream-report.md
+          if [ -n "$NUMBER" ]; then
+            gh issue edit "$NUMBER" --repo "$GITHUB_REPOSITORY" --body-file upstream-report.md
+            if [ "${ALERTS:-0}" -gt 0 ]; then
+              gh issue comment "$NUMBER" --repo "$GITHUB_REPOSITORY" \
+                --body "Relatório de $(date -u +%F): ${ALERTS} alerta(s). Veja a descrição da issue."
+            fi
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file upstream-report.md
+          fi

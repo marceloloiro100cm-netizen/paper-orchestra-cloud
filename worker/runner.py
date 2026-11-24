@@ -1,6 +1,10 @@
 """Executa o pipeline original em uma tarefa Cloud Run Jobs.
 
 Nenhum manuscrito depende do disco efêmero da instância após a execução.
+
+Rastreabilidade (plano V2): run_manifest.py (M14) registra versões, hashes e
+eventos; ai_declaration.py (M11; Origem: R25) gera o rascunho de declaração
+de uso de IA; editorial_status.py (M07; Origem: R11) sinaliza retratações.
 """
 import os
 import json
@@ -19,6 +23,8 @@ from reference_verification import verify_bibliography
 from source_materials import compose_library_context
 from neon_review import generate_review
 from byok import personal_agent_environment
+from run_manifest import RunManifest
+from ai_declaration import build_declaration
 
 PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
 BUCKET = os.environ["RESEARCH_BUCKET"]
@@ -31,18 +37,33 @@ storage_client = storage.Client(project=PROJECT)
 bucket = storage_client.bucket(BUCKET)
 ref = client.collection("research_jobs").document(RESEARCH_ID)
 prefix = f"research/{OWNER_UID}/{RESEARCH_ID}"
+# Manifesto de proveniência da execução atual (M14). Criado em main().
+MANIFEST: RunManifest | None = None
 
 
 def update(**fields):
     ref.update(fields)
+    if MANIFEST is not None and ("stage" in fields or "status" in fields):
+        MANIFEST.event(fields.get("stage") or fields.get("status"), status=fields.get("status"))
 
 
 def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def put(local: Path, remote_name: str, mime: str):
+def put(local: Path, remote_name: str, mime: str, record: bool = True):
     bucket.blob(f"{prefix}/output/{remote_name}").upload_from_filename(str(local), content_type=mime)
+    # O próprio manifesto e a declaração derivada dele não entram na lista de saídas.
+    if record and MANIFEST is not None:
+        MANIFEST.add_output(remote_name, local)
+
+
+def publish_manifest(root: Path, status: str, error: str = "") -> dict:
+    """Finaliza e envia run_manifest.json; devolve o conteúdo final."""
+    manifest = MANIFEST.finish(status, error)
+    path = MANIFEST.write(root / "run_manifest.json")
+    put(path, "run_manifest.json", "application/json", record=False)
+    return manifest
 
 
 def main():
@@ -58,6 +79,9 @@ def main():
                  if auth_mode == "user_gemini" else dict(os.environ))
     if auth_mode == "user_gemini" and data.get("neon_review_requested"):
         raise RuntimeError("Revisão Neon central bloqueada para pesquisadores BYOK")
+    global MANIFEST
+    # Recebe só campos selecionados do ambiente; nenhuma chave entra no manifesto.
+    MANIFEST = RunManifest(RESEARCH_ID, OWNER_UID, data, os.environ, Path(__file__).resolve().parent)
     update(status="running", stage="Preparando arquivos de entrada", started_at=now())
     with tempfile.TemporaryDirectory(prefix="orchestra_") as tmp:
         root = Path(tmp)
@@ -66,6 +90,7 @@ def main():
         raw.mkdir(); output.mkdir()
         for filename in ("idea_sparse.md", "experimental_log.md"):
             bucket.blob(f"{prefix}/input/{filename}").download_to_filename(str(raw / filename))
+            MANIFEST.add_input(filename, raw / filename)
         # Fontes próprias anexadas são extraídas como contexto limitado e não confiável.
         # Não apagamos nem alteramos os originais da biblioteca.
         if data.get("sources"):
@@ -85,6 +110,7 @@ def main():
             if context:
                 with (raw / "idea_sparse.md").open("a", encoding="utf-8") as source_file:
                     source_file.write(context)
+            MANIFEST.add_sources(manifest)
             manifest_path = root / "source_manifest.json"
             manifest_path.write_text(
                 json.dumps(manifest, ensure_ascii=False, indent=2),
@@ -105,6 +131,9 @@ def main():
                     "Não invente dados, citações ou resultados. "
                     "O template ICLR/CVPR continua o original e não é ABNT.\n"
                 )
+        # Hash do texto efetivamente entregue aos agentes (após anexos e idioma).
+        for filename in ("idea_sparse.md", "experimental_log.md"):
+            MANIFEST.add_agent_input(filename, raw / filename)
         command = [
             "python", "-u", "paper_writing_cli.py",
             "--raw_materials_dir", str(raw),
@@ -198,7 +227,8 @@ def main():
                 files.append("references")
                 update(reference_status="completed_with_limitations",
                        references_checked=reference_report["checked"],
-                       references_skipped=reference_report["skipped_by_limit"])
+                       references_skipped=reference_report["skipped_by_limit"],
+                       editorial_alerts=reference_report["editorial_summary"]["alerts"])
             else:
                 update(reference_status="unavailable")
         except Exception as exc:
@@ -231,7 +261,20 @@ def main():
             zipfile = shutil.make_archive(str(root / "latex_source"), "zip", str(assembled))
             put(Path(zipfile), "latex_source.zip", "application/zip")
             files.append("latex")
-        update(status="completed", stage="Concluído", agents=inspect_agents(output, bool(data["plotting"])), finished_at=now(), files=files)
+        final_agents = inspect_agents(output, bool(data["plotting"]))
+        # M14 + M11: manifesto e rascunho de declaração. Falha aqui não
+        # invalida o manuscrito já entregue.
+        try:
+            update(stage="Registrando proveniência")
+            manifest = publish_manifest(root, "completed")
+            files.append("manifest")
+            declaration = root / "declaracao_uso_ia.md"
+            declaration.write_text(build_declaration(manifest, final_agents), encoding="utf-8")
+            put(declaration, "declaracao_uso_ia.md", "text/markdown; charset=utf-8", record=False)
+            files.append("declaration")
+        except Exception as exc:
+            print("Manifesto ou declaração indisponíveis:", repr(exc), flush=True)
+        update(status="completed", stage="Concluído", agents=final_agents, finished_at=now(), files=files)
 
 
 if __name__ == "__main__":
@@ -244,4 +287,12 @@ if __name__ == "__main__":
             update(status="failed", stage="Falha", error=str(exc)[:400], finished_at=now())
         except Exception:
             pass
+        # Manifesto também em falhas: mostra até onde a execução chegou.
+        if MANIFEST is not None:
+            try:
+                with tempfile.TemporaryDirectory(prefix="manifest_") as tmp:
+                    publish_manifest(Path(tmp), "failed", str(exc))
+                ref.update({"files": firestore.ArrayUnion(["manifest"])})
+            except Exception as manifest_error:
+                print("Manifesto de falha indisponível:", repr(manifest_error), flush=True)
         raise

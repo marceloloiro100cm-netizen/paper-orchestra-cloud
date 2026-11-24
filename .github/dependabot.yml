@@ -1,0 +1,36 @@
+# M15 (plano Scriptorium V2). Origem: R29 em docs/upstreams.json.
+# PRs semanais para dependências Python e GitHub Actions. Cada PR passa pelo CI;
+# o merge em main dispara o deploy, então revise antes de aceitar.
+# Não cobre: Firebase JS por URL (R39), commit do PaperOrchestra (R02) e a
+# imagem base (R42). Esses são acompanhados pelo workflow "Vigiar upstreams".
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/api"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+    groups:
+      api-python:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "pip"
+    directory: "/worker"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+    groups:
+      worker-python:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5

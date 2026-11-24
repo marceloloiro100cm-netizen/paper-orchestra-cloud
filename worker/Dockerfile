@@ -7,15 +7,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 # Revisão auditada do projeto original. Atualizar somente após testes.
+# Origem: R02 em docs/upstreams.json (o teste do registro confere este commit).
 ARG PAPER_ORCHESTRA_COMMIT=d9bae997e793a015ed38bb1605be9eb58c00284f
+# Exposto ao runner para o manifesto de proveniência (M14).
+ENV PAPER_ORCHESTRA_COMMIT=${PAPER_ORCHESTRA_COMMIT}
 RUN git clone https://github.com/google-research/paper-orchestra.git /app/orchestra \
     && cd /app/orchestra && git checkout "$PAPER_ORCHESTRA_COMMIT"
 RUN pip install --no-cache-dir -r /app/orchestra/requirements.txt
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
-COPY agent_progress.py /app/agent_progress.py
-COPY scientific_audit.py /app/scientific_audit.py
-COPY reference_verification.py /app/reference_verification.py
 COPY templates/abnt-artigo/ /app/orchestra/templates/abnt-artigo/
 COPY templates/abnt-dissertacao/ /app/orchestra/templates/abnt-dissertacao/
 # O build falha se a classe brasileira ou os modelos não compilarem.
@@ -26,8 +26,6 @@ RUN kpsewhich abntex2.cls && kpsewhich abntex2cite.sty && \
        || (cat /tmp/abnt-smoke.log && exit 1); \
     done
 
-COPY source_materials.py /app/source_materials.py
-COPY neon_review.py /app/neon_review.py
-COPY byok.py /app/byok.py
-COPY runner.py /app/runner.py
+# Todos os módulos do worker (tests/test_container_modules.py confere os imports).
+COPY *.py /app/
 CMD ["python", "/app/runner.py"]

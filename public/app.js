@@ -157,7 +157,8 @@ async function download(id, kind) {
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `${id}_${kind === 'pdf' ? 'artigo.pdf' : kind === 'latex' ? 'latex.zip' : 'execucao.log'}`;
+    const names = {pdf: 'artigo.pdf', latex: 'latex.zip', manifest: 'manifesto_proveniencia.json', declaration: 'declaracao_uso_ia.md'};
+    a.href = url; a.download = `${id}_${names[kind] || 'execucao.log'}`;
     a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000);
   } catch (e) { alert(e.message); }
 }
@@ -223,7 +224,7 @@ async function showReferenceVerification(id, target) {
     heading.textContent = 'Conferência de metadados bibliográficos';
     box.append(heading);
     const description = document.createElement('p');
-    description.textContent = 'Fontes: Crossref, OpenAlex e Semantic Scholar. Metadados compatíveis NÃO provam que a fonte sustenta a afirmação citada.';
+    description.textContent = 'Fontes: Crossref, OpenAlex e Semantic Scholar; retratações e correções pela Crossref (inclui Retraction Watch). Metadados compatíveis NÃO provam que a fonte sustenta a afirmação citada, e a ausência de aviso não prova que a obra nunca foi retratada.';
     box.append(description);
     const count = document.createElement('p');
     count.textContent = `Consultadas: ${report.checked ?? 0} de ${report.total_bibtex_entries ?? 0} referências. Não consultadas por limite: ${report.skipped_by_limit ?? 0}.`;
@@ -246,6 +247,20 @@ async function showReferenceVerification(id, target) {
       const meta = document.createElement('small');
       meta.textContent = `BibTeX: ${ref.key || ''} · ano: ${ref.year || '?'} · DOI: ${ref.doi || 'não informado'}`;
       detail.append(meta);
+      const editorial = item.editorial || {};
+      if (editorial.editorial_status) {
+        const status = document.createElement('p');
+        const alert = ['retracted', 'withdrawn', 'expression_of_concern'].includes(editorial.editorial_status);
+        status.className = alert ? 'editorial-alert' : 'editorial-status';
+        status.textContent = 'Situação editorial (Crossref/Retraction Watch): ' + (editorial.label || editorial.editorial_status);
+        detail.append(status);
+        if (alert) summary.textContent = '⚠ ' + summary.textContent;
+        for (const notice of (editorial.notices || []).slice(0, 3)) {
+          const line = document.createElement('small');
+          line.textContent = `${notice.label || notice.type} · ${notice.date || 'sem data'} · fonte: ${notice.source}` + (notice.notice_doi ? ` · aviso: ${notice.notice_doi}` : '');
+          detail.append(line);
+        }
+      }
       for (const [provider, data] of Object.entries(item.sources || {})) {
         const line = document.createElement('p');
         line.textContent = provider + ': ' + (data.status === 'ok' ? (data.title || 'Metadados encontrados') : data.status === 'not_found' ? 'não localizado' : 'indisponível / limite de API');
@@ -401,11 +416,15 @@ async function loadJobs() {
       if (entry.error) {const err=document.createElement('small'); err.textContent=entry.error; info.append(err);}
       if (entry.status === 'completed' || entry.status === 'failed') {
         const files = document.createElement('div'); files.className='downloads';
-        const available = entry.status === 'failed' ? ['log'] : entry.files;
+        const available = entry.status === 'failed'
+          ? ['log', ...((entry.files || []).includes('manifest') ? ['manifest'] : [])]
+          : entry.files;
         for (const kind of available) {
           if (kind === 'neon' && !accountAccess?.admin) continue;
           const button = document.createElement('button'); button.type='button';
-          button.textContent=kind==='pdf'?'Baixar PDF':kind==='latex'?'Baixar LaTeX':kind==='audit'?'Ver auditoria':kind==='references'?'Conferir referências':kind==='neon'?'Parecer Neon':'Logs';
+          const labels={pdf:'Baixar PDF',latex:'Baixar LaTeX',audit:'Ver auditoria',references:'Conferir referências',neon:'Parecer Neon',manifest:'Manifesto de proveniência',declaration:'Rascunho da declaração de IA'};
+          button.textContent=labels[kind]||'Logs';
+          if(kind==='references'&&entry.editorial_alerts>0){button.textContent+=` (${entry.editorial_alerts} aviso${entry.editorial_alerts>1?'s':''} editorial${entry.editorial_alerts>1?'is':''})`;}
           button.addEventListener('click', ()=>kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : kind==='neon' ? showNeonReport(entry.id, info) : download(entry.id,kind));
           files.append(button);
         }
