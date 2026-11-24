@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Annotated, Literal
 from library import make_library_router, MAX_SELECTED_SOURCES
 from access import Invitation, get_access, is_admin, set_invitation
+from credentials import GeminiCredential, store_credential, delete_credential
 
 import firebase_admin
 from firebase_admin import auth
@@ -116,7 +117,8 @@ def health():
 
 @app.get("/api/capabilities")
 def capabilities(user: User):
-    return {"neon_review": NEON_REVIEW_ENABLED, "neon_model": "gemini-4-neon"}
+    return {"neon_review": NEON_REVIEW_ENABLED and is_admin(user, ALLOWED_EMAILS),
+            "neon_model": "gemini-4-neon"}
 
 
 
@@ -124,7 +126,32 @@ def capabilities(user: User):
 def account_access(user: User):
     access = get_access(db, user, ALLOWED_EMAILS)
     return {"admin": access["admin"], "byok_ready": access["byok_ready"],
-            "research_generation_enabled": access["admin"]}
+            "research_generation_enabled": access["admin"] or access["byok_ready"]}
+
+
+@app.put("/api/account/credential")
+def save_personal_credential(payload: GeminiCredential, user: User):
+    if is_admin(user, ALLOWED_EMAILS):
+        raise HTTPException(status_code=409, detail="A conta administradora usa a configuração existente.")
+    # Chave enviada somente pela sessão autenticada. Nunca retorna o valor.
+    try:
+        key = payload.normalized
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Formato da chave inválido.") from None
+    try:
+        return store_credential(db, PROJECT, user["uid"], key)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Não foi possível guardar a credencial de IA.") from None
+
+
+@app.delete("/api/account/credential")
+def remove_personal_credential(user: User):
+    if is_admin(user, ALLOWED_EMAILS):
+        raise HTTPException(status_code=409, detail="A credencial do administrador não é gerenciada aqui.")
+    try:
+        return delete_credential(db, PROJECT, user["uid"])
+    except Exception:
+        raise HTTPException(status_code=503, detail="Credencial desativada; não foi possível confirmar a exclusão no cofre.") from None
 
 
 @app.post("/api/admin/invitations", status_code=201)
@@ -156,10 +183,12 @@ def list_researches(user: User):
 @app.post("/api/jobs", status_code=202)
 def create_research(payload: NewResearch, user: User):
     owner_uid = user["uid"]
-    if not is_admin(user, ALLOWED_EMAILS):
-        # Bloqueia antes de gravar dados ou disparar Cloud Run; convidados
-        # nunca podem consumir o Vertex AI ou a chave Gemini do administrador.
-        raise HTTPException(status_code=409, detail="Sua conta aguarda a configuração de IA própria (BYOK). Nenhuma pesquisa foi iniciada.")
+    access = get_access(db, user, ALLOWED_EMAILS)
+    if not (access["admin"] or access["byok_ready"]):
+        # Bloqueia antes de armazenar materiais ou iniciar Cloud Run.
+        raise HTTPException(status_code=409, detail="Configure sua chave Gemini antes de iniciar uma pesquisa.")
+    if payload.neon_review and not access["admin"]:
+        raise HTTPException(status_code=422, detail="A revisão Neon exige um provedor compatível e não está disponível no BYOK.")
     if payload.neon_review and not NEON_REVIEW_ENABLED:
         raise HTTPException(status_code=409, detail="Revisão Neon indisponível até validar o acesso do worker.")
     # Proteção de custos: uma geração por vez por conta.
@@ -194,6 +223,7 @@ def create_research(payload: NewResearch, user: User):
         "id": job_id, "owner_uid": owner_uid,
         "title": payload.title, "status": "queued", "stage": "Preparando materiais",
         "template": payload.template, "model": payload.model,
+        "ai_auth_mode": "admin_vertex" if access["admin"] else "user_gemini",
         "reflection_model": payload.reflection_model or payload.model,
         "plotting": payload.plotting,
         "language": payload.language,
