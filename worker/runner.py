@@ -26,6 +26,7 @@ from neon_review import generate_review
 from byok import personal_agent_environment
 from run_manifest import RunManifest
 from ai_declaration import build_declaration
+from embeddings import make_embedder
 
 PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
 BUCKET = os.environ["RESEARCH_BUCKET"]
@@ -34,6 +35,9 @@ OWNER_UID = os.environ["RESEARCH_OWNER_UID"]
 BASE = Path("/app/orchestra")
 # Plano V2, Onda 1: contexto por trechos recuperados. Desligado por padrão.
 V2_RETRIEVAL = os.getenv("SCRIPTORIUM_V2_RETRIEVAL", "false").lower() == "true"
+# Onda 2: embeddings Gemini na busca e na matriz de evidências (envio de trechos
+# autorizado pelo responsável em 24/11/2026). Só vale com V2_RETRIEVAL ligado.
+V2_EMBEDDINGS = os.getenv("SCRIPTORIUM_V2_EMBEDDINGS", "true").lower() == "true"
 
 client = firestore.Client(project=PROJECT)
 storage_client = storage.Client(project=PROJECT)
@@ -106,6 +110,14 @@ def main():
     global MANIFEST
     # Recebe só campos selecionados do ambiente; nenhuma chave entra no manifesto.
     MANIFEST = RunManifest(RESEARCH_ID, OWNER_UID, data, os.environ, Path(__file__).resolve().parent)
+    # Mesma identidade de IA da pesquisa: convidado usa a própria chave (BYOK).
+    embedder = None
+    if V2_RETRIEVAL and V2_EMBEDDINGS:
+        try:
+            embedder = make_embedder(auth_mode, agent_env, PROJECT)
+        except Exception as exc:  # sem embeddings, a busca segue só com BM25
+            print("Embeddings indisponíveis:", type(exc).__name__, flush=True)
+    evidence_inputs = {"chunks": [], "vectors": {}, "sources": {}} if V2_RETRIEVAL else None
     update(status="running", stage="Preparando arquivos de entrada", started_at=now())
     with tempfile.TemporaryDirectory(prefix="orchestra_") as tmp:
         root = Path(tmp)
@@ -133,7 +145,8 @@ def main():
                 query = data.get("title", "") + "\n" + (raw / "idea_sparse.md").read_text(
                     encoding="utf-8", errors="replace")
                 context, manifest, coverage = compose_library_context_v2(
-                    safe_sources, fetch, query, cache=DerivedCache())
+                    safe_sources, fetch, query, cache=DerivedCache(),
+                    embedder=embedder, collect=evidence_inputs)
                 MANIFEST.set_context(coverage["strategy"], coverage)
                 coverage_path = root / "retrieval_coverage.json"
                 coverage_path.write_text(json.dumps(coverage, ensure_ascii=False, indent=2),
@@ -270,6 +283,41 @@ def main():
         except Exception as exc:
             print("Conferência bibliográfica externa indisponível:", repr(exc), flush=True)
             update(reference_status="unavailable")
+        # M05 + M08/M10: citações literais e matriz de evidências (V2). Não
+        # altera o manuscrito; falhas não invalidam o PDF já entregue.
+        if evidence_inputs is not None:
+            update(stage="Conferindo citações e evidências")
+            try:
+                from quote_verification import verify as verify_quotes
+                from evidence_matrix import build_matrix, to_csv
+                refined_tex = output / "content_refinement_workdir" / "final_refined_paper.tex"
+                raw_tex = output / "latex_writeup" / "raw_draft_paper.tex"
+                tex_path = refined_tex if refined_tex.is_file() else raw_tex
+                tex = tex_path.read_text(encoding="utf-8", errors="replace")
+                quotes = verify_quotes(tex, evidence_inputs["chunks"], evidence_inputs["sources"])
+                matrix = build_matrix(tex, evidence_inputs["chunks"], evidence_inputs["sources"],
+                                      vectors=evidence_inputs["vectors"], embedder=embedder)
+                report = {"schema": "scriptorium.evidence_report/1", "manuscript": tex_path.name,
+                          "quotes": quotes, "matrix": matrix}
+                report_path = root / "evidence_report.json"
+                report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+                put(report_path, "evidence_report.json", "application/json")
+                csv_path = root / "evidence_matrix.csv"
+                csv_path.write_text(to_csv(matrix), encoding="utf-8-sig")
+                put(csv_path, "evidence_matrix.csv", "text/csv; charset=utf-8")
+                files += ["evidence", "evidence_csv"]
+                update(evidence_status="completed", evidence_summary={
+                    "quotes": quotes["summary"].get("quotes", 0),
+                    "quotes_not_found": quotes["summary"].get("not_found_in_sources", 0),
+                    "pointers_unknown": quotes["summary"].get("pointers_unknown", 0),
+                    "claims": matrix["summary"]["claims"],
+                    "claims_without_evidence": matrix["summary"]["without_evidence_in_corpus"],
+                })
+            except Exception as exc:
+                print("Conferência de evidências indisponível:", repr(exc), flush=True)
+                update(evidence_status="unavailable")
+        if embedder is not None:
+            MANIFEST.add_ai_service("embeddings", embedder.info())
         # Parecer Neon totalmente opcional, isolado do pipeline original.
         # Falhas não invalidam PDF já gerado nem disparam múltiplas cobranças.
         if data.get("neon_review_requested") and auth_mode == "admin_vertex":

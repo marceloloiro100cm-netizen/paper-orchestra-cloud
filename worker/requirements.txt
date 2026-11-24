@@ -8,3 +8,5 @@ requests>=2.31,<3
 # Faixa fixada (antes vinha sem versão do requirements.txt do PaperOrchestra).
 # Origem: R37 em docs/upstreams.json. Licença AGPL-3.0 ou comercial: ver registro.
 PyMuPDF>=2.1,<3
+# Busca vetorial e embeddings (M04/M08). Origem: R43 em docs/upstreams.json.
+numpy>=1.26,<3

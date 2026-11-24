@@ -157,10 +157,53 @@ async function download(id, kind) {
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const names = {pdf: 'artigo.pdf', latex: 'latex.zip', manifest: 'manifesto_proveniencia.json', declaration: 'declaracao_uso_ia.md'};
+    const names = {pdf: 'artigo.pdf', latex: 'latex.zip', manifest: 'manifesto_proveniencia.json', declaration: 'declaracao_uso_ia.md', evidence_csv: 'matriz_evidencias.csv'};
     a.href = url; a.download = `${id}_${names[kind] || 'execucao.log'}`;
     a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000);
   } catch (e) { alert(e.message); }
+}
+
+async function showEvidenceReport(id, target) {
+  const old = target.querySelector('.evidence-report');
+  if (old) { old.remove(); return; }
+  const box = document.createElement('section');
+  box.className = 'scientific-audit-report evidence-report';
+  box.textContent = 'Carregando citações e evidências...';
+  target.append(box);
+  const line = (tag, text, cls) => { const el = document.createElement(tag); el.textContent = text; if (cls) el.className = cls; return el; };
+  try {
+    const report = await (await request(`/jobs/${id}/download/evidence`)).json();
+    box.replaceChildren();
+    box.append(line('strong', 'Citações literais e matriz de evidências: revisão humana necessária'));
+    box.append(line('p', 'Os trechos foram localizados automaticamente nas fontes anexadas. O sistema NÃO decide se um trecho apoia ou contradiz a afirmação, e "sem evidência no corpus" vale só para as fontes anexadas.'));
+    const quotes = report.quotes || {};
+    const qs = quotes.summary || {};
+    box.append(line('h4', 'Citações entre aspas'));
+    box.append(line('p', `Encontradas: ${qs.found || 0} · aproximadas: ${qs.approximate || 0} · não encontradas nas fontes: ${qs.not_found_in_sources || 0} · ponteiros desconhecidos: ${qs.pointers_unknown || 0}`));
+    const qLabels = {found: 'Encontrada', approximate: 'Aproximada (conferir redação)', not_found_in_sources: 'Não encontrada nas fontes anexadas', no_sources_attached: 'Sem fontes anexadas'};
+    for (const q of (quotes.quotes || []).slice(0, 40)) {
+      const where = q.pages ? ` · ${q.source_name || q.source_id} p. ${q.pages[0]}${q.pages[1] !== q.pages[0] ? '-' + q.pages[1] : ''}` : '';
+      box.append(line('p', `${q.status === 'not_found_in_sources' ? '⚠ ' : ''}${qLabels[q.status] || q.status}${where}: "${q.quote}"`,
+        q.status === 'not_found_in_sources' ? 'editorial-alert' : ''));
+    }
+    const matrix = report.matrix || {};
+    const ms = matrix.summary || {};
+    box.append(line('h4', 'Afirmações verificáveis'));
+    box.append(line('p', `Afirmações: ${ms.claims || 0} · com trechos candidatos: ${ms.with_candidates || 0} · sem evidência nas fontes anexadas: ${ms.without_evidence_in_corpus || 0}`));
+    for (const row of (matrix.claims || []).slice(0, 60)) {
+      const detail = document.createElement('details');
+      detail.className = 'reference-item';
+      detail.append(line('summary', `${row.audit_state === 'sem_evidencia_no_corpus' ? '⚠ ' : ''}${row.claim_id}: ${row.text}`));
+      if (row.cites && row.cites.length) detail.append(line('small', 'Citações BibTeX: ' + row.cites.join(', ')));
+      for (const ev of row.evidence || []) {
+        const pages = ev.pages ? `p. ${ev.pages[0]}${ev.pages[1] !== ev.pages[0] ? '-' + ev.pages[1] : ''}` : 'sem página';
+        detail.append(line('p', `${ev.source_name || ev.source_id} · ${pages} · termos em comum: ${ev.shared_terms}${ev.similarity != null ? ' · similaridade: ' + ev.similarity : ''}`));
+        detail.append(line('small', ev.excerpt || ''));
+      }
+      if (!(row.evidence || []).length) detail.append(line('p', 'Nenhum trecho candidato nas fontes anexadas.'));
+      box.append(detail);
+    }
+  } catch (err) { box.textContent = 'Não foi possível abrir o relatório: ' + err.message; }
 }
 
 async function showScientificAudit(id, target) {
@@ -422,10 +465,10 @@ async function loadJobs() {
         for (const kind of available) {
           if (kind === 'neon' && !accountAccess?.admin) continue;
           const button = document.createElement('button'); button.type='button';
-          const labels={pdf:'Baixar PDF',latex:'Baixar LaTeX',audit:'Ver auditoria',references:'Conferir referências',neon:'Parecer Neon',manifest:'Manifesto de proveniência',declaration:'Rascunho da declaração de IA'};
+          const labels={pdf:'Baixar PDF',latex:'Baixar LaTeX',audit:'Ver auditoria',references:'Conferir referências',neon:'Parecer Neon',manifest:'Manifesto de proveniência',declaration:'Rascunho da declaração de IA',evidence:'Citações e evidências',evidence_csv:'Matriz de evidências (CSV)'};
           button.textContent=labels[kind]||'Logs';
           if(kind==='references'&&entry.editorial_alerts>0){button.textContent+=` (${entry.editorial_alerts} aviso${entry.editorial_alerts>1?'s':''} editorial${entry.editorial_alerts>1?'is':''})`;}
-          button.addEventListener('click', ()=>kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : kind==='neon' ? showNeonReport(entry.id, info) : download(entry.id,kind));
+          button.addEventListener('click', ()=>kind==='evidence' ? showEvidenceReport(entry.id, info) : kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : kind==='neon' ? showNeonReport(entry.id, info) : download(entry.id,kind));
           files.append(button);
         }
         info.append(files);

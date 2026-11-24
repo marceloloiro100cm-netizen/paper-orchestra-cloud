@@ -16,6 +16,9 @@ from collections import defaultdict
 from lexical_index import INDEX_VERSION, LexicalIndex, query_terms
 
 STRATEGY = "v2-lexical-retrieval-1"
+HYBRID_STRATEGY = "v2-hybrid-rrf-1"
+# Reciprocal Rank Fusion: k=60 é o valor usual da literatura (Cormack et al., 2009).
+RRF_K = 60
 PER_SOURCE_MAX_CHARS = 20_000
 TOTAL_MAX_CHARS = 75_000
 TOP_N = 400
@@ -24,23 +27,53 @@ TOP_N = 400
 OPENING_CHUNKS_WITHOUT_MATCH = 2
 
 
-def select_passages(chunks: list[dict], query_text: str, *,
-                    total_budget: int = TOTAL_MAX_CHARS,
-                    per_source_budget: int = PER_SOURCE_MAX_CHARS) -> tuple[list[dict], dict]:
-    """Seleciona trechos por BM25 com rodízio entre fontes, dentro do orçamento."""
+def rank_chunks(chunks: list[dict], query_text: str, vectors: dict | None = None,
+                query_vector=None, limit: int = TOP_N) -> tuple[list[dict], list[str], str]:
+    """Ranking lexical (BM25) ou híbrido (BM25 + vetores, fundidos por RRF)."""
     by_id = {c["chunk_id"]: c for c in chunks}
-    sources = list(dict.fromkeys(c["source_id"] for c in chunks))
     terms = query_terms(query_text)
     index = LexicalIndex()
     try:
         index.add(chunks)
-        hits = index.search(terms, TOP_N)
+        lexical = index.search(terms, limit)
     finally:
         index.close()
+    if not vectors or query_vector is None:
+        return lexical, terms, STRATEGY
+    from vector_index import VectorIndex
+    ids = [c["chunk_id"] for c in chunks if c["chunk_id"] in vectors]
+    semantic = VectorIndex(ids, [vectors[i] for i in ids]).search(query_vector, limit) if ids else []
+    fused: dict[str, dict] = {}
+    for rank, hit in enumerate(lexical, start=1):
+        fused.setdefault(hit["chunk_id"], {"chunk_id": hit["chunk_id"], "source_id": hit["source_id"],
+                                           "score": 0.0})
+        fused[hit["chunk_id"]].update(bm25_rank=rank, bm25=hit["score"])
+        fused[hit["chunk_id"]]["score"] += 1.0 / (RRF_K + rank)
+    for rank, hit in enumerate(semantic, start=1):
+        entry = fused.setdefault(hit["chunk_id"], {"chunk_id": hit["chunk_id"],
+                                                   "source_id": by_id[hit["chunk_id"]]["source_id"],
+                                                   "score": 0.0})
+        entry.update(vector_rank=rank, similarity=hit["similarity"])
+        entry["score"] += 1.0 / (RRF_K + rank)
+    hits = sorted(fused.values(), key=lambda h: (-h["score"], h.get("bm25_rank") or 10**9))[:limit]
+    for hit in hits:
+        hit["score"] = round(hit["score"], 8)
+        hit["method"] = "rrf"
+    return hits, terms, HYBRID_STRATEGY
+
+
+def select_passages(chunks: list[dict], query_text: str, *,
+                    vectors: dict | None = None, query_vector=None,
+                    total_budget: int = TOTAL_MAX_CHARS,
+                    per_source_budget: int = PER_SOURCE_MAX_CHARS) -> tuple[list[dict], dict]:
+    """Seleciona trechos (BM25 ou híbrido) com rodízio entre fontes, dentro do orçamento."""
+    by_id = {c["chunk_id"]: c for c in chunks}
+    sources = list(dict.fromkeys(c["source_id"] for c in chunks))
+    hits, terms, strategy = rank_chunks(chunks, query_text, vectors, query_vector)
     ranked = defaultdict(list)
     for rank, hit in enumerate(hits, start=1):
         ranked[hit["source_id"]].append((rank, hit))
-    reason = "bm25"
+    reason = "rrf" if strategy == HYBRID_STRATEGY else "bm25"
     if not hits:
         # Sem termos úteis ou nenhuma coincidência: ordem do documento (como a V1).
         reason = "fallback_document_order"
@@ -62,7 +95,8 @@ def select_passages(chunks: list[dict], query_text: str, *,
                 size = chunk["char_count"]
                 if used_source[source] + size > per_source_budget or used_total + size > total_budget:
                     continue
-                selected.append({**chunk, "rank": rank, "score": hit.get("score")})
+                selected.append({**chunk, "rank": rank, "score": hit.get("score"),
+                                 "similarity": hit.get("similarity")})
                 used_source[source] += size
                 used_total += size
                 progressed = True
@@ -70,7 +104,9 @@ def select_passages(chunks: list[dict], query_text: str, *,
         if not progressed:
             break
     coverage = {
-        "strategy": STRATEGY, "index_version": INDEX_VERSION, "selection": reason,
+        "strategy": strategy, "index_version": INDEX_VERSION, "selection": reason,
+        "vector_backend": "numpy-flat-ip-1" if strategy == HYBRID_STRATEGY else None,
+        "rrf_k": RRF_K if strategy == HYBRID_STRATEGY else None,
         "query_terms": terms, "total_budget_chars": total_budget,
         "per_source_budget_chars": per_source_budget, "used_chars": used_total,
         "sources": {
@@ -82,7 +118,9 @@ def select_passages(chunks: list[dict], query_text: str, *,
             for s in sources
         },
         "limitations": [
-            "Busca lexical (BM25): trechos com sinônimos ou paráfrases da ideia podem não ser encontrados.",
+            ("Busca híbrida (BM25 + embeddings, fusão RRF): reduz, mas não elimina, perdas por sinônimos e paráfrases."
+             if strategy == HYBRID_STRATEGY else
+             "Busca lexical (BM25): trechos com sinônimos ou paráfrases da ideia podem não ser encontrados."),
             "Trechos não selecionados não foram lidos pelos agentes; isso não significa que sejam irrelevantes.",
         ],
     }

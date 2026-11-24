@@ -117,6 +117,18 @@ class DeclarationTest(unittest.TestCase):
         self.assertNotIn("está em conformidade", text.lower())
         self.assertIn("não garante conformidade", text)
 
+    def test_embeddings_listed_when_used(self):
+        manifest = RunManifest("f" * 32, "u", RECORD, ENV, WORKER, clock=clock)
+        manifest.set_context("v2-hybrid-rrf-1")
+        manifest.add_ai_service("embeddings", {"model": "gemini-embedding-001", "provider": "Google Vertex AI",
+                                               "usage": {"texts": 42, "requests": 1, "characters": 9000}})
+        text = build_declaration(manifest.finish("completed"), {})
+        self.assertIn("gemini-embedding-001", text)
+        self.assertIn("v2-hybrid-rrf-1", text)
+        unused = RunManifest("g" * 32, "u", RECORD, ENV, WORKER, clock=clock)
+        unused.add_ai_service("embeddings", {"model": "gemini-embedding-001", "usage": {"texts": 0}})
+        self.assertNotIn("gemini-embedding-001", build_declaration(unused.finish("completed"), {}))
+
     def test_neon_and_plotting_listed_only_when_used(self):
         record = {**RECORD, "plotting": True, "neon_review_requested": True, "reflection_model": RECORD["model"]}
         manifest = RunManifest("e" * 32, "u", record, ENV, WORKER, clock=clock).finish("completed")

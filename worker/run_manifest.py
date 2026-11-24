@@ -133,6 +133,10 @@ class RunManifest:
             for item in manifest
         ]
 
+    def add_ai_service(self, name: str, info: dict) -> None:
+        """Serviços de IA auxiliares (ex.: embeddings), sem texto enviado."""
+        self.data.setdefault("ai_services", {})[name] = info
+
     def set_context(self, strategy: str, coverage: dict | None = None) -> None:
         """Como o contexto das fontes foi montado (V1 corte ou V2 recuperação)."""
         self.data["context"] = {"strategy": strategy, **({"coverage": coverage} if coverage else {})}

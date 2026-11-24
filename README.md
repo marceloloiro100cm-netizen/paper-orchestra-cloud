@@ -174,3 +174,13 @@ gcloud run jobs update paper-orchestra-worker --region=southamerica-east1 \
 ```
 
 Para voltar ao comportamento anterior, use `SCRIPTORIUM_V2_RETRIEVAL=false`. O manifesto de cada execução registra qual estratégia foi usada.
+
+### Onda 2 do plano V2: busca híbrida, citações e evidências (24/11/2026)
+
+Com a Onda 1 ligada (`SCRIPTORIUM_V2_RETRIEVAL=true`), o worker também:
+
+- **busca híbrida (M04):** combina BM25 com embeddings do Gemini (`gemini-embedding-001`, 768 dimensões) por Reciprocal Rank Fusion. Trechos que falam do mesmo assunto com outras palavras passam a ser encontrados. O envio de trechos das fontes ao serviço de embeddings foi autorizado pelo responsável do projeto. O administrador usa o Vertex do projeto; convidados usam a própria chave Gemini. Se o serviço falhar, a busca volta para BM25 e o manifesto registra isso. Para desligar só os embeddings: `SCRIPTORIUM_V2_EMBEDDINGS=false`.
+- **citações literais (M05):** cada trecho entre aspas do manuscrito final é procurado nas fontes anexadas (encontrado, aproximado ou não encontrado), e ponteiros `[trecho id]` são resolvidos para fonte e página.
+- **matriz de evidências (M08/M10):** cada afirmação com citação ou número recebe até 3 trechos candidatos das fontes, com página; afirmações sem nada parecido nas fontes anexadas são sinalizadas. O sistema não decide se o trecho apoia ou contradiz: isso é revisão humana.
+
+Na interface: **Histórico → Citações e evidências** e **Matriz de evidências (CSV)**. A declaração de uso de IA passa a listar o modelo de embeddings quando ele for usado. Para medir a qualidade da busca no seu corpus, veja `docs/AVALIACAO-RECUPERACAO.md`.

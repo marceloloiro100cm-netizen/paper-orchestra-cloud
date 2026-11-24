@@ -53,6 +53,11 @@ def build_declaration(manifest: dict, agents: dict | None = None) -> str:
     if request.get("neon_review_requested"):
         tools.append(f"| Gemini | Google Cloud (projeto Scriptorium) | `gemini-4-neon` | Parecer crítico opcional (não altera o texto) |")
 
+    embeddings = (manifest.get("ai_services") or {}).get("embeddings")
+    if embeddings and embeddings.get("usage", {}).get("texts"):
+        tools.append(f"| Gemini Embedding | {embeddings.get('provider', provider)} | "
+                     f"`{embeddings.get('model', '')}` | Seleção de trechos das fontes anexadas por "
+                     "similaridade semântica e busca de evidências (não gera texto) |")
     used_stages = [label for key, label in STAGES
                    if agents.get(key) not in (None, "disabled")]
     sources = manifest.get("sources", [])
@@ -96,6 +101,7 @@ def build_declaration(manifest: dict, agents: dict | None = None) -> str:
         "",
         "- Ideia de pesquisa e registro experimental escritos pelo(a) autor(a) "
         f"(SHA-256: {', '.join(str(v.get('sha256', ''))[:12] for k, v in inputs.items() if k != 'delivered_to_agents') or 'não registrado'}).",
+        f"- Estratégia de uso das fontes: {(manifest.get('context') or {}).get('strategy', 'não registrada')}",
         f"- Fontes da biblioteca pessoal enviadas como contexto: {len(sources)}"
         + (": " + "; ".join(str(s.get("name", "")) for s in sources) if sources else "."),
         f"- **Houve envio de dados pessoais ou sensíveis? Quais e com que autorização?** {FILL}",

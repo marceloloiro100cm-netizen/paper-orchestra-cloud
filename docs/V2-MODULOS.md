@@ -2,7 +2,7 @@
 
 <!-- Arquivo gerado por scripts/upstreams.py render a partir de docs/upstreams.json. Não edite à mão. -->
 
-Atualizado em 2026-11-24. Implementados: 0; parciais: 16; não iniciados: 11.
+Atualizado em 2026-11-24. Implementados: 0; parciais: 19; não iniciados: 8.
 
 As ondas seguem o plano V2 (0: base segura; 1: leitura escalável; 2: busca e evidência; 3: auditoria científica; 4: pesquisa guiada; 5: ecossistema editorial).
 
@@ -17,11 +17,11 @@ As ondas seguem o plano V2 (0: base segura; 1: leitura escalável; 2: busca e ev
 | M03 | Fragmentação e indexação persistente | P1 | 1 | parcial | R05 (FAISS (Meta)), R06 (SQLite FTS5), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Trechos com cache privado por SHA-256 + versões no GCS; índice FTS5 montado por execução. Falta índice vetorial (FAISS, R05) e índice persistente por conta. |
 | M19 | Granularidade inteligente de fragmentos | P2 | 1 | parcial | R03 (Docling), R04 (Docling-Parse), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Política section-paragraph-1 (seção/parágrafo, ~1200 caracteres, heading_path). Falta benchmark em pt-BR contra janelas móveis. |
 | M23 | OCR seletivo e documentos complexos | P2 | 1 | parcial | R18 (olmOCR (AI2)), R03 (Docling), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Detecção de páginas digitalizadas, vazias ou com texto quebrado, registrada no manifesto. Falta executar OCR (olmOCR R18 ou alternativa) só nessas páginas. |
-| M04 | Recuperação híbrida BM25 + vetores | P1 | 2 | parcial | R05 (FAISS (Meta)), R06 (SQLite FTS5), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Parte lexical (BM25, FTS5) com rodízio entre fontes, atrás da flag SCRIPTORIUM_V2_RETRIEVAL. Falta parte vetorial e fusão RRF, que dependem da política de embeddings. |
-| M05 | Citações por ponteiros resolvidos | P1 | 2 | não iniciado | R12 (Estudo MIT: citações por ponteiros), R07 (LangExtract (Google)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Depende do M02 e do M04. |
-| M08 | Matriz de Evidências e proveniência | P1 | 2 | não iniciado | R07 (LangExtract (Google)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Depende de chunks com localizador (M02). |
-| M10 | Abstenção quando há evidência insuficiente | P1 | 2 | não iniciado | R01 (Projeto Scriptorium (paper-orchestra-cloud)), R12 (Estudo MIT: citações por ponteiros) | Depende de recuperação com scores (M04). |
-| M20 | Reranking especializado | P2 | 2 | não iniciado | R16 (InRanker (UNICAMP)), R17 (FlagEmbedding (BAAI)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Benchmark cego em corpus de educação pt-BR. |
+| M04 | Recuperação híbrida BM25 + vetores | P1 | 2 | parcial | R05 (FAISS (Meta)), R06 (SQLite FTS5), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Busca híbrida: BM25 + embeddings Gemini (gemini-embedding-001, 768 dimensões), fundidos por RRF (k=60), com cache de vetores e volta automática para BM25 se o serviço falhar. Falta medir recall@10 e MRR no corpus de referência (scripts/eval_retrieval.py). |
+| M05 | Citações por ponteiros resolvidos | P1 | 2 | parcial | R12 (Estudo MIT: citações por ponteiros), R07 (LangExtract (Google)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Confere depois da geração: cada citação entre aspas do LaTeX é procurada nos trechos das fontes (encontrada, aproximada ou não encontrada) e cada ponteiro [trecho id] é resolvido. Falta o motor emitir ponteiros e o backend montar a citação. |
+| M08 | Matriz de Evidências e proveniência | P1 | 2 | parcial | R07 (LangExtract (Google)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Matriz afirmação -> trechos candidatos (com página e similaridade), em JSON e CSV, com visualização na interface. Falta classificar apoia/contradiz (depende de LLM e avaliação humana) e persistir revisões. |
+| M10 | Abstenção quando há evidência insuficiente | P1 | 2 | parcial | R01 (Projeto Scriptorium (paper-orchestra-cloud)), R12 (Estudo MIT: citações por ponteiros) | Sinaliza afirmações sem evidência localizada nas fontes anexadas (limiares provisórios). Falta abstenção durante a geração e calibrar limiares no corpus. |
+| M20 | Reranking especializado | P2 | 2 | não iniciado | R16 (InRanker (UNICAMP)), R17 (FlagEmbedding (BAAI)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Comparar InRanker (R16) e FlagEmbedding (R17) com a busca híbrida atual usando scripts/eval_retrieval.py; adotar só com ganho reproduzível. |
 | M06 | Escudo de auditoria científica em camadas | P1 | 3 | parcial | R07 (LangExtract (Google)), R08 (Crossref REST API), R09 (OpenAlex API), R10 (Semantic Scholar API), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | A V1 já faz auditoria heurística e conferência de metadados; os estágios de ponteiro e suporte semântico dependem do M05. |
 | M07 | Detecção de retratações e atualizações editoriais | P1 | 3 | parcial | R11 (Retraction Watch via Crossref), R08 (Crossref REST API), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Implementado via Crossref REST (inclui Retraction Watch). Falta sincronizar o CSV completo e reavaliar ao reabrir um manuscrito. |
 | M17 | Detecção de contradições entre estudos | P2 | 3 | não iniciado | R07 (LangExtract (Google)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Depende do M08. |
@@ -41,10 +41,13 @@ As ondas seguem o plano V2 (0: base segura; 1: leitura escalável; 2: busca e ev
 - **M01:** `worker/structured_extract.py`
 - **M02:** `worker/structured_extract.py`, `worker/chunking.py`
 - **M03:** `worker/chunking.py`, `worker/lexical_index.py`, `worker/source_materials.py`
-- **M04:** `worker/lexical_index.py`, `worker/retrieval_context.py`
+- **M04:** `worker/lexical_index.py`, `worker/vector_index.py`, `worker/embeddings.py`, `worker/retrieval_context.py`
+- **M05:** `worker/quote_verification.py`, `worker/latex_text.py`
 - **M06:** `worker/scientific_audit.py`, `worker/reference_verification.py`
 - **M07:** `worker/editorial_status.py`, `worker/reference_verification.py`
+- **M08:** `worker/evidence_matrix.py`
 - **M09:** `worker/retrieval_context.py`
+- **M10:** `worker/evidence_matrix.py`
 - **M11:** `worker/ai_declaration.py`
 - **M13:** `worker/document_guard.py`, `worker/source_materials.py`, `api/library.py`
 - **M14:** `worker/run_manifest.py`

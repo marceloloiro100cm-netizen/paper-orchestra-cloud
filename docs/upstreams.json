@@ -130,7 +130,8 @@
       "review_frequency": "mensal",
       "risk": "Índice serializado no GCS não é banco distribuído; reavaliar para muitos usuários.",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "migration_note": "Por enquanto a busca vetorial usa NumPy (R43), exata e equivalente ao IndexFlatIP. FAISS entra quando o índice persistente por conta passar de dezenas de milhares de vetores."
     },
     {
       "id": "R06",
@@ -273,8 +274,8 @@
       "kind": "artigo",
       "canonical_url": "https://dspace.mit.edu/entities/publication/2994e161-6c34-4f88-973e-c13d1e8cd2ef",
       "license_spdx": "não se aplica",
-      "license_status": "artigo científico; implementar o princípio com código próprio",
-      "adopted": false,
+      "license_status": "artigo científico; princípio implementado com código próprio",
+      "adopted": true,
       "modules": [
         "M05",
         "M10"
@@ -282,7 +283,10 @@
       "update_policy": "Acompanhar revisões e trabalhos relacionados.",
       "review_frequency": "trimestral",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "used_in": [
+        "worker/quote_verification.py"
+      ]
     },
     {
       "id": "R13",
@@ -742,6 +746,7 @@
       "adopted": true,
       "modules": [
         "V1",
+        "M04",
         "M25"
       ],
       "used_in": [
@@ -930,6 +935,61 @@
       "risk": "Tag móvel: cada build pode receber outra versão do Debian e do TeX Live.",
       "owner": "marceloloiro100cm-netizen",
       "last_checked": "2026-11-24"
+    },
+    {
+      "id": "R43",
+      "name": "NumPy",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/numpy/numpy",
+      "github": "numpy/numpy",
+      "pypi": [
+        "numpy"
+      ],
+      "license_spdx": "BSD-3-Clause",
+      "license_status": "a conferir pelo vigia semanal",
+      "pinned": ">=1.26,<3",
+      "adopted": true,
+      "modules": [
+        "M03",
+        "M04",
+        "M08"
+      ],
+      "used_in": [
+        "worker/requirements.txt",
+        "worker/vector_index.py",
+        "worker/embeddings.py"
+      ],
+      "update_policy": "Dependabot semanal; também vem do requirements.txt do PaperOrchestra.",
+      "review_frequency": "mensal",
+      "migration_note": "Busca vetorial exata (equivalente ao IndexFlatIP do FAISS, R05) para até alguns milhares de trechos.",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
+    },
+    {
+      "id": "R44",
+      "name": "Gemini Embedding (gemini-embedding-001)",
+      "kind": "api",
+      "canonical_url": "https://ai.google.dev/api/embeddings",
+      "changelog_url": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/embeddings/get-text-embeddings",
+      "license_spdx": "termos do serviço",
+      "license_status": "serviço Google (Gemini API e Vertex AI); termos e preços próprios",
+      "pinned": "gemini-embedding-001, 768 dimensões (SCRIPTORIUM_EMBEDDING_MODEL / _DIMENSIONS)",
+      "installed_version": "gemini-embedding-001",
+      "adopted": true,
+      "modules": [
+        "M04",
+        "M08"
+      ],
+      "used_in": [
+        "worker/embeddings.py",
+        "worker/evidence_matrix.py",
+        "scripts/eval_retrieval.py"
+      ],
+      "update_policy": "Mensal: nome do modelo, dimensões, limites (250 textos e 20 mil tokens por requisição no Vertex) e preço. Trocar de modelo invalida o cache de vetores (a chave inclui modelo e dimensão).",
+      "review_frequency": "mensal",
+      "risk": "Envia trechos das fontes ao Google (autorizado pelo responsável em 24/11/2026). Convidados usam a própria chave; nunca o projeto do administrador.",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     }
   ],
   "modules": [
@@ -1009,9 +1069,11 @@
         "M03"
       ],
       "status": "parcial",
-      "next_step": "Parte lexical (BM25, FTS5) com rodízio entre fontes, atrás da flag SCRIPTORIUM_V2_RETRIEVAL. Falta parte vetorial e fusão RRF, que dependem da política de embeddings.",
+      "next_step": "Busca híbrida: BM25 + embeddings Gemini (gemini-embedding-001, 768 dimensões), fundidos por RRF (k=60), com cache de vetores e volta automática para BM25 se o serviço falhar. Falta medir recall@10 e MRR no corpus de referência (scripts/eval_retrieval.py).",
       "files": [
         "worker/lexical_index.py",
+        "worker/vector_index.py",
+        "worker/embeddings.py",
         "worker/retrieval_context.py"
       ]
     },
@@ -1030,8 +1092,12 @@
         "M02",
         "M04"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Depende do M02 e do M04."
+      "status": "parcial",
+      "next_step": "Confere depois da geração: cada citação entre aspas do LaTeX é procurada nos trechos das fontes (encontrada, aproximada ou não encontrada) e cada ponteiro [trecho id] é resolvido. Falta o motor emitir ponteiros e o backend montar a citação.",
+      "files": [
+        "worker/quote_verification.py",
+        "worker/latex_text.py"
+      ]
     },
     {
       "id": "M06",
@@ -1093,8 +1159,11 @@
         "M05",
         "M06"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Depende de chunks com localizador (M02)."
+      "status": "parcial",
+      "next_step": "Matriz afirmação -> trechos candidatos (com página e similaridade), em JSON e CSV, com visualização na interface. Falta classificar apoia/contradiz (depende de LLM e avaliação humana) e persistir revisões.",
+      "files": [
+        "worker/evidence_matrix.py"
+      ]
     },
     {
       "id": "M09",
@@ -1130,8 +1199,11 @@
         "M04",
         "M06"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Depende de recuperação com scores (M04)."
+      "status": "parcial",
+      "next_step": "Sinaliza afirmações sem evidência localizada nas fontes anexadas (limiares provisórios). Falta abstenção durante a geração e calibrar limiares no corpus.",
+      "files": [
+        "worker/evidence_matrix.py"
+      ]
     },
     {
       "id": "M11",
@@ -1322,7 +1394,7 @@
         "M19"
       ],
       "status": "nao_iniciado",
-      "next_step": "Benchmark cego em corpus de educação pt-BR."
+      "next_step": "Comparar InRanker (R16) e FlagEmbedding (R17) com a busca híbrida atual usando scripts/eval_retrieval.py; adotar só com ganho reproduzível."
     },
     {
       "id": "M21",
