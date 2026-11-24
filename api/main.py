@@ -8,8 +8,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 from library import make_library_router, MAX_SELECTED_SOURCES
-from access import Invitation, get_access, is_admin, set_invitation
+from access import (Invitation, get_access, is_admin, set_invitation,
+                    request_access, pending_access_requests, mark_request_decided)
 from credentials import GeminiCredential, store_credential, delete_credential
+from model_access import SUPPORTED_MODELS, verify_key_models, get_model_capabilities
 
 import firebase_admin
 from firebase_admin import auth
@@ -60,19 +62,24 @@ class NewResearch(BaseModel):
         return value
 
 
-def current_user(authorization: Annotated[str | None, Header()] = None):
+def verified_google_user(authorization: Annotated[str | None, Header()] = None):
+    """Identidade Google verificada, ainda SEM conceder acesso à pesquisa."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Entre com sua conta Google")
     try:
-        token = auth.verify_id_token(authorization[7:], check_revoked=True)
+        return auth.verify_id_token(authorization[7:], check_revoked=True)
     except Exception:
         raise HTTPException(status_code=401, detail="Sessão inválida ou expirada") from None
-    email = (token.get("email") or "").lower()
-    if not (is_admin(token, ALLOWED_EMAILS) or (BYOK_ENABLED and get_access(db, token, ALLOWED_EMAILS)["allowed"])):
+
+
+def current_user(token: Annotated[dict, Depends(verified_google_user)]):
+    if not (is_admin(token, ALLOWED_EMAILS)
+            or (BYOK_ENABLED and get_access(db, token, ALLOWED_EMAILS)["allowed"])):
         raise HTTPException(status_code=403, detail="Conta não autorizada")
     return token
 
 
+VerifiedUser = Annotated[dict, Depends(verified_google_user)]
 User = Annotated[dict, Depends(current_user)]
 
 # Biblioteca própria privada, separada das pesquisas já concluídas.
@@ -119,17 +126,49 @@ def health():
 
 @app.get("/api/capabilities")
 def capabilities(user: User):
-    return {"neon_review": NEON_REVIEW_ENABLED and is_admin(user, ALLOWED_EMAILS),
-            "neon_model": "gemini-4-neon"}
-
+    access = get_access(db, user, ALLOWED_EMAILS)
+    models = list(SUPPORTED_MODELS) if access["admin"] else get_model_capabilities(db, user["uid"])["allowed_models"]
+    return {
+        # Neon usa integração administrativa específica, NÃO é liberado por Gemini Pro.
+        "neon_review": NEON_REVIEW_ENABLED and access["admin"],
+        "neon_model": "gemini-4-neon",
+        "allowed_models": models,
+    }
 
 
 @app.get("/api/account/access")
 def account_access(user: User):
     access = get_access(db, user, ALLOWED_EMAILS)
-    return {"admin": access["admin"], "byok_ready": BYOK_ENABLED and access["byok_ready"],
-            "multiuser_enabled": BYOK_ENABLED,
-            "research_generation_enabled": access["admin"] or (BYOK_ENABLED and access["byok_ready"])}
+    model_access = ({"status": "admin_vertex", "allowed_models": list(SUPPORTED_MODELS)}
+                    if access["admin"] else get_model_capabilities(db, user["uid"]))
+    allowed = model_access["allowed_models"]
+    return {
+        "admin": access["admin"],
+        "byok_ready": BYOK_ENABLED and access["byok_ready"],
+        "key_connected": BYOK_ENABLED and access["byok_ready"] and not access["admin"],
+        "multiuser_enabled": BYOK_ENABLED,
+        "research_generation_enabled": access["admin"] or
+            (BYOK_ENABLED and access["byok_ready"] and bool(allowed)),
+        "allowed_models": allowed,
+        "model_status": model_access.get("model_status", {}),
+        "model_check_status": model_access["status"],
+        "model_checked_at": model_access.get("checked_at", ""),
+    }
+
+
+@app.post("/api/account/request-access", status_code=202)
+def request_research_access(user: VerifiedUser):
+    """Não concede biblioteca ou geração. Apenas registra pedido de convite."""
+    if not BYOK_ENABLED:
+        raise HTTPException(status_code=503, detail="Solicitação indisponível; contate o administrador.")
+    return request_access(db, user)
+
+
+@app.get("/api/admin/access-requests")
+def list_access_requests(user: User):
+    if not is_admin(user, ALLOWED_EMAILS):
+        raise HTTPException(status_code=403, detail="Somente administradores podem consultar solicitações.")
+    return {"items": pending_access_requests(db)}
 
 
 @app.put("/api/account/credential")
@@ -143,10 +182,17 @@ def save_personal_credential(payload: GeminiCredential, user: User):
         key = payload.normalized
     except ValueError:
         raise HTTPException(status_code=422, detail="Formato da chave inválido.") from None
+    # Prova acesso a cada modelo; a simples listagem de modelos não concede permissão.
+    # Chamadas mínimas de geração podem consumir a quota ou ter custo na conta da chave.
+    checks = verify_key_models(key)
+    if checks["status"] == "invalid_key":
+        raise HTTPException(status_code=422, detail="O Google recusou esta chave. Confira a chave no AI Studio.")
     try:
-        return store_credential(db, PROJECT, user["uid"], key)
+        stored = store_credential(db, PROJECT, user["uid"], key, model_access=checks)
     except Exception:
-        raise HTTPException(status_code=503, detail="Não foi possível guardar a credencial de IA.") from None
+        raise HTTPException(status_code=503, detail="Não foi possível guardar a chave com segurança.") from None
+    return {**stored, "allowed_models": checks["allowed_models"],
+            "model_status": checks["model_status"], "verification_status": checks["status"]}
 
 
 @app.delete("/api/account/credential")
@@ -167,7 +213,9 @@ def invite_researcher(payload: Invitation, user: User):
         raise HTTPException(status_code=503, detail="Convites indisponíveis até aprovação da infraestrutura.")
     if not is_admin(user, ALLOWED_EMAILS):
         raise HTTPException(status_code=403, detail="Apenas administradores podem convidar.")
-    return set_invitation(db, payload.email, True, user["uid"], ALLOWED_EMAILS)
+    result = set_invitation(db, payload.email, True, user["uid"], ALLOWED_EMAILS)
+    mark_request_decided(db, payload.email, "approved")
+    return result
 
 
 @app.delete("/api/admin/invitations/{email}")
@@ -177,7 +225,9 @@ def revoke_researcher(email: str, user: User):
     if not is_admin(user, ALLOWED_EMAILS):
         raise HTTPException(status_code=403, detail="Apenas administradores podem revogar.")
     try:
-        return set_invitation(db, email, False, user["uid"], ALLOWED_EMAILS)
+        result = set_invitation(db, email, False, user["uid"], ALLOWED_EMAILS)
+        mark_request_decided(db, email, "revoked")
+        return result
     except ValueError:
         raise HTTPException(status_code=422, detail="E-mail inválido.") from None
 
@@ -195,9 +245,15 @@ def list_researches(user: User):
 def create_research(payload: NewResearch, user: User):
     owner_uid = user["uid"]
     access = get_access(db, user, ALLOWED_EMAILS)
-    if not (access["admin"] or (BYOK_ENABLED and access["byok_ready"])):
-        # Bloqueia antes de armazenar materiais ou iniciar Cloud Run.
-        raise HTTPException(status_code=409, detail="Configure sua chave Gemini antes de iniciar uma pesquisa.")
+    allowed_models = (list(SUPPORTED_MODELS) if access["admin"]
+                      else get_model_capabilities(db, owner_uid)["allowed_models"])
+    if not (access["admin"] or (BYOK_ENABLED and access["byok_ready"] and allowed_models)):
+        # Bloqueia geração com chave cadastrada, mas ainda não validada, sem usar a conta central.
+        raise HTTPException(status_code=409, detail="Conecte e verifique sua chave Gemini antes de pesquisar.")
+    if payload.model not in allowed_models or (payload.reflection_model and payload.reflection_model not in allowed_models):
+        raise HTTPException(status_code=403, detail="Modelo indisponível para esta chave Gemini. Verifique sua conexão.")
+    if payload.plotting and not access["admin"]:
+        raise HTTPException(status_code=403, detail="Imagens exigem verificação separada; recurso indisponível nesta conta.")
     if payload.neon_review and not access["admin"]:
         raise HTTPException(status_code=422, detail="A revisão Neon exige um provedor compatível e não está disponível no BYOK.")
     if payload.neon_review and not NEON_REVIEW_ENABLED:
