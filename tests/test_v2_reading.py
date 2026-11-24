@@ -15,7 +15,7 @@ from retrieval_context import render_context, select_passages
 from source_materials import compose_library_context_v2, derived_key
 from structured_extract import extract_docx, extract_plain
 
-HAS_FITZ = importlib.util.find_spec("fitz") is not None
+HAS_FITZ = any(importlib.util.find_spec(n) is not None for n in ("pymupdf", "fitz"))
 
 
 def doc(blocks, pages=None):
@@ -235,7 +235,7 @@ class ComposeV2Test(unittest.TestCase):
 @unittest.skipUnless(HAS_FITZ, "PyMuPDF não instalado; roda no CI")
 class PdfExtractionTest(unittest.TestCase):
     def make_pdf(self):
-        import fitz
+        from pdf_backend import fitz
         pdf = fitz.open()
         page = pdf.new_page(width=595, height=842)
         page.insert_text((72, 90), "Sala de aula invertida", fontsize=20)

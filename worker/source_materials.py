@@ -24,7 +24,7 @@ def extract_text(blob: bytes, fmt: str) -> str:
     if fmt not in SUPPORTED:
         raise ValueError("Formato de arquivo não suportado.")
     if fmt == "pdf":
-        import fitz
+        from pdf_backend import fitz  # PyMuPDF (R37)
         with fitz.open(stream=blob, filetype="pdf") as doc:
             return "\n\n".join(page.get_text("text") for page in list(doc)[:60])
     if fmt == "docx":

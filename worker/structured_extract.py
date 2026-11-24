@@ -75,7 +75,7 @@ def _mark_headings(blocks: list[dict]) -> None:
 
 
 def extract_pdf(data: bytes, max_pages: int = MAX_PDF_PAGES) -> dict:
-    import fitz  # PyMuPDF (R37)
+    from pdf_backend import fitz  # PyMuPDF (R37)
     pages, blocks, warnings = [], [], []
     with fitz.open(stream=data, filetype="pdf") as doc:
         total = doc.page_count
