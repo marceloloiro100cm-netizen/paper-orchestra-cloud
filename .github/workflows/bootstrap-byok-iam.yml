@@ -1,0 +1,178 @@
+# Bootstrap BYOK sem Cloud Shell (pendência da issue #43).
+#
+# Modo "diagnosticar" (padrão): SOMENTE LEITURA. Mostra as permissões efetivas
+# do deployer e o estado das concessões BYOK. Não altera nada.
+#
+# Modo "aplicar": roda scripts/setup-byok-iam.sh pelo GitHub Actions. Exige o
+# texto de confirmação CONFIRMO-BYOK. Se o deployer não puder criar papéis
+# personalizados, mas puder alterar a política IAM do projeto, ele recebe
+# Role Administrator TEMPORÁRIO com condição de expiração de 30 minutos
+# (request.time), usa só para criar os dois papéis do BYOK e remove a
+# concessão no fim, mesmo em caso de falha. A expiração é uma segunda barreira:
+# se a remoção falhar, a concessão deixa de valer sozinha.
+name: Bootstrap BYOK (sem Cloud Shell)
+
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "diagnosticar (só leitura) ou aplicar"
+        required: true
+        default: diagnosticar
+        type: choice
+        options: [diagnosticar, aplicar]
+      confirmacao:
+        description: "Para aplicar, digite CONFIRMO-BYOK"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: paper-orchestra-iam
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: paperorchestra-mestrado
+  DEPLOYER: paper-orchestra-deployer@paperorchestra-mestrado.iam.gserviceaccount.com
+  TEMP_TITLE: TemporarioBootstrapBYOK
+
+jobs:
+  bootstrap:
+    if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Autenticar no Google Cloud por OIDC (sem chave JSON)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/201655574048/locations/global/workloadIdentityPools/github-actions/providers/github-actions
+          service_account: paper-orchestra-deployer@paperorchestra-mestrado.iam.gserviceaccount.com
+          project_id: paperorchestra-mestrado
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: paperorchestra-mestrado
+
+      - name: Diagnóstico (somente leitura)
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="$(gcloud auth print-access-token)"
+          curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            "https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT_ID}:testIamPermissions" \
+            -d '{"permissions":["resourcemanager.projects.getIamPolicy","resourcemanager.projects.setIamPolicy","iam.roles.create","iam.roles.update","iam.roles.get","serviceusage.services.enable"]}' \
+            > /tmp/perms.json
+          python3 - <<'PY'
+          import json
+          held = set(json.load(open('/tmp/perms.json')).get('permissions', []))
+          for p in ["resourcemanager.projects.getIamPolicy", "resourcemanager.projects.setIamPolicy",
+                    "iam.roles.create", "iam.roles.update", "iam.roles.get", "serviceusage.services.enable"]:
+              print(("SIM " if p in held else "NÃO"), p)
+          PY
+          for role in scriptoriumByokWriter scriptoriumByokAuditor; do
+            if gcloud iam roles describe "$role" --project="$PROJECT_ID" >/dev/null 2>&1; then
+              echo "Papel $role: existe"
+            else
+              echo "Papel $role: ausente (ou sem permissão para ler)"
+            fi
+          done
+          gcloud projects get-iam-policy "$PROJECT_ID" --format=json > /tmp/policy.json
+          python3 - <<'PY'
+          import json, os
+          policy = json.load(open('/tmp/policy.json'))
+          me = "serviceAccount:" + os.environ["DEPLOYER"]
+          roles = sorted({(b["role"], (b.get("condition") or {}).get("title", "")) for b in policy.get("bindings", [])
+                          if me in b.get("members", [])})
+          print("Papéis do deployer no projeto:")
+          for role, cond in roles:
+              print("  -", role, f"(condição: {cond})" if cond else "")
+          PY
+          bash scripts/audit-byok-iam.sh || echo "Auditoria BYOK ainda incompleta (esperado antes do bootstrap)."
+
+      - name: Conferir confirmação
+        if: inputs.modo == 'aplicar'
+        shell: bash
+        env:
+          CONFIRMACAO: ${{ inputs.confirmacao }}
+        run: |
+          if [ "$CONFIRMACAO" != "CONFIRMO-BYOK" ]; then
+            echo "::error::Para aplicar, rode de novo com confirmacao=CONFIRMO-BYOK."
+            exit 1
+          fi
+
+      - name: Papel temporário de criação de papéis (30 min), se necessário
+        if: inputs.modo == 'aplicar'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="$(gcloud auth print-access-token)"
+          held="$(curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            "https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT_ID}:testIamPermissions" \
+            -d '{"permissions":["iam.roles.create","iam.roles.update","resourcemanager.projects.setIamPolicy"]}')"
+          if echo "$held" | grep -q '"iam.roles.create"' && echo "$held" | grep -q '"iam.roles.update"'; then
+            echo "O deployer já pode criar papéis; nenhuma concessão temporária necessária."
+            echo "TEMP_GRANTED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if ! echo "$held" | grep -q '"resourcemanager.projects.setIamPolicy"'; then
+            echo "::error::O deployer não pode alterar o IAM do projeto. Este passo precisa ser feito no Console ou no Cloud Shell."
+            exit 1
+          fi
+          EXPIRES="$(date -u -d '+30 minutes' +%Y-%m-%dT%H:%M:%SZ)"
+          EXPR="request.time < timestamp(\"${EXPIRES}\")"
+          echo "TEMP_EXPR=${EXPR}" >> "$GITHUB_ENV"
+          echo "TEMP_GRANTED=true" >> "$GITHUB_ENV"
+          gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+            --member="serviceAccount:${DEPLOYER}" --role="roles/iam.roleAdmin" \
+            --condition="title=${TEMP_TITLE},description=Bootstrap BYOK; expira em ${EXPIRES},expression=${EXPR}" \
+            --quiet >/dev/null
+          echo "Role Administrator temporário concedido até ${EXPIRES}."
+
+      - name: Aplicar bootstrap BYOK (scripts/setup-byok-iam.sh)
+        if: inputs.modo == 'aplicar'
+        shell: bash
+        run: |
+          set -uo pipefail
+          # O IAM pode levar alguns minutos para propagar a concessão temporária.
+          # O script é idempotente (describe -> create/update; bindings repetidos
+          # não duplicam), então pode ser repetido com segurança.
+          for attempt in 1 2 3 4 5 6; do
+            if PROJECT_ID="$PROJECT_ID" bash scripts/setup-byok-iam.sh; then
+              echo "Bootstrap aplicado na tentativa ${attempt}."
+              exit 0
+            fi
+            echo "Tentativa ${attempt} falhou; aguardando 60 s pela propagação do IAM..."
+            sleep 60
+          done
+          echo "::error::O bootstrap não pôde ser aplicado. Veja as mensagens acima."
+          exit 1
+
+      - name: Remover o papel temporário (sempre)
+        if: always() && inputs.modo == 'aplicar' && env.TEMP_GRANTED == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # --all remove a concessão com qualquer condição (a temporária).
+          gcloud projects remove-iam-policy-binding "$PROJECT_ID" \
+            --member="serviceAccount:${DEPLOYER}" --role="roles/iam.roleAdmin" --all --quiet >/dev/null
+          gcloud projects get-iam-policy "$PROJECT_ID" --format=json > /tmp/after.json
+          python3 - <<'PY'
+          import json, os
+          policy = json.load(open('/tmp/after.json'))
+          me = "serviceAccount:" + os.environ["DEPLOYER"]
+          left = [b for b in policy.get("bindings", []) if b.get("role") == "roles/iam.roleAdmin" and me in b.get("members", [])]
+          assert not left, "Role Administrator ainda aparece para o deployer"
+          print("Confirmado: o deployer não tem mais Role Administrator.")
+          PY
+
+      - name: Auditoria final
+        if: inputs.modo == 'aplicar'
+        shell: bash
+        run: bash scripts/audit-byok-iam.sh
