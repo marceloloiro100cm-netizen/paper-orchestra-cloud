@@ -61,7 +61,7 @@ function displayLibrary() {
   );
   if (!items.length) {target.textContent='Nenhum documento encontrado. Adicione PDFs, DOCX ou bibliografias para começar.';return;}
   for (const item of items) {
-    const line = document.createElement('div'); line.className = 'library-item';
+    const line = document.createElement('div'); line.className = 'library-item'; line.dataset.libraryId = item.id;
     const body = document.createElement('div');
     const label = document.createElement('label');
     const check = document.createElement('input'); check.type='checkbox';
@@ -530,6 +530,9 @@ $('revoke-researcher').addEventListener('click', () => changeInvite(true));
 
 onAuthStateChanged(auth, async (current) => {
   user=current;
+  window.dispatchEvent(new CustomEvent('scriptorium:library-user-changed', {
+    detail: { uid: current?.uid || null }
+  }));
   $('login-panel').classList.toggle('hidden', !!user);
   $('workspace').classList.toggle('hidden', !user);
   $('logout').classList.toggle('hidden', !user);

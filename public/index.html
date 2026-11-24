@@ -383,7 +383,265 @@
     }
 
     /* Itens dinâmicos da Biblioteca (gerados por app.js) */
-    .library-item {
+/* Segmented toggle Kanban | Lista */
+    .segmented {
+      display: inline-flex;
+      padding: 3px;
+      border-radius: 11px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-main);
+    }
+    .seg-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .seg-btn.active { background: var(--mpie-blue); color: #FFFFFF; }
+    html[data-theme="black"] .seg-btn.active { color: #070A0F; }
+
+    /* Gaveta retrátil de Upload (mantém biblioteca limpa) */
+    details.upload-drawer {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-main);
+      border-radius: 14px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+    }
+    details.upload-drawer summary {
+      font-weight: 650;
+      font-size: 0.88rem;
+      color: var(--mpie-blue-text);
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    details.upload-drawer[open] summary { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border-main); }
+
+    /* Toolbar da Biblioteca + Barra de Espaço de Leitura (75.000 chars) */
+    .lib-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .lib-search-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      flex: 1;
+      min-width: 240px;
+    }
+    .lib-search-row input { flex: 1; min-width: 180px; }
+    .lib-search-row select { width: auto; min-width: 130px; }
+
+    .budget-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 14px;
+      border-radius: 12px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-main);
+      font-size: 0.78rem;
+      flex-shrink: 0;
+      transition: background-color 180ms ease, border-color 180ms ease;
+    }
+    .budget-box.budget-over {
+      background: var(--danger-soft);
+      border-color: var(--danger-border);
+      color: var(--danger-text);
+    }
+    .budget-title { font-weight: 700; color: var(--mpie-blue-text); }
+    .budget-box.budget-over .budget-title { color: var(--danger-text); }
+    .budget-chars { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .budget-box.budget-over .budget-chars { color: var(--danger-text); font-weight: 600; }
+    .budget-track { width: 84px; height: 8px; border-radius: 999px; background: var(--border-main); overflow: hidden; }
+    .budget-fill { height: 100%; width: 0%; background: var(--mpie-blue); transition: width 180ms ease, background-color 180ms ease; }
+    .budget-box.budget-over .budget-fill { background: var(--danger); }
+
+    .budget-alert {
+      margin: 0 0 12px;
+      padding: 10px 14px;
+      border-radius: 11px;
+      background: var(--danger-soft);
+      border: 1px solid var(--danger-border);
+      color: var(--danger-text);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    /* Chips de Filtro por Coluna Kanban */
+    .col-pills {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 0 14px;
+      border-top: 1px solid var(--border-soft);
+      border-bottom: 1px solid var(--border-soft);
+      margin-bottom: 16px;
+    }
+    .col-pill {
+      border: 1px solid var(--border-main);
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      padding: 5px 11px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+    .col-pill.active { background: var(--mpie-blue); border-color: var(--mpie-blue); color: #FFFFFF; }
+    html[data-theme="black"] .col-pill.active { color: #070A0F; }
+
+    /* Quadro Kanban com Drag & Drop */
+    .kanban-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+    .kanban-col {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-main);
+      border-radius: 15px;
+      padding: 12px;
+      min-height: 280px;
+      transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+    }
+    .kanban-col.drag-over {
+      border-color: var(--mpie-blue);
+      background: var(--mpie-blue-soft);
+      box-shadow: inset 0 0 0 2px var(--mpie-blue);
+    }
+    .kanban-col-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border-main);
+    }
+    .kanban-col-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .kanban-col-desc { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .kanban-count {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-main);
+      color: var(--text-secondary);
+    }
+    .rename-btn {
+      border: none;
+      background: transparent;
+      color: var(--mpie-blue-text);
+      font-size: 0.78rem;
+      padding: 0 3px;
+      opacity: 0.75;
+    }
+    .rename-btn:hover { opacity: 1; }
+    .kanban-cards { display: flex; flex-direction: column; gap: 10px; }
+    .kanban-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-main);
+      border-radius: 12px;
+      padding: 11px;
+      cursor: grab;
+      transition: transform 120ms ease, opacity 120ms ease, border-color 120ms ease;
+    }
+    .kanban-card:active { cursor: grabbing; }
+    .kanban-card.dragging { opacity: 0.45; transform: scale(0.98); }
+    .kanban-card.selected { border-color: var(--mpie-blue); box-shadow: inset 0 0 0 1px var(--mpie-blue); }
+    .kcard-title { font-size: 0.82rem; font-weight: 650; color: var(--text-primary); word-break: break-word; line-height: 1.3; }
+    .kcard-meta { font-size: 0.72rem; color: var(--text-muted); margin-top: 5px; line-height: 1.35; word-break: break-word; }
+    .kcard-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 9px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-soft);
+    }
+    .kcard-btn {
+      border: 1px solid var(--border-main);
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      border-radius: 7px;
+      padding: 4px 8px;
+      font-size: 0.73rem;
+      font-weight: 600;
+    }
+    .kcard-btn.on { background: var(--mpie-blue); border-color: var(--mpie-blue); color: #FFFFFF; }
+    html[data-theme="black"] .kcard-btn.on { color: #070A0F; }
+    .kcard-move { width: auto; max-width: 125px; padding: 3px 6px; font-size: 0.72rem; border-radius: 7px; }
+    .kanban-empty {
+      border: 1px dashed var(--border-main);
+      border-radius: 10px;
+      padding: 22px 10px;
+      text-align: center;
+      font-size: 0.74rem;
+      color: var(--text-muted);
+    }
+
+    /* Modal Configurar Colunas */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-main);
+      border-radius: 18px;
+      width: min(560px, 100%);
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    }
+    .modal-head, .modal-foot {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .modal-foot { border-bottom: none; border-top: 1px solid var(--border-main); background: var(--bg-subtle); }
+    .modal-body { padding: 16px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    .cfg-row { background: var(--bg-subtle); border: 1px solid var(--border-main); border-radius: 12px; padding: 11px; }
+
+    
+        .kanban-source-hidden { display: none !important; }
+        .library-item {
       border-top: 1px solid var(--border-soft);
       padding: 14px 0;
       display: flex;
@@ -618,26 +876,74 @@
         <div class="panel-header">
           <div>
             <h2>Biblioteca acadêmica permanente</h2>
-            <p class="subtle" style="margin:0">Guarde PDFs, DOCX, BibTeX, RIS ou TXT na sua conta. Selecione até oito fontes para a próxima pesquisa; documentos anexados são contexto, não resultados verificados.</p>
+            <p class="subtle" style="margin:0">Organize seus documentos no Kanban (arraste para mudar o filtro) ou alterne para Lista. Selecione até 8 fontes para a próxima pesquisa.</p>
           </div>
-          <button class="btn alt" type="button" id="refresh-library">Atualizar</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <div class="segmented" role="group" aria-label="Modo de visualização da biblioteca">
+              <button type="button" class="seg-btn active" id="view-kanban-btn">Kanban</button>
+              <button type="button" class="seg-btn" id="view-list-btn">Lista</button>
+            </div>
+            <button type="button" class="btn alt" id="open-config-cols">⚙ Colunas</button>
+            <button class="btn alt" type="button" id="refresh-library">Atualizar</button>
+          </div>
         </div>
 
-        <div class="library-grid">
-          <div><label for="library-file">Arquivo</label><input id="library-file" type="file" accept=".pdf,.docx,.bib,.ris,.txt" /></div>
-          <div><label for="library-collection">Coleção (assunto ou capítulo)</label><input id="library-collection" type="text" maxlength="60" value="Geral" placeholder="Ex.: Revisão bibliográfica"/></div>
-        </div>
-        <label for="library-description">Descrição opcional</label>
-        <input id="library-description" type="text" maxlength="300" placeholder="Por que este documento é relevante?"/>
-        <div class="actions">
-          <button class="btn" type="button" id="upload-library">Guardar na biblioteca</button>
-          <span id="library-message" role="status" class="subtle"></span>
+        <!-- Gaveta retrátil de Upload (mantém o topo limpo e preserva 100% os IDs de app.js) -->
+        <details class="upload-drawer">
+          <summary><span>+ Guardar novo arquivo na biblioteca (.pdf, .docx, .bib, .ris, .txt)</span><span class="subtle" style="font-size:.78rem">Abrir / Fechar</span></summary>
+          <div class="library-grid">
+            <div><label for="library-file">Arquivo</label><input id="library-file" type="file" accept=".pdf,.docx,.bib,.ris,.txt" /></div>
+            <div>
+              <label for="library-collection">Coluna / Coleção</label>
+              <input id="library-collection" list="kanban-col-options" type="text" maxlength="60" value="A Triar" placeholder="Escolha ou digite a coluna"/>
+              <datalist id="kanban-col-options"></datalist>
+            </div>
+          </div>
+          <label for="library-description">Descrição opcional</label>
+          <input id="library-description" type="text" maxlength="300" placeholder="Por que este documento é relevante?"/>
+          <div class="actions">
+            <button class="btn" type="button" id="upload-library">Guardar na biblioteca</button>
+            <span id="library-message" role="status" class="subtle"></span>
+          </div>
+        </details>
+
+        <!-- Toolbar de busca, filtro de formato e medidor de espaço de leitura (75.000 chars) -->
+        <div class="lib-toolbar">
+          <div class="lib-search-row">
+            <input id="library-filter" type="text" placeholder="Buscar por nome, coleção ou descrição..."/>
+            <select id="format-filter" aria-label="Filtrar por formato">
+              <option value="todos">Formato: Todos</option>
+              <option value="pdf">PDF</option>
+              <option value="docx">DOCX</option>
+              <option value="bib">BIB</option>
+              <option value="ris">RIS</option>
+              <option value="txt">TXT</option>
+            </select>
+          </div>
+
+          <div class="budget-box" id="budget-box" title="Limite real do Worker: 20.000 caracteres por arquivo e 75.000 caracteres no total">
+            <div>
+              <div class="budget-title" id="budget-sources">0/8 fontes anexadas</div>
+              <div class="budget-chars" id="budget-chars">0 / 75.000 caracteres (est.)</div>
+            </div>
+            <div class="budget-track"><div class="budget-fill" id="budget-fill"></div></div>
+          </div>
         </div>
 
-        <label for="library-filter">Buscar na biblioteca</label>
-        <input id="library-filter" type="text" placeholder="Filtrar por nome, coleção ou descrição"/>
-        <p id="selected-count" class="library-note">0 fonte(s) selecionada(s) para a próxima pesquisa</p>
-        <div id="library-list" role="status">Carregando biblioteca...</div>
+        <div id="budget-alert" class="budget-alert hidden">
+          Limite de 75.000 caracteres ultrapassado: o Worker cortará trechos excedentes na geração. Remova uma fonte ou priorize textos mais concisos.
+        </div>
+
+        <p id="selected-count" class="library-note" style="margin-top:0">0 fonte(s) selecionada(s) para a próxima pesquisa</p>
+
+        <!-- Chips de filtro por coluna Kanban -->
+        <div class="col-pills" id="col-pills"></div>
+
+        <!-- Quadro Kanban sincronizado com #library-list -->
+        <div id="kanban-board" class="kanban-grid"></div>
+
+        <!-- Lista original gerenciada por public/app.js (visível no modo Lista) -->
+        <div id="library-list" role="status" class="kanban-source-hidden">Carregando biblioteca...</div>
 
         <div class="step-footer">
           <button type="button" class="btn" data-go-step="2">Continuar para Nova Pesquisa →</button>
@@ -732,7 +1038,28 @@
     </div>
   </main>
 
-  <footer>Scriptorium MPIE • Projeto acadêmico independente baseado no PaperOrchestra • Revise referências e resultados antes de divulgar.</footer>
+  <!-- Modal: Configurar nomes das colunas Kanban -->
+  <div id="config-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="cfg-title">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div>
+          <strong id="cfg-title" style="font-family:var(--font-serif);font-size:1.15rem">Configurar Colunas do Kanban</strong>
+          <div class="subtle" style="font-size:.76rem">Renomeie cada coluna conforme seus capítulos ou fluxo de leitura.</div>
+        </div>
+        <button type="button" class="btn alt" id="cfg-close" style="padding:5px 10px">✕</button>
+      </div>
+      <div class="modal-body" id="cfg-body"></div>
+      <div class="modal-foot">
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn alt" id="cfg-add">+ Nova Coluna</button>
+          <button type="button" class="btn alt" id="cfg-reset">Restaurar padrão</button>
+        </div>
+        <button type="button" class="btn" id="cfg-done">Concluir</button>
+      </div>
+    </div>
+  </div>
+
+    <footer>Scriptorium MPIE • Projeto acadêmico independente baseado no PaperOrchestra • Revise referências e resultados antes de divulgar.</footer>
 
   <!-- Camada exclusivamente visual (Modo Black + navegação entre as 3 etapas, sem tocar no core) -->
   <script>
@@ -797,6 +1124,451 @@
           if (m) sub1.textContent = m[0] + '/8 fonte(s) anexada(s)';
         }).observe(selCount, { childList: true, characterData: true, subtree: true });
       }
+    })();
+  </script>
+  <script>
+    (function () {
+      const CHAR_LIMIT_TOTAL = 75000;
+      const DEFAULT_COLS = [
+        { id: 'col-1', name: 'A Triar', desc: 'Arquivos recém-enviados' },
+        { id: 'col-2', name: 'Em Leitura', desc: 'Em fichamento crítico' },
+        { id: 'col-3', name: 'Pronto para Citar', desc: 'Validados para os agentes' },
+        { id: 'col-4', name: 'Normas & Bases', desc: 'Manuais ABNT e .bib' }
+      ];
+
+      let columns = JSON.parse(JSON.stringify(DEFAULT_COLS));
+      let itemColMap = {};
+      let viewMode = 'kanban';
+      let activeColFilter = 'todas';
+      let activeFormat = 'todos';
+      let editingColId = null;
+      let draggedKey = null;
+
+      // Preferências pertencem à conta Google ativa, nunca ao navegador inteiro.
+      // O servidor continua sendo a fonte de verdade para os documentos.
+      let libraryUid = null;
+      const prefKey = (name) => 'scriptorium_library_' + libraryUid + '_' + name;
+      function loadPrefs() {
+        columns = JSON.parse(JSON.stringify(DEFAULT_COLS));
+        itemColMap = {};
+        viewMode = 'kanban';
+        activeColFilter = 'todas';
+        activeFormat = 'todos';
+        editingColId = null;
+        if (!libraryUid) return;
+        try {
+          const sc = JSON.parse(localStorage.getItem(prefKey('cols')) || 'null');
+          if (Array.isArray(sc) && sc.length >= 2 &&
+              sc.every(c => typeof c.id === 'string' && typeof c.name === 'string'))
+            columns = sc;
+          const sm = JSON.parse(localStorage.getItem(prefKey('items')) || '{}');
+          if (sm && typeof sm === 'object' && !Array.isArray(sm)) itemColMap = sm;
+          const sv = localStorage.getItem(prefKey('view'));
+          if (sv === 'kanban' || sv === 'list') viewMode = sv;
+        } catch (_) {}
+      }
+      function savePrefs() {
+        if (!libraryUid) return;
+        try {
+          localStorage.setItem(prefKey('cols'), JSON.stringify(columns));
+          localStorage.setItem(prefKey('items'), JSON.stringify(itemColMap));
+          localStorage.setItem(prefKey('view'), viewMode);
+        } catch (_) {}
+      }
+
+      
+      /* 3. Sincronização Biblioteca Real (#library-list) <-> Kanban & Orçamento 75k chars */
+      const libList = document.getElementById('library-list');
+      const kanbanBoard = document.getElementById('kanban-board');
+      const colPills = document.getElementById('col-pills');
+      const viewKanbanBtn = document.getElementById('view-kanban-btn');
+      const viewListBtn = document.getElementById('view-list-btn');
+      const formatFilter = document.getElementById('format-filter');
+      const datalist = document.getElementById('kanban-col-options');
+
+      function updateDatalist() {
+        datalist.replaceChildren();
+        columns.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.name;
+          datalist.appendChild(opt);
+        });
+      }
+
+      function estimateCharsFromMeta(filename, metaText) {
+        const ext = (filename.toLowerCase().match(/\.([a-z0-9]+)$/) || [])[1] || '';
+        const m = (metaText || '').match(/([\d.,]+)\s*(kb|kib|mb|mib|b)\b/i);
+        let kb = 250;
+        if (m) {
+          const val = parseFloat(m[1].replace(',', '.'));
+          const unit = m[2].toLowerCase();
+          if (unit === 'mb' || unit === 'mib') kb = val * 1024;
+          else if (unit === 'kb' || unit === 'kib') kb = val;
+          else kb = val / 1024;
+        }
+        // Estimativa realista de texto extraível por formato (teto real de 20k chars/arquivo)
+        let est = 0;
+        if (ext === 'txt' || ext === 'bib' || ext === 'ris') est = Math.round(kb * 900);
+        else if (ext === 'docx') est = Math.round(kb * 35);
+        else est = Math.round(kb * 14);
+        return Math.max(1200, Math.min(20000, est));
+      }
+
+      function resolveColId(key, metaText) {
+        if (itemColMap[key] && columns.some(c => c.id === itemColMap[key])) return itemColMap[key];
+        const lowerMeta = (metaText || '').toLowerCase();
+        for (const c of columns) {
+          if (lowerMeta.includes(c.name.toLowerCase())) return c.id;
+        }
+        return columns[0].id;
+      }
+
+      function readRealLibraryItems() {
+        const nodes = Array.from(libList.querySelectorAll('.library-item'));
+        return nodes.map((node, idx) => {
+          const cb = node.querySelector('input[type="checkbox"]');
+          const label = node.querySelector('label');
+          const metaEl = node.querySelector('.library-meta');
+          const filename = (label ? label.textContent : `Documento ${idx + 1}`).trim();
+          const metaText = (metaEl ? metaEl.textContent : '').trim();
+          const ext = (filename.toLowerCase().match(/\.([a-z0-9]+)$/) || [])[1] || '';
+          const key = filename + '|' + idx;
+          const stableKey = node.dataset.libraryId || filename;
+          const colId = resolveColId(stableKey, metaText);
+          const buttons = Array.from(node.querySelectorAll('.library-actions button'));
+          return {
+            node, cb, filename, metaText, ext, stableKey, colId,
+            checked: !!(cb && cb.checked),
+            estChars: estimateCharsFromMeta(filename, metaText),
+            buttons
+          };
+        });
+      }
+
+      function updateBudget(items) {
+        const selected = items.filter(i => i.checked);
+        const totalChars = selected.reduce((sum, i) => sum + i.estChars, 0);
+        const isOver = totalChars > CHAR_LIMIT_TOTAL;
+        const pct = Math.min(100, Math.round((totalChars / CHAR_LIMIT_TOTAL) * 100));
+
+        const box = document.getElementById('budget-box');
+        const srcEl = document.getElementById('budget-sources');
+        const chrEl = document.getElementById('budget-chars');
+        const fill = document.getElementById('budget-fill');
+        const alertBox = document.getElementById('budget-alert');
+        const sub1 = document.getElementById('step-sub-1');
+
+        srcEl.textContent = `${selected.length}/8 fontes anexadas`;
+        chrEl.textContent = `${totalChars.toLocaleString('pt-BR')} / 75.000 caracteres`;
+        fill.style.width = pct + '%';
+        box.classList.toggle('budget-over', isOver);
+        alertBox.classList.toggle('hidden', !isOver);
+        if (sub1) sub1.textContent = `${selected.length}/8 fonte(s) · ${viewMode === 'kanban' ? 'Kanban' : 'Lista'}`;
+      }
+
+      function renderLibraryViews() {
+        updateDatalist();
+        const items = readRealLibraryItems();
+        updateBudget(items);
+
+        viewKanbanBtn.classList.toggle('active', viewMode === 'kanban');
+        viewListBtn.classList.toggle('active', viewMode === 'list');
+
+        // Render chips de filtro por coluna
+        colPills.replaceChildren();
+        const lbl = document.createElement('span');
+        lbl.style.cssText = 'font-size:.74rem;font-weight:600;color:var(--text-muted);margin-right:4px';
+        lbl.textContent = 'Filtro por coluna:';
+        colPills.appendChild(lbl);
+
+        const allBtn = document.createElement('button');
+        allBtn.type = 'button';
+        allBtn.className = 'col-pill' + (activeColFilter === 'todas' ? ' active' : '');
+        allBtn.textContent = `Todas (${items.length})`;
+        allBtn.addEventListener('click', () => { activeColFilter = 'todas'; renderLibraryViews(); });
+        colPills.appendChild(allBtn);
+
+        columns.forEach(col => {
+          const count = items.filter(i => i.colId === col.id).length;
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'col-pill' + (activeColFilter === col.id ? ' active' : '');
+          b.textContent = `${col.name} (${count})`;
+          b.addEventListener('click', () => { activeColFilter = col.id; renderLibraryViews(); });
+          colPills.appendChild(b);
+        });
+
+        // Aplica filtros (coluna + formato) na lista real para o modo Lista
+        items.forEach(it => {
+          const matchCol = activeColFilter === 'todas' || it.colId === activeColFilter;
+          const matchFmt = activeFormat === 'todos' || it.ext === activeFormat;
+          it.node.style.display = (matchCol && matchFmt) ? '' : 'none';
+        });
+
+        if (viewMode === 'list') {
+          kanbanBoard.classList.add('hidden');
+          libList.classList.remove('kanban-source-hidden');
+          return;
+        }
+
+        // Modo Kanban
+        libList.classList.add('kanban-source-hidden');
+        kanbanBoard.classList.remove('hidden');
+        kanbanBoard.replaceChildren();
+
+        if (!items.length) {
+          const emptyMsg = document.createElement('div');
+          emptyMsg.className = 'kanban-empty';
+          emptyMsg.style.gridColumn = '1 / -1';
+          emptyMsg.textContent = (libList.textContent || 'Nenhum documento carregado na biblioteca ainda.').trim();
+          kanbanBoard.appendChild(emptyMsg);
+          return;
+        }
+
+        const visibleCols = activeColFilter === 'todas' ? columns : columns.filter(c => c.id === activeColFilter);
+        visibleCols.forEach(col => {
+          const colEl = document.createElement('section');
+          colEl.className = 'kanban-col';
+          colEl.dataset.dropCol = col.id;
+
+          colEl.addEventListener('dragover', e => { e.preventDefault(); colEl.classList.add('drag-over'); });
+          colEl.addEventListener('dragleave', e => { if (!colEl.contains(e.relatedTarget)) colEl.classList.remove('drag-over'); });
+          colEl.addEventListener('drop', e => {
+            e.preventDefault();
+            colEl.classList.remove('drag-over');
+            const key = draggedKey || e.dataTransfer.getData('text/plain');
+            if (key) {
+              itemColMap[key] = col.id;
+              savePrefs();
+              renderLibraryViews();
+            }
+          });
+
+          const colItems = items.filter(i => i.colId === col.id && (activeFormat === 'todos' || i.ext === activeFormat));
+
+          // Cabeçalho da coluna (com renomeação inline)
+          const head = document.createElement('div');
+          head.className = 'kanban-col-head';
+          const left = document.createElement('div');
+          left.style.minWidth = '0';
+          left.style.flex = '1';
+
+          if (editingColId === col.id) {
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'display:flex;gap:5px;align-items:center';
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.value = col.name;
+            inp.maxLength = 40;
+            inp.style.cssText = 'padding:4px 8px;font-size:.78rem;font-weight:700';
+            const ok = document.createElement('button');
+            ok.type = 'button';
+            ok.className = 'kcard-btn on';
+            ok.textContent = 'OK';
+            const commit = () => {
+              if (inp.value.trim()) col.name = inp.value.trim();
+              editingColId = null;
+              savePrefs();
+              renderLibraryViews();
+            };
+            ok.addEventListener('click', commit);
+            inp.addEventListener('keydown', e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { editingColId = null; renderLibraryViews(); } });
+            wrap.append(inp, ok);
+            left.appendChild(wrap);
+            setTimeout(() => { inp.focus(); inp.select(); }, 10);
+          } else {
+            const h = document.createElement('h3');
+            h.className = 'kanban-col-title';
+            h.textContent = col.name;
+            const rBtn = document.createElement('button');
+            rBtn.type = 'button';
+            rBtn.className = 'rename-btn';
+            rBtn.title = 'Renomear coluna';
+            rBtn.textContent = '✎';
+            rBtn.addEventListener('click', () => { editingColId = col.id; renderLibraryViews(); });
+            h.appendChild(rBtn);
+            left.appendChild(h);
+          }
+
+          const d = document.createElement('div');
+          d.className = 'kanban-col-desc';
+          d.textContent = col.desc;
+          left.appendChild(d);
+
+          const cnt = document.createElement('span');
+          cnt.className = 'kanban-count';
+          cnt.textContent = String(colItems.length);
+          head.append(left, cnt);
+          colEl.appendChild(head);
+
+          // Cartões da coluna
+          const listWrap = document.createElement('div');
+          listWrap.className = 'kanban-cards';
+
+          if (!colItems.length) {
+            const emp = document.createElement('div');
+            emp.className = 'kanban-empty';
+            emp.textContent = `Arraste um documento para cá para aplicar o filtro "${col.name}".`;
+            listWrap.appendChild(emp);
+          } else {
+            colItems.forEach(it => {
+              const card = document.createElement('article');
+              card.className = 'kanban-card' + (it.checked ? ' selected' : '');
+              card.draggable = true;
+              card.addEventListener('dragstart', e => {
+                draggedKey = it.stableKey;
+                card.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', it.stableKey);
+              });
+              card.addEventListener('dragend', () => {
+                card.classList.remove('dragging');
+                draggedKey = null;
+                kanbanBoard.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+              });
+
+              const t = document.createElement('div');
+              t.className = 'kcard-title';
+              t.textContent = it.filename;
+
+              const m = document.createElement('div');
+              m.className = 'kcard-meta';
+              m.textContent = it.metaText || `${it.estChars.toLocaleString('pt-BR')} chars (est.)`;
+
+              const foot = document.createElement('div');
+              foot.className = 'kcard-foot';
+
+              const toggleBtn = document.createElement('button');
+              toggleBtn.type = 'button';
+              toggleBtn.className = 'kcard-btn' + (it.checked ? ' on' : '');
+              toggleBtn.textContent = it.checked ? 'Anexado ✓' : '+ Anexar';
+              toggleBtn.addEventListener('click', () => {
+                if (it.cb) { it.cb.click(); setTimeout(renderLibraryViews, 20); }
+              });
+
+              const selMove = document.createElement('select');
+              selMove.className = 'kcard-move';
+              selMove.setAttribute('aria-label', 'Mover para coluna');
+              columns.forEach(c => {
+                const o = document.createElement('option');
+                o.value = c.id;
+                o.textContent = c.name;
+                if (c.id === col.id) o.selected = true;
+                selMove.appendChild(o);
+              });
+              selMove.addEventListener('change', () => {
+                itemColMap[it.stableKey] = selMove.value;
+                savePrefs();
+                renderLibraryViews();
+              });
+
+              foot.append(toggleBtn, selMove);
+              card.append(t, m, foot);
+              listWrap.appendChild(card);
+            });
+          }
+
+          colEl.appendChild(listWrap);
+          kanbanBoard.appendChild(colEl);
+        });
+      }
+
+      /* 4. Modal Configurar Colunas */
+      const cfgModal = document.getElementById('config-modal');
+      const cfgBody = document.getElementById('cfg-body');
+
+      function renderCfgModal() {
+        cfgBody.replaceChildren();
+        columns.forEach((col, i) => {
+          const row = document.createElement('div');
+          row.className = 'cfg-row';
+
+          const top = document.createElement('div');
+          top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:.76rem';
+          const lbl = document.createElement('strong');
+          lbl.style.color = 'var(--mpie-blue-text)';
+          lbl.textContent = `Coluna ${i + 1}`;
+          top.appendChild(lbl);
+
+          if (columns.length > 2) {
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.style.cssText = 'border:none;background:transparent;color:var(--danger-text);font-size:.76rem;font-weight:600';
+            del.textContent = 'Remover';
+            del.addEventListener('click', () => {
+              const fb = columns.find(c => c.id !== col.id).id;
+              Object.keys(itemColMap).forEach(k => { if (itemColMap[k] === col.id) itemColMap[k] = fb; });
+              columns = columns.filter(c => c.id !== col.id);
+              if (activeColFilter === col.id) activeColFilter = 'todas';
+              savePrefs();
+              renderCfgModal();
+              renderLibraryViews();
+            });
+            top.appendChild(del);
+          }
+
+          const grid = document.createElement('div');
+          grid.className = 'columns';
+          grid.style.gap = '8px';
+
+          const inpName = document.createElement('input');
+          inpName.type = 'text';
+          inpName.value = col.name;
+          inpName.maxLength = 40;
+          inpName.placeholder = 'Nome da coluna';
+          inpName.addEventListener('input', () => { col.name = inpName.value.trim() || 'Sem nome'; savePrefs(); });
+
+          const inpDesc = document.createElement('input');
+          inpDesc.type = 'text';
+          inpDesc.value = col.desc;
+          inpDesc.maxLength = 80;
+          inpDesc.placeholder = 'Descrição curta';
+          inpDesc.addEventListener('input', () => { col.desc = inpDesc.value; savePrefs(); });
+
+          grid.append(inpName, inpDesc);
+          row.append(top, grid);
+          cfgBody.appendChild(row);
+        });
+      }
+
+      document.getElementById('open-config-cols').addEventListener('click', () => { renderCfgModal(); cfgModal.classList.remove('hidden'); });
+      const closeCfg = () => { cfgModal.classList.add('hidden'); renderLibraryViews(); };
+      document.getElementById('cfg-close').addEventListener('click', closeCfg);
+      document.getElementById('cfg-done').addEventListener('click', closeCfg);
+      cfgModal.addEventListener('click', e => { if (e.target === cfgModal) closeCfg(); });
+      document.getElementById('cfg-add').addEventListener('click', () => {
+        columns.push({ id: 'col-' + Date.now().toString().slice(-4), name: `Nova Coluna ${columns.length + 1}`, desc: 'Filtro personalizado' });
+        savePrefs();
+        renderCfgModal();
+      });
+      document.getElementById('cfg-reset').addEventListener('click', () => {
+        columns = JSON.parse(JSON.stringify(DEFAULT_COLS));
+        activeColFilter = 'todas';
+        savePrefs();
+        renderCfgModal();
+      });
+
+      viewKanbanBtn.addEventListener('click', () => { viewMode = 'kanban'; savePrefs(); renderLibraryViews(); });
+      viewListBtn.addEventListener('click', () => { viewMode = 'list'; savePrefs(); renderLibraryViews(); });
+      formatFilter.addEventListener('change', () => { activeFormat = formatFilter.value; renderLibraryViews(); });
+
+      // Observa qualquer atualização feita por public/app.js em #library-list e #selected-count
+      if (typeof MutationObserver !== 'undefined') {
+        new MutationObserver(renderLibraryViews).observe(libList, { childList: true, subtree: true });
+        const selCount = document.getElementById('selected-count');
+        if (selCount) new MutationObserver(() => updateBudget(readRealLibraryItems())).observe(selCount, { childList: true, characterData: true, subtree: true });
+      }
+      libList.addEventListener('change', () => setTimeout(renderLibraryViews, 20));
+      window.addEventListener('scriptorium:library-user-changed', (event) => {
+        const uid = event.detail && event.detail.uid;
+        if (libraryUid === uid) return;
+        libraryUid = uid || null;
+        loadPrefs();
+        libList.textContent = 'Carregando biblioteca...';
+        renderLibraryViews();
+      });
+      renderLibraryViews();
+
     })();
   </script>
   <script src="/config.js"></script>
