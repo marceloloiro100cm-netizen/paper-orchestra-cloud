@@ -65,7 +65,8 @@ class BYOKTests(unittest.TestCase):
         self.assertEqual(result["GOOGLE_API_KEY"], "A" * 39)
         self.assertEqual(result["GOOGLE_GENAI_USE_VERTEXAI"], "false")
         self.assertNotIn("GOOGLE_CLOUD_PROJECT", result)
-        self.assertNotIn("VERTEX_AI_PROJECT", result)
+        self.assertEqual(result["VERTEX_AI_PROJECT"], "")
+        self.assertEqual(result["VERTEX_AI_LOCATION"], "")
         self.assertEqual(original["GEMINI_API_KEY"], "CENTRAL_SECRET")
         self.assertEqual(manager.requests, [
             "projects/myproject/secrets/scriptorium-byok-guest-1/versions/latest"
