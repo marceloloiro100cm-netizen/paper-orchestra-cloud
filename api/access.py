@@ -66,3 +66,44 @@ def set_invitation(db, email: str, active: bool, invited_by: str, admin_emails: 
         "updated_by_uid": invited_by,
     })
     return {"email": email, "status": "active" if active else "revoked"}
+
+
+def request_access(db, user: dict) -> dict:
+    """Solicitação voluntária de convite, sem qualquer concessão automática."""
+    email = user.get("email", "")
+    if user.get("email_verified") is not True:
+        raise HTTPException(status_code=403, detail="Confirme seu e-mail Google para solicitar acesso.")
+    try:
+        email = normalize_email(email)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="E-mail Google indisponível.") from None
+    ref = db.collection("research_access_requests").document(member_id(email))
+    snap = ref.get()
+    if snap.exists and snap.to_dict().get("status") == "pending":
+        return {"status": "pending"}
+    ref.set({
+        "email": email, "uid": user.get("uid", ""),
+        "status": "pending", "requested_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"status": "pending"}
+
+
+def pending_access_requests(db, max_items: int = 100) -> list[dict]:
+    """Apenas o endpoint administrativo pode chamar esta função."""
+    docs = db.collection("research_access_requests").where("status", "==", "pending").limit(max_items).stream()
+    rows = []
+    for doc in docs:
+        data = doc.to_dict() or {}
+        if isinstance(data.get("email"), str):
+            rows.append({"email": data["email"], "requested_at": data.get("requested_at", "")})
+    rows.sort(key=lambda row: row["requested_at"], reverse=True)
+    return rows
+
+
+def mark_request_decided(db, email: str, decision: str) -> None:
+    """Deixa trilha de aprovação/revogação sem alterar o Firebase Authentication."""
+    ref = db.collection("research_access_requests").document(member_id(email))
+    if ref.get().exists:
+        ref.update({
+            "status": decision, "decided_at": datetime.now(timezone.utc).isoformat(),
+        })
