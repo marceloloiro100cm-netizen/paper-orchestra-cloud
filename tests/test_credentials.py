@@ -84,6 +84,11 @@ class CredentialTests(unittest.TestCase):
         self.assertFalse(credential_state(db, "guest"))
         self.assertEqual(manager.deleted, ["projects/safeproject/secrets/scriptorium-byok-guest"])
 
+    def test_new_aq_key_format_accepted(self):
+        from credentials import GeminiCredential
+        key = "AQ." + "z" * 44
+        self.assertEqual(GeminiCredential(key=key).normalized, key)
+
     def test_bad_uid_rejected(self):
         with self.assertRaises(ValueError):
             secret_id("../unsafe")
