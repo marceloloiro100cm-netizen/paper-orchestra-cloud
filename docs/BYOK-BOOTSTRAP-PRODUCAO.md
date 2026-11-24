@@ -78,8 +78,11 @@ Se o deploy falhar em `gcloud builds submit` com acesso negado ao bucket
 `paperorchestra-mestrado_cloudbuild`, conceda de novo, pelo Console e por 1 hora,
 só **Administrador de IAM do projeto** ao deployer e rode o mesmo workflow com
 `modo=permissoes-deploy` e `confirmacao=CONFIRMO-BYOK`. Ele concede
-`roles/serviceusage.serviceUsageConsumer` e `roles/storage.admin` com condição
+`roles/serviceusage.serviceUsageConsumer`, `roles/artifactregistry.reader` e `roles/storage.admin` com condição
 limitada ao bucket de fontes do Cloud Build, e remove o papel temporário ao final.
+O deployer também precisa de **Usuário da conta de serviço** na conta
+`201655574048-compute@developer.gserviceaccount.com` (usada pelo Cloud Build); essa
+concessão é feita na própria conta de serviço, pelo Console.
 
 Esta é a única exceção à regra abaixo: a concessão é feita por um humano, dura no
 máximo 1 hora e é revogada pelo próprio workflow.
