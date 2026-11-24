@@ -317,7 +317,7 @@ async function loadCapabilities() {
   try {
     const r=await request('/capabilities');
     const caps=await r.json();
-    if(caps.neon_review === true) {
+    if(caps.neon_review === true && accountAccess?.admin === true) {
       $('neon-panel').classList.remove('hidden');
       $('neon-explanation').classList.remove('hidden');
     }
@@ -433,15 +433,104 @@ $('new-paper').addEventListener('submit', async (event) => {
     };
     await request('/jobs', {method:'POST',body:JSON.stringify(payload)});
     $('submit-status').textContent='Pesquisa enviada. Você pode fechar o navegador.';
-    $('new-paper').reset();selectedSourceIds.clear();updateSelectedCount();displayLibrary();await loadJobs();
+    $('new-paper').reset();applyModelAccess();selectedSourceIds.clear();updateSelectedCount();displayLibrary();await loadJobs();
   } catch (e) { $('submit-status').textContent=e.message; }
   finally {button.disabled=false;}
 });
 
 let accountAccess = null;
 
+// Sempre uma interface: o backend declara quais modelos a chave realmente permitiu
+// no último teste. Nenhuma opção paga é exibida por mera presença da chave.
+function applyModelAccess() {
+  const allowed = new Set(accountAccess?.allowed_models || []);
+  for (const id of ['model', 'reflection-model']) {
+    const select = $(id);
+    for (const option of select.options) {
+      if (!option.value) continue; // "Mesmo modelo da redação"
+      const visible = allowed.has(option.value);
+      option.disabled = !visible;
+      option.hidden = !visible;
+    }
+  }
+  const pro = 'gemini-3.1-pro-preview', flash = 'gemini-3-flash-preview';
+  const best = allowed.has(pro) ? pro : (allowed.has(flash) ? flash : '');
+  $('model').value = best;
+  $('reflection-model').value = '';
+  const canPlot = !!accountAccess?.admin || allowed.has(pro);
+  $('plotting').checked = canPlot && $('plotting').checked;
+  $('plotting').disabled = !canPlot;
+  $('plotting').closest('.switch-row')?.classList.toggle('hidden', !canPlot);
+  const message = $('model-access-summary');
+  if (accountAccess?.admin) {
+    message.textContent = 'Modelos disponíveis na infraestrutura administrativa.';
+  } else if (allowed.has(pro)) {
+    message.textContent = 'Sua chave foi testada: modelo avançado disponível. O uso pode gerar custos na sua conta Google.';
+  } else if (allowed.has(flash)) {
+    message.textContent = 'Modelo econômico disponível. Os modelos avançados não aparecem nesta conta.';
+  } else {
+    message.textContent = 'Nenhum modelo confirmado. Conecte ou confira sua chave Gemini em Minha conta.';
+  }
+}
+
+async function loadAccessRequests() {
+  if (!accountAccess?.admin) return;
+  const holder = $('pending-access-list');
+  holder.textContent = 'Consultando solicitações...';
+  try {
+    const response = await request('/admin/access-requests');
+    const data = await response.json();
+    holder.replaceChildren();
+    if (!(data.items || []).length) {
+      holder.textContent = 'Nenhuma solicitação de acesso pendente.';
+      return;
+    }
+    for (const item of data.items) {
+      const entry = document.createElement('div');
+      entry.className = 'access-request-entry';
+      const text = document.createElement('span');
+      text.textContent = item.email;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn';
+      button.textContent = 'Autorizar';
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+          await request('/admin/access-requests/' + encodeURIComponent(item.id) + '/approve',
+            {method: 'POST'});
+          $('account-message').textContent = 'Acesso autorizado para ' + item.email + '.';
+          await loadAccessRequests();
+        } catch (error) {
+          $('account-message').textContent = 'Não foi possível autorizar: ' + error.message;
+          button.disabled = false;
+        }
+      });
+      entry.append(text, button);
+      holder.append(entry);
+    }
+  } catch (error) {
+    holder.textContent = 'Não foi possível consultar solicitações: ' + error.message;
+  }
+}
+$('refresh-access-requests').addEventListener('click', loadAccessRequests);
+$('request-invitation').addEventListener('click', async () => {
+  const button = $('request-invitation');
+  button.disabled = true;
+  $('pending-help').textContent = 'Enviando solicitação...';
+  try {
+    await request('/account/request-access', {method: 'POST'});
+    $('pending-help').textContent = 'Solicitação registrada. Após a autorização do administrador, toque em "Já fui autorizado".';
+  } catch (error) {
+    $('pending-help').textContent = 'Não foi possível registrar automaticamente. Use a opção de copiar mensagem. (' + error.message + ')';
+  } finally {
+    button.disabled = false;
+  }
+});
+
 async function loadAccountAccess() {
   $('account-panel').classList.remove('hidden');
+  $('workspace').classList.remove('access-setup');
   $('workspace').classList.add('access-pending');
   $('access-pending').classList.add('hidden');
   $('guest-credential').classList.add('hidden');
@@ -456,21 +545,30 @@ async function loadAccountAccess() {
   try {
     const response = await request('/account/access', { signal: controller.signal });
     accountAccess = await response.json();
-    $('workspace').classList.remove('access-pending');
+    $('workspace').classList.remove('access-pending', 'access-setup');
     $('account-state').textContent = accountAccess.admin ? 'Administrador' :
-      (accountAccess.byok_ready ? 'Chave cadastrada (não testada)' : 'Conecte sua chave Gemini');
+      (accountAccess.byok_ready ?
+        (accountAccess.model_access?.status === 'verified' ? 'Conexão verificada' : 'Verifique sua chave') :
+        'Conecte sua chave Gemini');
     $('admin-invitations').classList.toggle('hidden', !accountAccess.admin);
     $('guest-credential').classList.toggle('hidden', !!accountAccess.admin);
     const guestReady = !accountAccess.admin && !!accountAccess.byok_ready;
-    $('gemini-setup-details').open = !guestReady;
+    const guestVerified = guestReady && accountAccess.model_access?.status === 'verified';
+    const hasModels = !!accountAccess.research_generation_enabled;
+    $('workspace').classList.toggle('access-setup', !hasModels);
+    $('gemini-setup-details').open = !guestVerified;
     $('gemini-setup-title').textContent = guestReady
       ? 'Gerenciar ou trocar minha chave Gemini'
       : 'Conectar minha chave Gemini — primeiro acesso';
-    $('gemini-key-ready').classList.toggle('hidden', !guestReady);
+    $('gemini-key-ready').classList.toggle('hidden', !guestVerified);
     $('remove-personal-key').classList.toggle('hidden', !guestReady);
-    $('submit').disabled = !accountAccess.research_generation_enabled;
+    $('submit').disabled = !hasModels;
     $('account-message').textContent = accountAccess.admin ? '' :
-      (guestReady ? '' : 'Conclua os três passos abaixo para iniciar sua primeira pesquisa.');
+      (guestVerified ? '' : (guestReady
+        ? 'Sua chave foi cadastrada, mas ainda não há um modelo confirmado. Confira a chave abaixo.'
+        : 'Para começar, conecte sua chave Gemini seguindo as instruções.'));
+    applyModelAccess();
+    if (accountAccess.admin) loadAccessRequests();
   } catch (error) {
     accountAccess = null;
     // Compatibilidade exclusiva da conta administradora já autorizada na API antiga.
@@ -500,7 +598,9 @@ async function loadAccountAccess() {
         ? 'A API não respondeu em 12 segundos. Tente verificar novamente.'
         : 'Não foi possível confirmar sua conta: ' + (error?.message || 'erro inesperado'));
     $('access-pending').classList.remove('hidden');
+    $('workspace').classList.remove('access-setup');
     $('submit').disabled = true;
+    accountAccess = null;
   } finally {
     clearTimeout(timeout);
   }
@@ -550,7 +650,7 @@ $('copy-access-request').addEventListener('click', async () => {
 $('retry-access').addEventListener('click', async () => {
   if (!user) return;
   await loadAccountAccess();
-  if (accountAccess) {
+  if (accountAccess?.research_generation_enabled) {
     await Promise.all([loadJobs(), loadLibrary(), loadCapabilities()]);
     if (refreshInterval) clearInterval(refreshInterval);
     refreshInterval = setInterval(loadJobs, 12000);
@@ -568,15 +668,26 @@ $('save-personal-key').addEventListener('click', async () => {
   button.disabled = true;
   $('key-setup-result').textContent = 'Salvando chave no cofre seguro...';
   try {
-    await request('/account/credential', {
+    $('key-setup-result').textContent = 'Verificando com o Google quais modelos sua chave pode usar...';
+    const result = await request('/account/credential', {
       method:'PUT', body: JSON.stringify({key})
     });
+    const saved = await result.json();
     $('personal-gemini-key').value = '';
     $('personal-gemini-key').type = 'password';
     $('toggle-personal-key').textContent = 'Mostrar';
     $('toggle-personal-key').setAttribute('aria-pressed','false');
     await loadAccountAccess();
-    $('key-setup-result').textContent = 'Chave cadastrada. A disponibilidade do modelo será conferida na execução.';
+    if (accountAccess?.research_generation_enabled) {
+      await Promise.all([loadJobs(),loadLibrary(),loadCapabilities()]);
+    }
+    const models = saved.model_access?.models || {};
+    const hasPro = models['gemini-3.1-pro-preview'] === 'supported';
+    const hasFlash = models['gemini-3-flash-preview'] === 'supported';
+    $('key-setup-result').textContent = hasPro ?
+      'Conexão concluída. Seu modelo avançado está disponível!' :
+      (hasFlash ? 'Conexão concluída. Você já pode pesquisar com o modelo econômico.' :
+        'Chave cadastrada, mas o Google não liberou os modelos testados. Confira os limites da conta.');
   } catch(error) {
     $('key-setup-result').textContent = 'Não foi possível salvar a chave: ' + error.message;
   } finally { button.disabled = false; }
@@ -616,7 +727,7 @@ onAuthStateChanged(auth, async (current) => {
   if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
   if (user) {
     await loadAccountAccess();
-    if (accountAccess) {
+    if (accountAccess?.research_generation_enabled) {
       await Promise.all([loadJobs(),loadLibrary(),loadCapabilities()]);
       refreshInterval = setInterval(loadJobs, 12000);
     }
