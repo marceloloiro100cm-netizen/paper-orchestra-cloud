@@ -122,7 +122,7 @@ jobs:
             exit 0
           fi
           if ! echo "$held" | grep -q '"resourcemanager.projects.setIamPolicy"'; then
-            echo "::error::O deployer não pode alterar o IAM do projeto. Este passo precisa ser feito no Console ou no Cloud Shell."
+            echo "::error::O deployer não pode alterar o IAM do projeto. Conceda pelo Console (celular serve), por 1 hora, Role Administrator e Project IAM Admin ao deployer e rode de novo. Este workflow remove os dois ao final."
             exit 1
           fi
           EXPIRES="$(date -u -d '+30 minutes' +%Y-%m-%dT%H:%M:%SZ)"
@@ -154,22 +154,32 @@ jobs:
           echo "::error::O bootstrap não pôde ser aplicado. Veja as mensagens acima."
           exit 1
 
-      - name: Remover o papel temporário (sempre)
-        if: always() && inputs.modo == 'aplicar' && env.TEMP_GRANTED == 'true'
+      - name: Remover papéis temporários (sempre)
+        if: always() && inputs.modo == 'aplicar'
         shell: bash
         run: |
           set -euo pipefail
-          # --all remove a concessão com qualquer condição (a temporária).
-          gcloud projects remove-iam-policy-binding "$PROJECT_ID" \
-            --member="serviceAccount:${DEPLOYER}" --role="roles/iam.roleAdmin" --all --quiet >/dev/null
+          # Remove do deployer os papéis de bootstrap, venham eles da concessão
+          # automática (TemporarioBootstrapBYOK) ou de uma concessão manual feita
+          # no Console. --all remove qualquer condição. Project IAM Admin sai por
+          # último, porque é ele que autoriza a própria remoção.
+          gcloud projects get-iam-policy "$PROJECT_ID" --format=json > /tmp/before.json
+          for role in roles/iam.roleAdmin roles/resourcemanager.projectIamAdmin; do
+            if python3 -c "import json,os,sys; p=json.load(open('/tmp/before.json')); me='serviceAccount:'+os.environ['DEPLOYER']; sys.exit(0 if any(b.get('role')=='$role' and me in b.get('members',[]) for b in p.get('bindings',[])) else 1)"; then
+              gcloud projects remove-iam-policy-binding "$PROJECT_ID" \
+                --member="serviceAccount:${DEPLOYER}" --role="$role" --all --quiet >/dev/null
+              echo "Removido do deployer: $role"
+            fi
+          done
           gcloud projects get-iam-policy "$PROJECT_ID" --format=json > /tmp/after.json
           python3 - <<'PY'
           import json, os
           policy = json.load(open('/tmp/after.json'))
           me = "serviceAccount:" + os.environ["DEPLOYER"]
-          left = [b for b in policy.get("bindings", []) if b.get("role") == "roles/iam.roleAdmin" and me in b.get("members", [])]
-          assert not left, "Role Administrator ainda aparece para o deployer"
-          print("Confirmado: o deployer não tem mais Role Administrator.")
+          bad = {"roles/iam.roleAdmin", "roles/resourcemanager.projectIamAdmin"}
+          left = [b["role"] for b in policy.get("bindings", []) if b.get("role") in bad and me in b.get("members", [])]
+          assert not left, f"Papéis de bootstrap ainda aparecem para o deployer: {left}"
+          print("Confirmado: o deployer não tem mais Role Administrator nem Project IAM Admin.")
           PY
 
       - name: Auditoria final

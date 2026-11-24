@@ -55,6 +55,26 @@ O bootstrap é uma operação **única e privilegiada**:
    administrador aprova pedido; convidado conecta chave; convidado não lê
    biblioteca do administrador nem utiliza seu projeto Gemini.
 
+## Alternativa sem Cloud Shell (pelo celular)
+
+Quando o Cloud Shell não estiver disponível, o bootstrap pode ser aplicado pelo
+workflow **Bootstrap IAM BYOK (único)** (`.github/workflows/bootstrap-byok-iam.yml`):
+
+1. No Console do Google Cloud (navegador do celular serve), abra **IAM e
+   administrador > IAM**, clique em **Conceder acesso** e informe
+   `paper-orchestra-deployer@paperorchestra-mestrado.iam.gserviceaccount.com`.
+2. Adicione os papéis **Administrador de papéis** (`roles/iam.roleAdmin`) e
+   **Administrador do IAM do projeto** (`roles/resourcemanager.projectIamAdmin`).
+   Em cada um, use **Adicionar condição do IAM > Acesso com expiração** de 1 hora.
+3. No GitHub, em **Actions > Bootstrap IAM BYOK (único)**, rode com
+   `modo=aplicar` e `confirmacao=CONFIRMO-BYOK`.
+4. O workflow cria os papéis customizados e os vínculos condicionados, remove do
+   deployer os dois papéis temporários (mesmo antes de expirarem) e roda a
+   auditoria final. Se algo falhar, a expiração de 1 hora remove os papéis do mesmo jeito.
+
+Esta é a única exceção à regra abaixo: a concessão é feita por um humano, dura no
+máximo 1 hora e é revogada pelo próprio workflow.
+
 ## Resolução de problemas
 
 - `iam.roles.create`, `iam.roles.update` ou
