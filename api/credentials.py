@@ -36,7 +36,7 @@ class GeminiCredential(BaseModel):
     @property
     def normalized(self) -> str:
         key = self.key.strip()
-        if not re.fullmatch(r"[A-Za-z0-9_-]{20,512}", key):
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{20,512}", key):
             raise ValueError("Formato de chave inválido")
         return key
 
