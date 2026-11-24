@@ -121,6 +121,38 @@ class WatchTest(unittest.TestCase):
         findings = up.watch_entry(entry(github=None, npm=["firebase"], pinned="11.10.0"), fetch, TODAY)
         self.assertIn("12.0.0", texts(findings, "alerta"))
 
+    def test_own_project_has_no_version_warning(self):
+        fetch = fake_fetch({"https://api.github.com/repos/org/lib": {"full_name": "org/lib",
+                                                                      "license": {"spdx_id": "NOASSERTION"}}})
+        findings = up.watch_entry(entry(kind="codigo_proprio", license_spdx="a definir"), fetch, TODAY)
+        self.assertEqual([f for f in findings if f["level"] != "info"], [])
+
+    def test_pip_range_is_covered_by_dependabot(self):
+        fetch = fake_fetch({
+            "https://api.github.com/repos/org/lib/releases/latest": {"tag_name": "0.9"},
+            "https://api.github.com/repos/org/lib": {"full_name": "org/lib", "license": {"spdx_id": "MIT"}},
+            "https://pypi.org/pypi/lib/json": {"info": {"version": "0.9", "license_expression": "MIT"}},
+        })
+        findings = up.watch_entry(entry(pypi=["lib"], pinned=">=0.5,<1"), fetch, TODAY)
+        self.assertNotIn("sem versão revisada", texts(findings, "aviso"))
+        self.assertIn("Dependabot", texts(findings, "info"))
+
+    def test_noassertion_accepted_when_package_declares_same_license(self):
+        fetch = fake_fetch({
+            "https://registry.npmjs.org/lib/latest": {"version": "1.0.0", "license": "Apache-2.0"},
+            "https://api.github.com/repos/org/lib/releases/latest": {"tag_name": "v1"},
+            "https://api.github.com/repos/org/lib": {"full_name": "org/lib", "license": {"spdx_id": "NOASSERTION"}},
+        })
+        findings = up.watch_entry(entry(npm=["lib"], license_spdx="Apache-2.0", pinned="1.0.0",
+                                        latest_reviewed="v1"), fetch, TODAY)
+        self.assertNotIn("LICENSE", texts(findings, "aviso"))
+
+    def test_multiline_pypi_license_is_compacted(self):
+        fetch = fake_fetch({"https://pypi.org/pypi/lib/json": {"info": {"version": "1",
+                            "license": "Apache License\n          Version 2.0"}}})
+        info = texts(up.watch_entry(entry(github=None, pypi=["lib"]), fetch, TODAY), "info")
+        self.assertIn("Apache License Version 2.0", info)
+
     def test_report_groups_by_level(self):
         registry = {"upstreams": [entry(github=None, last_checked="2026-01-01")]}
         report, findings = up.watch(registry, fake_fetch({}), TODAY)

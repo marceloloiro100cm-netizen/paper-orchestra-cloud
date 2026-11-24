@@ -274,6 +274,15 @@ def _same_license(registered: str, reported: str | None) -> bool:
     return bool(reported) and registered.lower() == reported.lower()
 
 
+def _one_line(text, limit: int = 80) -> str:
+    return " ".join(str(text or "").split())[:limit]
+
+
+def _range_covered_by_dependabot(entry: dict) -> bool:
+    """Dependência pip com faixa de versões: o Dependabot acompanha a faixa."""
+    return bool(entry.get("pypi")) and str(entry.get("pinned") or "").lstrip().startswith((">=", "<", "~=", "=="))
+
+
 def watch_entry(entry: dict, fetch, today: date) -> list[dict]:
     """Retorna achados de um upstream. Nunca lança exceção por falha de rede."""
     findings = []
@@ -283,6 +292,30 @@ def watch_entry(entry: dict, fetch, today: date) -> list[dict]:
 
     def add(level, text):
         findings.append({"id": uid, "name": entry["name"], "level": level, "text": text})
+
+    registry_licenses: set[str] = set()
+    package_findings: list[tuple[str, str]] = []
+    for package in entry.get("pypi") or []:
+        data = fetch(f"https://pypi.org/pypi/{quote(package, safe='')}/json")
+        info = data.get("info") if isinstance(data, dict) else None
+        if not info:
+            package_findings.append(("aviso", f"PyPI indisponível para {package}."))
+            continue
+        license_text = _one_line(info.get("license_expression") or info.get("license"), 60)
+        registry_licenses.add(license_text.lower())
+        package_findings.append(("info", f"PyPI {package}: versão {info.get('version')}; "
+                                         f"licença declarada: {license_text or 'não informada'}."))
+    for package in entry.get("npm") or []:
+        data = fetch(f"https://registry.npmjs.org/{quote(package, safe='@')}/latest")
+        if "_http_error" in data:
+            package_findings.append(("aviso", f"npm indisponível para {package}."))
+            continue
+        version = data.get("version")
+        pinned = entry.get("pinned")
+        registry_licenses.add(_one_line(data.get("license"), 60).lower())
+        level = "alerta" if pinned and version and version != pinned and entry.get("adopted") else "info"
+        package_findings.append((level, f"npm {package}: versão {version} (fixada: {pinned or '-'}); "
+                                        f"licença: {_one_line(data.get('license'), 60)}."))
 
     repo = entry.get("github")
     if repo:
@@ -297,37 +330,28 @@ def watch_entry(entry: dict, fetch, today: date) -> list[dict]:
                 add("alerta", f"Repositório arquivado em {full_name}: sem manutenção.")
             spdx = (info.get("license") or {}).get("spdx_id")
             if spdx in (None, "NOASSERTION"):
-                if entry["kind"] != "codigo_proprio":
+                if registered_license.lower() in registry_licenses:
+                    add("info", f"GitHub não identifica a licença, mas o pacote publicado declara {registered_license}.")
+                elif entry["kind"] != "codigo_proprio":
                     add("aviso", "GitHub não identifica a licença; conferir o arquivo LICENSE.")
             elif spdx_comparable and not _same_license(registered_license, spdx):
                 add("alerta", f"Licença divergente: registro diz {registered_license}, GitHub informa {spdx}.")
             elif not spdx_comparable:
                 add("info", f"GitHub informa licença {spdx}; registro ainda diz '{registered_license}'.")
-            latest = _github_latest(full_name, entry.get("track"), info.get("default_branch") or "main", fetch)
+            # O próprio projeto é acompanhado por PR e CI, não por versão revisada.
+            latest = None if entry["kind"] == "codigo_proprio" else _github_latest(
+                full_name, entry.get("track"), info.get("default_branch") or "main", fetch)
             if latest:
                 if reviewed and latest != reviewed:
                     add("alerta", f"Nova versão em {full_name}: {latest} (revisada: {reviewed}).")
+                elif not reviewed and _range_covered_by_dependabot(entry):
+                    add("info", f"Versão atual: {latest}; faixa {entry['pinned']} acompanhada pelo Dependabot.")
                 elif not reviewed and entry.get("adopted"):
                     add("aviso", f"Em uso sem versão revisada registrada; versão atual: {latest}.")
                 elif not reviewed:
                     add("info", f"Versão atual: {latest} (ainda não adotado).")
-    for package in entry.get("pypi") or []:
-        data = fetch(f"https://pypi.org/pypi/{quote(package, safe='')}/json")
-        info = data.get("info") if isinstance(data, dict) else None
-        if not info:
-            add("aviso", f"PyPI indisponível para {package}.")
-            continue
-        license_text = info.get("license_expression") or (info.get("license") or "")[:60]
-        add("info", f"PyPI {package}: versão {info.get('version')}; licença declarada: {license_text or 'não informada'}.")
-    for package in entry.get("npm") or []:
-        data = fetch(f"https://registry.npmjs.org/{quote(package, safe='@')}/latest")
-        if "_http_error" in data:
-            add("aviso", f"npm indisponível para {package}.")
-            continue
-        version = data.get("version")
-        pinned = entry.get("pinned")
-        level = "alerta" if pinned and version and version != pinned and entry.get("adopted") else "info"
-        add(level, f"npm {package}: versão {version} (fixada: {pinned or '-'}); licença: {data.get('license')}.")
+    for level, text in package_findings:
+        add(level, text)
     days = FREQUENCIES.get(entry.get("review_frequency"))
     if days:
         due = date.fromisoformat(entry["last_checked"]) + timedelta(days=days)
