@@ -442,29 +442,38 @@ let accountAccess = null;
 
 async function loadAccountAccess() {
   $('account-panel').classList.remove('hidden');
+  $('workspace').classList.add('access-pending');
+  $('access-pending').classList.add('hidden');
   $('guest-credential').classList.add('hidden');
   $('admin-invitations').classList.add('hidden');
   $('submit').disabled = true;
   $('account-state').textContent = 'Verificando...';
-  // Uma rota lenta ou deploy incompleto não pode deixar a tela carregando para sempre.
+  $('pending-email').textContent = user?.email || '';
+  $('pending-help').textContent = '';
+  // Uma API demorada nunca deve bloquear a tela indefinidamente.
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
     const response = await request('/account/access', { signal: controller.signal });
     accountAccess = await response.json();
+    $('workspace').classList.remove('access-pending');
     $('account-state').textContent = accountAccess.admin ? 'Administrador' :
-      (accountAccess.byok_ready ? 'Chave cadastrada (não testada)' : 'Chave Gemini necessária');
+      (accountAccess.byok_ready ? 'Chave cadastrada (não testada)' : 'Conecte sua chave Gemini');
     $('admin-invitations').classList.toggle('hidden', !accountAccess.admin);
     $('guest-credential').classList.toggle('hidden', !!accountAccess.admin);
+    const guestReady = !accountAccess.admin && !!accountAccess.byok_ready;
+    $('gemini-setup-details').open = !guestReady;
+    $('gemini-setup-title').textContent = guestReady
+      ? 'Gerenciar ou trocar minha chave Gemini'
+      : 'Conectar minha chave Gemini — primeiro acesso';
+    $('gemini-key-ready').classList.toggle('hidden', !guestReady);
+    $('remove-personal-key').classList.toggle('hidden', !guestReady);
     $('submit').disabled = !accountAccess.research_generation_enabled;
-    $('account-message').textContent = accountAccess.research_generation_enabled ?
-      'Credencial cadastrada. A disponibilidade dos modelos será verificada durante a pesquisa.' :
-      'Para iniciar uma pesquisa, configure sua própria chave Gemini.';
+    $('account-message').textContent = accountAccess.admin ? '' :
+      (guestReady ? '' : 'Conclua os três passos abaixo para iniciar sua primeira pesquisa.');
   } catch (error) {
     accountAccess = null;
-    // Compatibilidade com o backend legado: /account/access não existe nele.
-    // /capabilities exige token Firebase autorizado e, na API antiga,
-    // somente a lista de administradores consegue chamar essa rota.
+    // Compatibilidade exclusiva da conta administradora já autorizada na API antiga.
     if (error?.status === 404) {
       try {
         await request('/capabilities', { signal: controller.signal });
@@ -472,6 +481,7 @@ async function loadAccountAccess() {
           admin: true, byok_ready: false, multiuser_enabled: false,
           research_generation_enabled: true, legacy_backend: true
         };
+        $('workspace').classList.remove('access-pending');
         $('account-state').textContent = 'Administrador';
         $('account-message').textContent = '';
         $('submit').disabled = false;
@@ -481,29 +491,95 @@ async function loadAccountAccess() {
       }
     }
     const timedOut = error?.name === 'AbortError' || error?.name === 'TimeoutError';
-    $('account-state').textContent = timedOut ? 'Conexão indisponível' : 'Verificação falhou';
-    $('account-message').textContent = timedOut
-      ? 'A API não respondeu em 12 segundos. Atualize a página ou tente novamente.'
-      : 'Não foi possível confirmar sua conta: ' + (error?.message || 'erro inesperado');
+    const awaitingAuthorization = error?.status === 403;
+    $('account-state').textContent = timedOut ? 'Conexão indisponível' :
+      (awaitingAuthorization ? 'Aguardando autorização' : 'Verificação falhou');
+    $('account-message').textContent = awaitingAuthorization
+      ? 'A conta Google está conectada, mas o Scriptorium ainda não liberou seu acesso.'
+      : (timedOut
+        ? 'A API não respondeu em 12 segundos. Tente verificar novamente.'
+        : 'Não foi possível confirmar sua conta: ' + (error?.message || 'erro inesperado'));
+    $('access-pending').classList.remove('hidden');
     $('submit').disabled = true;
   } finally {
     clearTimeout(timeout);
   }
 }
 
+// O navegador não recebe permissão para criar ou ler automaticamente chaves do AI Studio.
+// Somente uma interação explícita permite ler do clipboard, e nada vai para localStorage.
+$('paste-personal-key').addEventListener('click', async () => {
+  const field = $('personal-gemini-key');
+  try {
+    if (!navigator.clipboard?.readText) throw new Error('clipboard_unavailable');
+    const value = (await navigator.clipboard.readText()).trim();
+    if (!/^[A-Za-z0-9_.-]{20,512}$/.test(value)) {
+      $('key-setup-result').textContent =
+        'O conteúdo copiado não parece ser uma chave Gemini. Confira no Google AI Studio.';
+      return;
+    }
+    field.value = value;
+    field.type = 'password';
+    $('toggle-personal-key').textContent = 'Mostrar';
+    $('toggle-personal-key').setAttribute('aria-pressed', 'false');
+    $('key-setup-result').textContent = 'Chave colada. Revise e clique em Salvar.';
+  } catch (_) {
+    $('key-setup-result').textContent =
+      'Seu navegador não permitiu a colagem automática. Toque no campo e use Colar.';
+    field.focus();
+  }
+});
+$('toggle-personal-key').addEventListener('click', () => {
+  const field = $('personal-gemini-key');
+  const visible = field.type === 'password';
+  field.type = visible ? 'text' : 'password';
+  $('toggle-personal-key').textContent = visible ? 'Ocultar' : 'Mostrar';
+  $('toggle-personal-key').setAttribute('aria-pressed', String(visible));
+});
+$('copy-access-request').addEventListener('click', async () => {
+  const message = 'Olá! Solicito um convite para usar o Scriptorium MPIE. Minha conta Google é: '
+    + (user?.email || '(e-mail da conta)') + '.';
+  try {
+    await navigator.clipboard.writeText(message);
+    $('pending-help').textContent = 'Pedido copiado. Envie a mensagem ao administrador.';
+  } catch (_) {
+    window.prompt('Copie e envie esta mensagem ao administrador:', message);
+    $('pending-help').textContent = 'Envie o pedido ao administrador para autorizar sua conta.';
+  }
+});
+$('retry-access').addEventListener('click', async () => {
+  if (!user) return;
+  await loadAccountAccess();
+  if (accountAccess) {
+    await Promise.all([loadJobs(), loadLibrary(), loadCapabilities()]);
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(loadJobs, 12000);
+  }
+});
+
 $('save-personal-key').addEventListener('click', async () => {
   const button = $('save-personal-key');
   const key = $('personal-gemini-key').value.trim();
-  if (!key) { $('account-message').textContent='Informe sua chave Gemini.';return; }
+  if (!/^[A-Za-z0-9_.-]{20,512}$/.test(key)) {
+    $('key-setup-result').textContent =
+      'Cole uma chave válida do Google AI Studio antes de salvar.';
+    return;
+  }
   button.disabled = true;
+  $('key-setup-result').textContent = 'Salvando chave no cofre seguro...';
   try {
     await request('/account/credential', {
       method:'PUT', body: JSON.stringify({key})
     });
     $('personal-gemini-key').value = '';
+    $('personal-gemini-key').type = 'password';
+    $('toggle-personal-key').textContent = 'Mostrar';
+    $('toggle-personal-key').setAttribute('aria-pressed','false');
     await loadAccountAccess();
-  } catch(error) { $('account-message').textContent = error.message; }
-  finally { button.disabled = false; }
+    $('key-setup-result').textContent = 'Chave cadastrada. A disponibilidade do modelo será conferida na execução.';
+  } catch(error) {
+    $('key-setup-result').textContent = 'Não foi possível salvar a chave: ' + error.message;
+  } finally { button.disabled = false; }
 });
 $('remove-personal-key').addEventListener('click', async () => {
   if (!window.confirm('Revogar sua chave de IA? Novas pesquisas serão bloqueadas.')) return;
@@ -537,7 +613,23 @@ onAuthStateChanged(auth, async (current) => {
   $('workspace').classList.toggle('hidden', !user);
   $('logout').classList.toggle('hidden', !user);
   $('identity').textContent=user?.email || '';
-  if (refreshInterval) clearInterval(refreshInterval);
-  if (user) { await loadAccountAccess(); if (accountAccess) await Promise.all([loadJobs(),loadLibrary(),loadCapabilities()]); refreshInterval=setInterval(loadJobs, 12000); }
-  else { accountAccess=null; $('account-panel').classList.add('hidden'); $('personal-gemini-key').value=''; libraryItems=[];selectedSourceIds.clear();updateSelectedCount(); }
+  if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
+  if (user) {
+    await loadAccountAccess();
+    if (accountAccess) {
+      await Promise.all([loadJobs(),loadLibrary(),loadCapabilities()]);
+      refreshInterval = setInterval(loadJobs, 12000);
+    }
+  } else {
+    accountAccess = null;
+    $('workspace').classList.remove('access-pending');
+    $('account-panel').classList.add('hidden');
+    $('access-pending').classList.add('hidden');
+    $('guest-credential').classList.add('hidden');
+    $('personal-gemini-key').value = '';
+    $('personal-gemini-key').type = 'password';
+    libraryItems = [];
+    selectedSourceIds.clear();
+    updateSelectedCount();
+  }
 });
