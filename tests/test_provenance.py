@@ -80,6 +80,19 @@ class ManifestTest(unittest.TestCase):
         other.add_sources([{"id": "s1", "sha256": "0" * 64}])
         self.assertNotEqual(first, other.finish("completed")["corpus_snapshot"])
 
+    def test_context_strategy_recorded_without_text(self):
+        self.manifest.set_context("v2-lexical-retrieval-1", {"strategy": "v2-lexical-retrieval-1",
+                                                             "sources": {"s1": {"chunks_selected": 2}}})
+        self.manifest.add_sources([{"id": "s1", "chunks_total": 9, "chunks_selected": 2,
+                                    "ocr_pages_flagged": [4], "cache": "hit", "text": "não copiar"}])
+        data = self.manifest.finish("completed")
+        self.assertEqual(data["context"]["strategy"], "v2-lexical-retrieval-1")
+        self.assertEqual(data["sources"][0]["ocr_pages_flagged"], [4])
+        self.assertNotIn("não copiar", json.dumps(data, ensure_ascii=False))
+
+    def test_default_context_without_sources(self):
+        self.assertEqual(self.build()["context"]["strategy"], "sem fontes anexadas")
+
     def test_plotting_records_image_model(self):
         data = RunManifest("c" * 32, "u", {**RECORD, "plotting": True}, ENV, WORKER, clock=clock).finish("completed")
         self.assertEqual(data["request"]["image_model"], "gemini-3-pro-image-preview")

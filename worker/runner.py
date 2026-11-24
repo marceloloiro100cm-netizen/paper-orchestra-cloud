@@ -7,6 +7,7 @@ eventos; ai_declaration.py (M11; Origem: R25) gera o rascunho de declaração
 de uso de IA; editorial_status.py (M07; Origem: R11) sinaliza retratações.
 """
 import os
+import re
 import json
 import shutil
 import subprocess
@@ -20,7 +21,7 @@ from google.cloud import firestore, storage
 from agent_progress import current_stage, inspect_agents
 from scientific_audit import audit_pdf
 from reference_verification import verify_bibliography
-from source_materials import compose_library_context
+from source_materials import compose_library_context, compose_library_context_v2
 from neon_review import generate_review
 from byok import personal_agent_environment
 from run_manifest import RunManifest
@@ -31,6 +32,8 @@ BUCKET = os.environ["RESEARCH_BUCKET"]
 RESEARCH_ID = os.environ["RESEARCH_ID"]
 OWNER_UID = os.environ["RESEARCH_OWNER_UID"]
 BASE = Path("/app/orchestra")
+# Plano V2, Onda 1: contexto por trechos recuperados. Desligado por padrão.
+V2_RETRIEVAL = os.getenv("SCRIPTORIUM_V2_RETRIEVAL", "false").lower() == "true"
 
 client = firestore.Client(project=PROJECT)
 storage_client = storage.Client(project=PROJECT)
@@ -56,6 +59,27 @@ def put(local: Path, remote_name: str, mime: str, record: bool = True):
     # O próprio manifesto e a declaração derivada dele não entram na lista de saídas.
     if record and MANIFEST is not None:
         MANIFEST.add_output(remote_name, local)
+
+
+class DerivedCache:
+    """Cache privado de documentos estruturados e trechos, por dono e conteúdo.
+
+    Caminho: library/{uid}/derived/{parser}/{política}/{sha256}.json. É dado
+    derivado e descartável; o original da biblioteca nunca é alterado.
+    """
+    KEY = re.compile(r"[a-z0-9-]+/[a-z0-9-]+/[0-9a-f]{64}")
+
+    def _blob(self, key: str):
+        if not self.KEY.fullmatch(key):
+            raise ValueError("Chave de cache inválida")
+        return bucket.blob(f"library/{OWNER_UID}/derived/{key}.json")
+
+    def get(self, key: str):
+        blob = self._blob(key)
+        return blob.download_as_bytes() if blob.exists() else None
+
+    def put(self, key: str, data: bytes) -> None:
+        self._blob(key).upload_from_string(data, content_type="application/json")
 
 
 def publish_manifest(root: Path, status: str, error: str = "") -> dict:
@@ -103,10 +127,21 @@ def main():
             ]
             if len(safe_sources) != len(sources):
                 raise ValueError("Referência inválida na biblioteca desta conta")
-            context, manifest = compose_library_context(
-                safe_sources,
-                lambda object_path: bucket.blob(object_path).download_as_bytes(),
-            )
+            fetch = lambda object_path: bucket.blob(object_path).download_as_bytes()
+            if V2_RETRIEVAL:
+                # Consulta = título + ideia original (antes de anexar fontes e idioma).
+                query = data.get("title", "") + "\n" + (raw / "idea_sparse.md").read_text(
+                    encoding="utf-8", errors="replace")
+                context, manifest, coverage = compose_library_context_v2(
+                    safe_sources, fetch, query, cache=DerivedCache())
+                MANIFEST.set_context(coverage["strategy"], coverage)
+                coverage_path = root / "retrieval_coverage.json"
+                coverage_path.write_text(json.dumps(coverage, ensure_ascii=False, indent=2),
+                                         encoding="utf-8")
+                put(coverage_path, "retrieval_coverage.json", "application/json")
+            else:
+                context, manifest = compose_library_context(safe_sources, fetch)
+                MANIFEST.set_context("v1-truncation-1")
             if context:
                 with (raw / "idea_sparse.md").open("a", encoding="utf-8") as source_file:
                     source_file.write(context)
@@ -120,6 +155,7 @@ def main():
             update(source_summary={
                 "selected": len(safe_sources),
                 "included": sum(m["status"] == "included" for m in manifest),
+                "strategy": "v2" if V2_RETRIEVAL else "v1",
             })
         # Preferência aplicada somente aos dados temporários, não aos originais salvos.
         if data.get("language") == "pt-BR":

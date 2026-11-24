@@ -18,7 +18,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R03 | [Docling](https://github.com/docling-project/docling) | biblioteca | não | MIT | - | M01, M19, M23 |
 | R04 | [Docling-Parse](https://github.com/docling-project/docling-parse) | biblioteca | não | MIT | - | M01, M02, M19 |
 | R05 | [FAISS (Meta)](https://github.com/facebookresearch/faiss) | biblioteca | não | MIT | - | M03, M04 |
-| R06 | [SQLite FTS5](https://www.sqlite.org/fts5.html) | biblioteca | não | blessing | - | M03, M04 |
+| R06 | [SQLite FTS5](https://www.sqlite.org/fts5.html) | biblioteca | sim | blessing | - | M03, M04 |
 | R07 | [LangExtract (Google)](https://github.com/google/langextract) | biblioteca | não | Apache-2.0 | - | M02, M05, M06, M08, M17, M25 |
 | R08 | [Crossref REST API](https://www.crossref.org/documentation/retrieve-metadata/) | api | sim | termos do serviço | - | V1, M06, M07, M18 |
 | R09 | [OpenAlex API](https://docs.openalex.org/) | api | sim | termos do serviço | - | V1, M06, M18 |
@@ -49,7 +49,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R34 | [Google Cloud Client Libraries para Python (Firestore, Storage, Run, Secret Manager)](https://github.com/googleapis/google-cloud-python) | biblioteca | sim | Apache-2.0 | faixas em api/requirements.txt e worker/requirements.txt | V1 |
 | R35 | [Google Gen AI SDK para Python (google-genai)](https://github.com/googleapis/python-genai) | biblioteca | sim | Apache-2.0 | >=2.34.0,<3 | V1, M25 |
 | R36 | [Requests](https://github.com/psf/requests) | biblioteca | sim | Apache-2.0 | >=2.31,<3 | V1, M07 |
-| R37 | [PyMuPDF](https://github.com/pymupdf/PyMuPDF) | biblioteca | sim | AGPL-3.0 | sem fixação (vem do requirements.txt do PaperOrchestra) | V1, M01, M23 |
+| R37 | [PyMuPDF](https://github.com/pymupdf/PyMuPDF) | biblioteca | sim | AGPL-3.0 | >=2.1,<3 | V1, M01, M02, M23 |
 | R38 | [abnTeX2](https://github.com/abntex/abntex2) | biblioteca | sim | LPPL-1.3c | versão do pacote Debian texlive-publishers da imagem python:3.11-slim | V1, M27 |
 | R39 | [Firebase JavaScript SDK](https://github.com/firebase/firebase-js-sdk) | biblioteca | sim | Apache-2.0 | 11.10.0 | V1 |
 | R40 | [OSV-Scanner GitHub Action (workflows reutilizáveis)](https://github.com/google/osv-scanner-action) | ferramenta | sim | Apache-2.0 | v2.7.1 | M15 |
@@ -121,7 +121,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Política de atualização:** Release mensal; alerta de segurança imediato; versão fixada no build.
 - **Frequência de revisão:** mensal
 - **Risco:** Uso alto de CPU e RAM; baixa pesos de modelos durante o build ou a execução.
-- **Nota de migração:** -
+- **Nota de migração:** Onda 1 usa PyMuPDF (R37) como parser estrutural. Docling entra só depois do corpus de avaliação de 30 PDFs, comparando ordem de leitura, títulos e tabelas.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -144,7 +144,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Política de atualização:** Mesma matriz de versões do Docling.
 - **Frequência de revisão:** mensal
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** Onda 1 usa PyMuPDF (R37) como parser estrutural. Docling entra só depois do corpus de avaliação de 30 PDFs, comparando ordem de leitura, títulos e tabelas.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -184,9 +184,9 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Situação da licença:** domínio público (SQLite); validar a distribuição usada no contêiner
 - **Licença dos pesos:** -
 - **Versão fixada:** -
-- **Versão instalada:** -
+- **Versão instalada:** SQLite embutido no Python da imagem python:3.11-slim (módulo sqlite3)
 - **Última versão revisada:** -
-- **Onde é usado:** -
+- **Onde é usado:** worker/lexical_index.py
 - **Política de atualização:** Acompanhar o release log do SQLite e a versão empacotada no Python da imagem.
 - **Frequência de revisão:** mensal
 - **Risco:** -
@@ -896,11 +896,11 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Licença (SPDX):** AGPL-3.0
 - **Situação da licença:** a conferir: licença dupla (AGPL-3.0 ou comercial da Artifex)
 - **Licença dos pesos:** -
-- **Versão fixada:** sem fixação (vem do requirements.txt do PaperOrchestra)
+- **Versão fixada:** >=2.1,<3
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** worker/source_materials.py, worker/scientific_audit.py, worker/neon_review.py
-- **Política de atualização:** Fixar versão no worker/requirements.txt antes da V2; revisar obrigações da AGPL para serviço em rede.
+- **Onde é usado:** worker/requirements.txt, worker/structured_extract.py, worker/source_materials.py, worker/scientific_audit.py, worker/neon_review.py
+- **Política de atualização:** Faixa fixada em worker/requirements.txt (antes vinha sem versão do PaperOrchestra); Dependabot semanal; testes de extração de PDF no CI.
 - **Frequência de revisão:** mensal
 - **Risco:** AGPL: o serviço é acessível pela rede. O código do projeto é público, o que ajuda, mas a conformidade precisa ser conferida.
 - **Nota de migração:** -

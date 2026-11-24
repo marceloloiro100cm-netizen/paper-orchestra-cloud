@@ -28,7 +28,9 @@ SCHEMA = "scriptorium.run_manifest/1"
 PAPER_ORCHESTRA_REPOSITORY = "https://github.com/google-research/paper-orchestra"
 SOURCE_FIELDS = ("id", "name", "format", "sha256", "status", "extracted_characters",
                  "truncated", "risk_level", "risk_flags", "neutralized_delimiters",
-                 "removed_invisible_characters", "guard_version", "note")
+                 "removed_invisible_characters", "removed_control_characters", "guard_version",
+                 "note", "parser_version", "chunk_policy", "pages_total", "pages_processed",
+                 "ocr_pages_flagged", "warnings", "chunks_total", "chunks_selected", "cache")
 # Campos de pedido copiados do registro da pesquisa. Nada de credenciais.
 REQUEST_FIELDS = ("template", "language", "plotting", "model", "reflection_model",
                   "neon_review_requested", "ai_auth_mode")
@@ -95,6 +97,7 @@ class RunManifest:
                 "upstream_registry": "docs/upstreams.json",
             },
             "inputs": {},
+            "context": {"strategy": "sem fontes anexadas"},
             "sources": [],
             "events": [],
             "outputs": {},
@@ -129,6 +132,10 @@ class RunManifest:
             {key: item.get(key) for key in SOURCE_FIELDS if key in item}
             for item in manifest
         ]
+
+    def set_context(self, strategy: str, coverage: dict | None = None) -> None:
+        """Como o contexto das fontes foi montado (V1 corte ou V2 recuperação)."""
+        self.data["context"] = {"strategy": strategy, **({"coverage": coverage} if coverage else {})}
 
     def add_output(self, kind: str, path: Path) -> None:
         self.data["outputs"][kind] = {"file": path.name, **file_fingerprint(path)}
