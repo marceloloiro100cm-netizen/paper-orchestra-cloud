@@ -27,12 +27,12 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R12 | [Estudo MIT: citações por ponteiros](https://dspace.mit.edu/entities/publication/2994e161-6c34-4f88-973e-c13d1e8cd2ef) | artigo | sim | não se aplica | - | M05, M10 |
 | R13 | [GapView (UC Irvine)](https://escholarship.org/uc/item/2zs4w991) | artigo | não | não se aplica | - | M09, M16 |
 | R14 | [FIRE (MBZUAI)](https://github.com/mbzuai-nlp/fire) | prototipo | não | a conferir | - | M22 |
-| R15 | [RA-RAG (POSTECH)](https://github.com/ml-postech/RA-RAG) | prototipo | não | MIT | - | M18 |
+| R15 | [RA-RAG (POSTECH)](https://github.com/ml-postech/RA-RAG) | prototipo | sim | MIT | - | M18 |
 | R16 | [InRanker (UNICAMP)](https://github.com/unicamp-dl/InRanker) | prototipo | não | Apache-2.0 | - | M20 |
 | R17 | [FlagEmbedding (BAAI)](https://github.com/FlagOpen/FlagEmbedding) | biblioteca | não | MIT | - | M20 |
 | R18 | [olmOCR (AI2)](https://github.com/allenai/olmocr) | biblioteca | não | Apache-2.0 | - | M23 |
-| R19 | [SciELO](https://www.scielo.org/) | api | não | políticas próprias | - | M24 |
-| R20 | [BRAPCI](https://brapci.inf.br/) | api | não | a conferir | - | M24 |
+| R19 | [SciELO](https://www.scielo.org/) | api | sim | políticas próprias | - | M24 |
+| R20 | [BRAPCI](https://brapci.inf.br/) | api | sim | a conferir | - | M24 |
 | R21 | [Zotero Web API v3](https://www.zotero.org/support/dev/web_api/v3/start) | api | não | termos do serviço | - | M26 |
 | R22 | [Better BibTeX for Zotero](https://github.com/retorquere/zotero-better-bibtex) | biblioteca | não | MIT | - | M26 |
 | R23 | [Citation.js](https://github.com/citation-js/citation-js) | biblioteca | não | MIT | - | M27 |
@@ -257,7 +257,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** worker/reference_verification.py
+- **Onde é usado:** worker/reference_verification.py, worker/source_quality.py
 - **Política de atualização:** Mensal: documentação, changelog e exigência de chave (OPENALEX_API_KEY).
 - **Frequência de revisão:** mensal
 - **Risco:** -
@@ -395,11 +395,11 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** -
+- **Onde é usado:** worker/source_quality.py
 - **Política de atualização:** Trimestral; não instalar automaticamente.
 - **Frequência de revisão:** trimestral
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** Usado como referência de desenho (confiabilidade como sinal contextual); nenhum código copiado.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -487,11 +487,11 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** -
+- **Onde é usado:** worker/source_quality.py
 - **Política de atualização:** Mensal: termos e endpoints oficiais.
 - **Frequência de revisão:** mensal
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** DOIs SciELO (prefixo 10.1590/) são registrados na Crossref e já passam pela conferência normal (orientação oficial da SciELO sobre DOI). Para obras sem DOI: link de busca para conferência manual, sem raspagem.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -510,11 +510,11 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** -
+- **Onde é usado:** worker/source_quality.py
 - **Política de atualização:** Mensal: site e políticas; sem scraping agressivo.
 - **Frequência de revisão:** mensal
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** Só link para a página inicial, para conferência manual pelo título; nenhuma API presumida.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen

@@ -20,6 +20,7 @@ from urllib.parse import quote
 import requests
 
 from editorial_status import editorial_status, summarize as summarize_editorial
+from source_quality import manual_verification, quality_factors
 
 DOI_PATTERN = re.compile(r"10\.\d{4,9}/[^\s<>\"{}]+", re.I)
 ENTRY_START = re.compile(r"@([A-Za-z]+)\s*[{(]\s*([^,\s{}()]+)\s*,", re.I)
@@ -192,9 +193,21 @@ def _openalex(entry, session):
     try:
         result = data if doi else data["results"][0]
         result_doi = canonical_doi(result.get("doi", ""))
+        location = result.get("primary_location") or {}
+        venue = location.get("source") or {}
         return {"status": "ok", "title": result.get("title") or result.get("display_name") or "",
                 "year": str(result.get("publication_year", "")),
-                "doi": result_doi, "url": str(result.get("id", ""))[:250]}
+                "doi": result_doi, "url": str(result.get("id", ""))[:250],
+                # Sinais para M18 (source_quality.py); nunca viram nota única.
+                "quality": {
+                    "document_type": result.get("type"),
+                    "venue": str(venue.get("display_name") or "")[:200],
+                    "venue_type": venue.get("type"),
+                    "is_retracted": result.get("is_retracted"),
+                    "cited_by_count": result.get("cited_by_count"),
+                    "is_oa": (result.get("open_access") or {}).get("is_oa"),
+                    "language": result.get("language"),
+                }}
     except (KeyError, IndexError, TypeError):
         return {"status": "unavailable"}
 
@@ -282,6 +295,9 @@ def verify_bibliography(bib_text: str, max_references: int = MAX_REFERENCES,
         # M07: só consulta avisos editoriais quando há DOI (identificador estável).
         item["editorial"] = editorial_status(entry["doi"], session, _request,
                                              own_record=own_record, user_agent=USER_AGENT)
+        # M18: fatores de contexto separados; M24: verificação manual sugerida.
+        item["quality_factors"] = quality_factors(item)
+        item["manual_verification"] = manual_verification(item)
         results.append(item)
     return {
         "status": "completed_with_limitations",

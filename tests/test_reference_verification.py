@@ -83,6 +83,9 @@ class ReferenceVerifierTests(unittest.TestCase):
         self.assertEqual(session.calls[-1][1], {"filter": "updates:10.1000/example", "rows": 20})
         self.assertEqual(item["editorial"]["editorial_status"], "no_notice_found")
         self.assertNotIn("_editorial_record", item["sources"]["crossref"])
+        # M18/M24: sinais de contexto presentes; sem links manuais quando confirmada.
+        self.assertEqual(item["quality_factors"]["version"], "source-quality-1")
+        self.assertIsNone(item["manual_verification"])
         for url, params, headers in session.calls:
             self.assertNotIn("GEMINI", str(url) + str(params))
 

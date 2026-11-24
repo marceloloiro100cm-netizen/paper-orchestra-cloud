@@ -2,7 +2,7 @@
 
 <!-- Arquivo gerado por scripts/upstreams.py render a partir de docs/upstreams.json. Não edite à mão. -->
 
-Atualizado em 2026-11-24. Implementados: 0; parciais: 19; não iniciados: 8.
+Atualizado em 2026-11-24. Implementados: 0; parciais: 21; não iniciados: 6.
 
 As ondas seguem o plano V2 (0: base segura; 1: leitura escalável; 2: busca e evidência; 3: auditoria científica; 4: pesquisa guiada; 5: ecossistema editorial).
 
@@ -22,12 +22,12 @@ As ondas seguem o plano V2 (0: base segura; 1: leitura escalável; 2: busca e ev
 | M08 | Matriz de Evidências e proveniência | P1 | 2 | parcial | R07 (LangExtract (Google)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Matriz afirmação -> trechos candidatos (com página e similaridade), em JSON e CSV, com visualização na interface. Falta classificar apoia/contradiz (depende de LLM e avaliação humana) e persistir revisões. |
 | M10 | Abstenção quando há evidência insuficiente | P1 | 2 | parcial | R01 (Projeto Scriptorium (paper-orchestra-cloud)), R12 (Estudo MIT: citações por ponteiros) | Sinaliza afirmações sem evidência localizada nas fontes anexadas (limiares provisórios). Falta abstenção durante a geração e calibrar limiares no corpus. |
 | M20 | Reranking especializado | P2 | 2 | não iniciado | R16 (InRanker (UNICAMP)), R17 (FlagEmbedding (BAAI)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Comparar InRanker (R16) e FlagEmbedding (R17) com a busca híbrida atual usando scripts/eval_retrieval.py; adotar só com ganho reproduzível. |
-| M06 | Escudo de auditoria científica em camadas | P1 | 3 | parcial | R07 (LangExtract (Google)), R08 (Crossref REST API), R09 (OpenAlex API), R10 (Semantic Scholar API), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | A V1 já faz auditoria heurística e conferência de metadados; os estágios de ponteiro e suporte semântico dependem do M05. |
-| M07 | Detecção de retratações e atualizações editoriais | P1 | 3 | parcial | R11 (Retraction Watch via Crossref), R08 (Crossref REST API), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Implementado via Crossref REST (inclui Retraction Watch). Falta sincronizar o CSV completo e reavaliar ao reabrir um manuscrito. |
-| M17 | Detecção de contradições entre estudos | P2 | 3 | não iniciado | R07 (LangExtract (Google)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Depende do M08. |
-| M18 | Confiabilidade contextual das fontes | P2 | 3 | não iniciado | R15 (RA-RAG (POSTECH)), R08 (Crossref REST API), R09 (OpenAlex API), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Pode reaproveitar o status editorial do M07. |
-| M24 | Metadados brasileiros: SciELO e BRAPCI | P2 | 3 | não iniciado | R19 (SciELO), R20 (BRAPCI), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Confirmar se há API oficial da SciELO e os termos da BRAPCI antes de codificar. |
-| M09 | Mapa de omissões e cobertura | P1 | 4 | parcial | R13 (GapView (UC Irvine)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | retrieval_coverage.json registra, por fonte, trechos totais, encontrados e selecionados. Falta painel na interface. |
+| M06 | Escudo de auditoria científica em camadas | P1 | 3 | parcial | R07 (LangExtract (Google)), R08 (Crossref REST API), R09 (OpenAlex API), R10 (Semantic Scholar API), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Escudo consolida os 4 estágios do plano (ponteiros, metadados, situação editorial, suporte) mais a triagem do texto, em alertas alta/média/baixa, sem nota geral. Falta o estágio 4 classificar apoia/contradiz (LLM + avaliação humana). |
+| M07 | Detecção de retratações e atualizações editoriais | P1 | 3 | parcial | R11 (Retraction Watch via Crossref), R08 (Crossref REST API), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Implementado via Crossref (inclui Retraction Watch) e reforçado pelo sinal is_retracted do OpenAlex no escudo (M06). Falta reavaliar ao reabrir um manuscrito antigo. |
+| M17 | Detecção de contradições entre estudos | P2 | 3 | não iniciado | R07 (LangExtract (Google)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Exige classificar pares de afirmações com um modelo de linguagem (custo por execução) e um conjunto rotulado de contradições reais e aparentes para medir precisão. Decidir modelo e orçamento antes de implementar. |
+| M18 | Confiabilidade contextual das fontes | P2 | 3 | parcial | R15 (RA-RAG (POSTECH)), R08 (Crossref REST API), R09 (OpenAlex API), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Sinais separados por referência: tipo de documento, periódico ou preprint, idade, citações (OpenAlex), acesso aberto, sinais de retratação e campo para avaliação humana. Sem nota única. |
+| M24 | Metadados brasileiros: SciELO e BRAPCI | P2 | 3 | parcial | R19 (SciELO), R20 (BRAPCI), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Referências não confirmadas recebem links de busca (Google Acadêmico, SciELO, BRAPCI) para conferência manual; DOI SciELO identificado. Falta registrar na interface o resultado da conferência humana. |
+| M09 | Mapa de omissões e cobertura | P1 | 4 | parcial | R13 (GapView (UC Irvine)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Relatório de cobertura por fonte (trechos totais, correspondências e selecionados) visível na interface. Falta agregar por autor, época e tema. |
 | M12 | Checkpoints de validação humana | P1 | 4 | não iniciado | R01 (Projeto Scriptorium (paper-orchestra-cloud)), R25 (IFRS: Instrução Normativa nº 16/2026 (IA generativa)) | Exige dividir o motor original em etapas retomáveis. |
 | M16 | GapView: diagnóstico pré-pesquisa | P2 | 4 | não iniciado | R13 (GapView (UC Irvine)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Depende do M09. |
 | M21 | Fichamentos persistentes e cache | P2 | 4 | parcial | R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Primeira camada (parsing e trechos por SHA-256 + versões) implementada. Falta cache de fichamentos por modelo e política. |
@@ -43,17 +43,19 @@ As ondas seguem o plano V2 (0: base segura; 1: leitura escalável; 2: busca e ev
 - **M03:** `worker/chunking.py`, `worker/lexical_index.py`, `worker/source_materials.py`
 - **M04:** `worker/lexical_index.py`, `worker/vector_index.py`, `worker/embeddings.py`, `worker/retrieval_context.py`
 - **M05:** `worker/quote_verification.py`, `worker/latex_text.py`
-- **M06:** `worker/scientific_audit.py`, `worker/reference_verification.py`
+- **M06:** `worker/audit_shield.py`, `worker/scientific_audit.py`, `worker/reference_verification.py`
 - **M07:** `worker/editorial_status.py`, `worker/reference_verification.py`
 - **M08:** `worker/evidence_matrix.py`
-- **M09:** `worker/retrieval_context.py`
+- **M09:** `worker/retrieval_context.py`, `public/app.js`
 - **M10:** `worker/evidence_matrix.py`
 - **M11:** `worker/ai_declaration.py`
 - **M13:** `worker/document_guard.py`, `worker/source_materials.py`, `api/library.py`
 - **M14:** `worker/run_manifest.py`
 - **M15:** `.github/dependabot.yml`, `.github/workflows/osv-scanner-pr.yml`, `.github/workflows/osv-scanner-scheduled.yml`, `.github/workflows/watch-upstreams.yml`, `scripts/upstreams.py`
+- **M18:** `worker/source_quality.py`
 - **M19:** `worker/chunking.py`
 - **M21:** `worker/source_materials.py`, `worker/runner.py`
 - **M23:** `worker/ocr_router.py`
+- **M24:** `worker/source_quality.py`
 - **M25:** `worker/neon_review.py`
 - **M27:** `worker/templates/abnt-artigo`, `worker/templates/abnt-dissertacao`

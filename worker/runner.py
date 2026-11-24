@@ -118,6 +118,9 @@ def main():
         except Exception as exc:  # sem embeddings, a busca segue só com BM25
             print("Embeddings indisponíveis:", type(exc).__name__, flush=True)
     evidence_inputs = {"chunks": [], "vectors": {}, "sources": {}} if V2_RETRIEVAL else None
+    # M06: relatórios reunidos no escudo de auditoria; M09: cobertura publicada.
+    shield_inputs = {"audit": None, "references": None, "evidence": None}
+    coverage_published = False
     update(status="running", stage="Preparando arquivos de entrada", started_at=now())
     with tempfile.TemporaryDirectory(prefix="orchestra_") as tmp:
         root = Path(tmp)
@@ -152,6 +155,7 @@ def main():
                 coverage_path.write_text(json.dumps(coverage, ensure_ascii=False, indent=2),
                                          encoding="utf-8")
                 put(coverage_path, "retrieval_coverage.json", "application/json")
+                coverage_published = True
             else:
                 context, manifest = compose_library_context(safe_sources, fetch)
                 MANIFEST.set_context("v1-truncation-1")
@@ -242,7 +246,7 @@ def main():
                 raise FileNotFoundError("O motor concluiu sem gerar final_paper.pdf")
             pdf = matches[0]
         put(pdf, "final_paper.pdf", "application/pdf")
-        files = ["pdf", "log"]
+        files = ["pdf", "log"] + (["coverage"] if coverage_published else [])
         # Auditoria local não gera texto ou evidências novas.
         try:
             refined_tex = output / "content_refinement_workdir" / "final_refined_paper.tex"
@@ -256,6 +260,7 @@ def main():
             put(report_file, "scientific_audit.json", "application/json")
             files.append("audit")
             update(audit_status=report["status"], audit_findings=report["summary"]["findings"])
+            shield_inputs["audit"] = report
         except Exception as exc:
             print("Auditoria local indisponível:", repr(exc), flush=True)
             update(audit_status="unavailable")
@@ -274,6 +279,7 @@ def main():
                 )
                 put(reference_file, "reference_verification.json", "application/json")
                 files.append("references")
+                shield_inputs["references"] = reference_report
                 update(reference_status="completed_with_limitations",
                        references_checked=reference_report["checked"],
                        references_skipped=reference_report["skipped_by_limit"],
@@ -306,6 +312,7 @@ def main():
                 csv_path.write_text(to_csv(matrix), encoding="utf-8-sig")
                 put(csv_path, "evidence_matrix.csv", "text/csv; charset=utf-8")
                 files += ["evidence", "evidence_csv"]
+                shield_inputs["evidence"] = report
                 update(evidence_status="completed", evidence_summary={
                     "quotes": quotes["summary"].get("quotes", 0),
                     "quotes_not_found": quotes["summary"].get("not_found_in_sources", 0),
@@ -318,6 +325,18 @@ def main():
                 update(evidence_status="unavailable")
         if embedder is not None:
             MANIFEST.add_ai_service("embeddings", embedder.info())
+        # M06: escudo de auditoria em camadas (sem nota geral nem selo).
+        try:
+            from audit_shield import build_shield
+            shield = build_shield(shield_inputs["audit"], shield_inputs["references"],
+                                  shield_inputs["evidence"])
+            shield_path = root / "audit_shield.json"
+            shield_path.write_text(json.dumps(shield, ensure_ascii=False, indent=2), encoding="utf-8")
+            put(shield_path, "audit_shield.json", "application/json")
+            files.append("shield")
+            update(shield_counts=shield["counts"])
+        except Exception as exc:
+            print("Escudo de auditoria indisponível:", repr(exc), flush=True)
         # Parecer Neon totalmente opcional, isolado do pipeline original.
         # Falhas não invalidam PDF já gerado nem disparam múltiplas cobranças.
         if data.get("neon_review_requested") and auth_mode == "admin_vertex":
