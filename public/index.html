@@ -1197,6 +1197,24 @@
       .gemini-key-row button { flex: 1; }
       .gemini-steps .actions .btn { flex: 1 1 100%; justify-content: center; text-align: center; }
     }
+    /* Uma só interface. Dados e ações aparecem apenas após autorização real da API. */
+    #workspace.access-pending > :not(#account-panel),
+    #workspace.setup-required > :not(#account-panel) {
+      display: none !important;
+    }
+    #account-panel .panel-header { flex-wrap: wrap; gap: 12px; }
+    #account-state { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+    #access-pending .actions .btn, #guest-credential .gemini-steps .btn { min-height: 44px; }
+    #pending-requests-list .access-request-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-top:1px solid var(--border-main); }
+    #pending-requests-list .access-request-row strong { overflow-wrap:anywhere; }
+    #pending-requests-list .access-request-row .btn { min-height:40px; }
+    #model-access-status { margin: 2px 0 9px; color:var(--text-muted); }
+    details.upload-drawer summary { gap:8px; }
+    @media (max-width: 560px) {
+      #account-panel { padding:16px !important; }
+      #account-panel .panel-header h2 { font-size:1.32rem; }
+      #access-pending .actions .btn { width:100%; }
+    }
   </style>
 </head>
 <body>
@@ -1257,20 +1275,21 @@
         <div id="account-message" class="subtle" role="status"></div>
         <div id="access-pending" class="hidden" aria-live="polite">
           <h3 style="margin:0 0 7px">Seu login Google foi reconhecido</h3>
-          <p class="subtle">O Scriptorium ainda não autorizou esta conta. Peça um convite ao administrador; se já recebeu um, ele deve conferir se o acesso multiusuário está ativado. Entrar com Google não libera pesquisas nem documentos automaticamente.</p>
+          <p class="subtle">Seu login Google funcionou! Para proteger as pesquisas, o administrador precisa liberar sua entrada. Você pode pedir acesso com um toque.</p>
           <p class="subtle">E-mail da conta: <strong id="pending-email"></strong></p>
           <div class="actions">
-            <button class="btn" type="button" id="copy-access-request">Copiar pedido de convite</button>
+            <button class="btn" type="button" id="send-access-request">Solicitar acesso</button>
+            <button class="btn alt" type="button" id="copy-access-request">Copiar pedido</button>
             <button class="btn alt" type="button" id="retry-access">Verificar meu acesso</button>
           </div>
           <p class="subtle" id="pending-help" role="status"></p>
         </div>
         <div id="guest-credential" class="hidden">
-          <p id="gemini-key-ready" class="subtle hidden" role="status">Chave cadastrada. Você já pode iniciar pesquisas; o acesso real aos modelos será confirmado durante a execução.</p>
+          <p id="gemini-key-ready" class="subtle hidden" role="status">Sua chave está conectada. O Scriptorium verificou os modelos disponíveis para ela.</p>
           <details class="gemini-setup" id="gemini-setup-details">
             <summary id="gemini-setup-title">Conectar minha chave Gemini — primeiro acesso</summary>
             <div class="gemini-setup-body">
-              <p class="subtle">São três passos. A chave pertence à sua conta/projeto Google, não à conta do administrador.</p>
+              <p class="subtle">Não é necessário ter uma assinatura Google AI Pro ou Ultra. A disponibilidade e os limites da API dependem do seu projeto Google.</p>
               <ol class="gemini-steps">
                 <li><strong>Abra o Google AI Studio com sua conta Google.</strong>
                   <div class="actions">
@@ -1292,7 +1311,7 @@
                 <button class="btn alt" type="button" id="remove-personal-key">Revogar minha chave</button>
               </div>
               <p class="subtle" id="key-setup-result" role="status"></p>
-              <p class="subtle">A chave é armazenada pelo servidor no Google Secret Manager. O cadastro verifica o formato; a autorização efetiva dos modelos será testada quando uma pesquisa for executada. Nunca envie a chave por mensagem.</p>
+              <p class="subtle">Ao salvar, fazemos testes curtos com os modelos disponíveis. Esses testes podem consumir uma pequena quota e, em projetos pagos, gerar cobrança. A chave fica protegida no servidor e nunca é exibida novamente. Não a envie por mensagem.</p>
               <p class="subtle">As cotas e eventuais custos da API Gemini pertencem ao projeto Google da chave. O plano pessoal Gemini/Google AI Pro não substitui o faturamento da API.</p>
             </div>
           </details>
@@ -1304,7 +1323,9 @@
             <button class="btn" type="button" id="invite-researcher">Autorizar acesso</button>
             <button class="btn alt" type="button" id="revoke-researcher">Revogar acesso</button>
           </div>
-          <p class="subtle">Convidados precisam cadastrar sua própria chave Gemini antes de iniciar uma pesquisa.</p>
+          <p class="subtle">O convidado só poderá pesquisar com os modelos realmente verificados em sua chave Gemini.</p>
+          <div class="actions"><button class="btn alt" type="button" id="refresh-access-requests">Ver pedidos recebidos</button></div>
+          <div id="pending-requests-list" class="subtle" aria-live="polite"></div>
         </div>
       </section>
       <!-- Navegação em 3 etapas (Estúdio Editorial) -->
@@ -1351,7 +1372,7 @@
 
         <!-- Gaveta retrátil de Upload (mantém o topo limpo e preserva 100% os IDs de app.js) -->
         <details class="upload-drawer">
-          <summary><span>+ Guardar novo arquivo na biblioteca (.pdf, .docx, .bib, .ris, .txt)</span><span class="subtle" style="font-size:.78rem">Abrir / Fechar</span></summary>
+          <summary><span>+ Adicionar arquivo à biblioteca</span></summary>
           <div class="library-grid">
             <div><label for="library-file">Arquivo</label><input id="library-file" type="file" accept=".pdf,.docx,.bib,.ris,.txt" /></div>
             <div>
@@ -1512,6 +1533,7 @@
             <div class="config-section">
               <span class="config-label">Motor de IA e Recursos</span>
               <label for="model" style="margin-top:0">Modelo principal de redação</label>
+              <p class="field-hint" id="model-access-status" aria-live="polite">Verificando os modelos disponíveis para esta conta...</p>
               <select id="model">
                 <option value="gemini-3-flash-preview">Gemini 3 Flash (econômico e rápido)</option>
                 <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (maior capacidade)</option>
@@ -1524,7 +1546,7 @@
                 <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (revisão aprofundada)</option>
               </select>
 
-              <div class="switch-row">
+              <div class="switch-row" id="plotting-panel">
                 <label for="plotting">
                   Gerar gráficos com IA
                   <span class="switch-sub">Adiciona o agente de plotagem (mais chamadas e custo).</span>
