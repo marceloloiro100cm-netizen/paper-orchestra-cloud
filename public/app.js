@@ -459,12 +459,12 @@ async function loadAccountAccess() {
     const response = await request('/account/access');
     accountAccess = await response.json();
     $('account-state').textContent = accountAccess.admin ? 'Administrador' :
-      (accountAccess.byok_ready ? 'Gemini configurado' : 'Chave Gemini necessária');
+      (accountAccess.byok_ready ? 'Chave cadastrada (não testada)' : 'Chave Gemini necessária');
     $('admin-invitations').classList.toggle('hidden', !accountAccess.admin);
     $('guest-credential').classList.toggle('hidden', !!accountAccess.admin);
     $('submit').disabled = !accountAccess.research_generation_enabled;
     $('account-message').textContent = accountAccess.research_generation_enabled ?
-      'Sua conta está autorizada a iniciar pesquisas.' :
+      'Credencial cadastrada. A disponibilidade dos modelos será verificada durante a pesquisa.' :
       'Para iniciar uma pesquisa, configure sua própria chave Gemini.';
   } catch (error) {
     accountAccess = null;
