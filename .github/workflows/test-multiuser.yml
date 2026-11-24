@@ -9,6 +9,8 @@ on:
       - "tests/test_access.py"
       - "tests/test_byok.py"
       - "tests/test_credentials.py"
+      - "tests/test_multiuser_cross_access.py"
+      - "scripts/check-public-onboarding.py"
       - "scripts/setup-byok-iam.sh"
       - "scripts/audit-byok-iam.sh"
       - ".github/workflows/test-multiuser.yml"
@@ -34,6 +36,7 @@ jobs:
       - name: Validar sintaxe
         run: |
           python -m compileall -q api/access.py api/access_requests.py api/model_access.py api/credentials.py api/main.py worker/byok.py worker/runner.py
+          python -m py_compile scripts/check-public-onboarding.py tests/test_multiuser_cross_access.py
           node --check public/app.js
           bash -n scripts/setup-byok-iam.sh scripts/audit-byok-iam.sh
       - name: Instalar dependências mínimas
@@ -45,3 +48,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_credentials.py' -v
           python -m unittest discover -s tests -p 'test_model_access.py' -v
           python -m unittest discover -s tests -p 'test_access_requests.py' -v
+          python -m unittest discover -s tests -p 'test_multiuser_cross_access.py' -v
+
+      - name: Diagnóstico público da API atual (sem token ou dados reais)
+        run: python3 scripts/check-public-onboarding.py --diagnostic

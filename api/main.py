@@ -124,7 +124,10 @@ def serializable(record: dict) -> dict:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "v1"}
+    # Identificador público e não secreto para auditoria do rollout da API.
+    # Permite saber se o Firebase está roteando para a revisão certa.
+    return {"ok": True, "version": "multiuser-v2",
+            "release_sha": os.getenv("SCRIPTORIUM_RELEASE_SHA", "")}
 
 @app.get("/api/capabilities")
 def capabilities(user: User):
