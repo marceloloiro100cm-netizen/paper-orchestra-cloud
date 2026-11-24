@@ -58,6 +58,10 @@ def build_declaration(manifest: dict, agents: dict | None = None) -> str:
         tools.append(f"| Gemini Embedding | {embeddings.get('provider', provider)} | "
                      f"`{embeddings.get('model', '')}` | Seleção de trechos das fontes anexadas por "
                      "similaridade semântica e busca de evidências (não gera texto) |")
+    compare = (manifest.get("ai_services") or {}).get("contradictions")
+    if compare and compare.get("calls"):
+        tools.append(f"| Gemini | {compare.get('provider', provider)} | `{compare.get('model', '')}` | "
+                     "Comparação experimental de pares de trechos das fontes (não altera o texto) |")
     used_stages = [label for key, label in STAGES
                    if agents.get(key) not in (None, "disabled")]
     sources = manifest.get("sources", [])
@@ -108,6 +112,10 @@ def build_declaration(manifest: dict, agents: dict | None = None) -> str:
         "",
         "## 5. Supervisão e verificação humana",
         "",
+        *([f"- **Fontes revisadas e aprovadas pelo(a) autor(a) antes da geração:** "
+            f"{_date(e.get('at', ''))} (checkpoint registrado no Scriptorium)"
+            for e in (manifest.get("approvals") or {}).get("events", [])
+            if e.get("checkpoint") == "source_approval" and e.get("decision") == "approve"][:1]),
         f"- **Partes reescritas ou revisadas pelo(a) autor(a):** {FILL}",
         f"- **Referências conferidas nas obras originais (todas? quais?):** {FILL}",
         f"- **Dados, números e resultados conferidos:** {FILL}",

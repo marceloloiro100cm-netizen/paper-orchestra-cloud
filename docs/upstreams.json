@@ -296,7 +296,7 @@
       "canonical_url": "https://escholarship.org/uc/item/2zs4w991",
       "license_spdx": "não se aplica",
       "license_status": "referência de pesquisa",
-      "adopted": false,
+      "adopted": true,
       "modules": [
         "M09",
         "M16"
@@ -304,7 +304,11 @@
       "update_policy": "Revisitar a cada semestre.",
       "review_frequency": "semestral",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "used_in": [
+        "worker/gap_report.py"
+      ],
+      "migration_note": "Referência de desenho do diagnóstico pré-pesquisa (M16); nenhum código copiado."
     },
     {
       "id": "R14",
@@ -455,14 +459,19 @@
       "canonical_url": "https://www.zotero.org/support/dev/web_api/v3/start",
       "license_spdx": "termos do serviço",
       "license_status": "API com autenticação e políticas próprias",
-      "adopted": false,
+      "adopted": true,
       "modules": [
         "M26"
       ],
       "update_policy": "Mensal: documentação e anúncios; credenciais só no Secret Manager.",
       "review_frequency": "mensal",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "used_in": [
+        "api/zotero_import.py"
+      ],
+      "installed_version": "Web API v3 (cabeçalho Zotero-API-Version: 3)",
+      "migration_note": "Conferido em 24/11/2026: base https://api.zotero.org, cabeçalho Zotero-API-Key, limit máx. 100, Total-Results, /items/top, format=bibtex, /keys/<chave> com userID. A chave nunca é guardada."
     },
     {
       "id": "R22",
@@ -479,7 +488,8 @@
       "update_policy": "Changelog mensal; opção do lado do cliente.",
       "review_frequency": "mensal",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "migration_note": "Opcional do lado do pesquisador: com o Better BibTeX no Zotero, as chaves de citação exportadas ficam estáveis."
     },
     {
       "id": "R23",
@@ -760,11 +770,14 @@
       "modules": [
         "V1",
         "M04",
+        "M17",
         "M25"
       ],
       "used_in": [
         "worker/requirements.txt",
-        "worker/neon_review.py"
+        "worker/neon_review.py",
+        "worker/embeddings.py",
+        "worker/contradictions.py"
       ],
       "update_policy": "Dependabot semanal; conferir IDs de modelo e preços na documentação oficial.",
       "review_frequency": "mensal",
@@ -1253,8 +1266,14 @@
         "M08",
         "M14"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Exige dividir o motor original em etapas retomáveis."
+      "status": "parcial",
+      "next_step": "Primeiro checkpoint (await_source_approval): depois do diagnóstico, o pesquisador aprova ou descarta as fontes; transição atômica (sem dupla aprovação), registro de quem e quando no manifesto e na declaração. Faltam os checkpoints de revisão de afirmações e de aprovação final.",
+      "files": [
+        "api/main.py",
+        "api/job_state.py",
+        "worker/runner.py",
+        "public/app.js"
+      ]
     },
     {
       "id": "M13",
@@ -1333,8 +1352,13 @@
         "M04",
         "M09"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Depende do M09."
+      "status": "parcial",
+      "next_step": "Modo preflight: cobertura por pergunta ou subtópico da ideia (boa, parcial, lacuna), termos sem cobertura, fontes sem relação e páginas para OCR, antes de pagar pela redação. Falta calibrar limiares no corpus de referência.",
+      "files": [
+        "worker/gap_report.py",
+        "worker/runner.py",
+        "public/app.js"
+      ]
     },
     {
       "id": "M17",
@@ -1350,8 +1374,12 @@
         "M08",
         "M19"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Exige classificar pares de afirmações com um modelo de linguagem (custo por execução) e um conjunto rotulado de contradições reais e aparentes para medir precisão. Decidir modelo e orçamento antes de implementar."
+      "status": "parcial",
+      "next_step": "Experimental, desligado por padrão (SCRIPTORIUM_V2_CONTRADICTIONS=true): até 12 pares de trechos de fontes diferentes, classificados pelo modelo, com frases conferidas contra os trechos. Falta conjunto rotulado para medir precisão.",
+      "files": [
+        "worker/contradictions.py",
+        "worker/audit_shield.py"
+      ]
     },
     {
       "id": "M18",
@@ -1531,8 +1559,13 @@
         "M13",
         "M14"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Hoje a biblioteca já aceita .bib e .ris exportados do Zotero."
+      "status": "parcial",
+      "next_step": "Importação somente leitura de coleções do Zotero como .bib, com origem registrada e sem guardar a chave. Falta sincronização incremental (versões/ETag) e importação de anexos com consentimento.",
+      "files": [
+        "api/zotero_import.py",
+        "api/library.py",
+        "public/app.js"
+      ]
     },
     {
       "id": "M27",

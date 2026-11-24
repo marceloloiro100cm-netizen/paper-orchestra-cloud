@@ -25,7 +25,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R10 | [Semantic Scholar API](https://www.semanticscholar.org/product/api) | api | sim | termos do serviço | - | V1, M06 |
 | R11 | [Retraction Watch via Crossref](https://www.crossref.org/documentation/retrieve-metadata/retraction-watch/) | api | sim | termos do serviço | - | M07 |
 | R12 | [Estudo MIT: citações por ponteiros](https://dspace.mit.edu/entities/publication/2994e161-6c34-4f88-973e-c13d1e8cd2ef) | artigo | sim | não se aplica | - | M05, M10 |
-| R13 | [GapView (UC Irvine)](https://escholarship.org/uc/item/2zs4w991) | artigo | não | não se aplica | - | M09, M16 |
+| R13 | [GapView (UC Irvine)](https://escholarship.org/uc/item/2zs4w991) | artigo | sim | não se aplica | - | M09, M16 |
 | R14 | [FIRE (MBZUAI)](https://github.com/mbzuai-nlp/fire) | prototipo | não | a conferir | - | M22 |
 | R15 | [RA-RAG (POSTECH)](https://github.com/ml-postech/RA-RAG) | prototipo | sim | MIT | - | M18 |
 | R16 | [InRanker (UNICAMP)](https://github.com/unicamp-dl/InRanker) | prototipo | não | Apache-2.0 | - | M20 |
@@ -33,7 +33,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R18 | [olmOCR (AI2)](https://github.com/allenai/olmocr) | biblioteca | não | Apache-2.0 | - | M23 |
 | R19 | [SciELO](https://www.scielo.org/) | api | sim | políticas próprias | - | M24 |
 | R20 | [BRAPCI](https://brapci.inf.br/) | api | sim | a conferir | - | M24 |
-| R21 | [Zotero Web API v3](https://www.zotero.org/support/dev/web_api/v3/start) | api | não | termos do serviço | - | M26 |
+| R21 | [Zotero Web API v3](https://www.zotero.org/support/dev/web_api/v3/start) | api | sim | termos do serviço | - | M26 |
 | R22 | [Better BibTeX for Zotero](https://github.com/retorquere/zotero-better-bibtex) | biblioteca | não | MIT | - | M26 |
 | R23 | [Citation.js](https://github.com/citation-js/citation-js) | biblioteca | não | MIT | - | M27 |
 | R24 | [CSL Styles](https://github.com/citation-style-language/styles) | biblioteca | não | CC-BY-SA-3.0 | - | M27 |
@@ -47,7 +47,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R32 | [Pydantic](https://github.com/pydantic/pydantic) | biblioteca | sim | MIT | >=2.5,<3 | V1 |
 | R33 | [Firebase Admin SDK para Python](https://github.com/firebase/firebase-admin-python) | biblioteca | sim | Apache-2.0 | >=6.5,<8 | V1 |
 | R34 | [Google Cloud Client Libraries para Python (Firestore, Storage, Run, Secret Manager)](https://github.com/googleapis/google-cloud-python) | biblioteca | sim | Apache-2.0 | faixas em api/requirements.txt e worker/requirements.txt | V1 |
-| R35 | [Google Gen AI SDK para Python (google-genai)](https://github.com/googleapis/python-genai) | biblioteca | sim | Apache-2.0 | >=2.34.0,<3 | V1, M04, M25 |
+| R35 | [Google Gen AI SDK para Python (google-genai)](https://github.com/googleapis/python-genai) | biblioteca | sim | Apache-2.0 | >=2.34.0,<3 | V1, M04, M17, M25 |
 | R36 | [Requests](https://github.com/psf/requests) | biblioteca | sim | Apache-2.0 | >=2.31,<3 | V1, M07 |
 | R37 | [PyMuPDF](https://github.com/pymupdf/PyMuPDF) | biblioteca | sim | AGPL-3.0 | >=2.1,<3 | V1, M01, M02, M23 |
 | R38 | [abnTeX2](https://github.com/abntex/abntex2) | biblioteca | sim | LPPL-1.3c | versão do pacote Debian texlive-publishers da imagem python:3.11-slim | V1, M27 |
@@ -349,11 +349,11 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** -
+- **Onde é usado:** worker/gap_report.py
 - **Política de atualização:** Revisitar a cada semestre.
 - **Frequência de revisão:** semestral
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** Referência de desenho do diagnóstico pré-pesquisa (M16); nenhum código copiado.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -531,13 +531,13 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Situação da licença:** API com autenticação e políticas próprias
 - **Licença dos pesos:** -
 - **Versão fixada:** -
-- **Versão instalada:** -
+- **Versão instalada:** Web API v3 (cabeçalho Zotero-API-Version: 3)
 - **Última versão revisada:** -
-- **Onde é usado:** -
+- **Onde é usado:** api/zotero_import.py
 - **Política de atualização:** Mensal: documentação e anúncios; credenciais só no Secret Manager.
 - **Frequência de revisão:** mensal
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** Conferido em 24/11/2026: base https://api.zotero.org, cabeçalho Zotero-API-Key, limit máx. 100, Total-Results, /items/top, format=bibtex, /keys/<chave> com userID. A chave nunca é guardada.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -560,7 +560,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Política de atualização:** Changelog mensal; opção do lado do cliente.
 - **Frequência de revisão:** mensal
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** Opcional do lado do pesquisador: com o Better BibTeX no Zotero, as chaves de citação exportadas ficam estáveis.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -855,7 +855,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** >=2.34.0,<3
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** worker/requirements.txt, worker/neon_review.py
+- **Onde é usado:** worker/requirements.txt, worker/neon_review.py, worker/embeddings.py, worker/contradictions.py
 - **Política de atualização:** Dependabot semanal; conferir IDs de modelo e preços na documentação oficial.
 - **Frequência de revisão:** mensal
 - **Risco:** -

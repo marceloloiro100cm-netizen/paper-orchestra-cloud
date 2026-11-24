@@ -179,6 +179,82 @@ async function toggleReport(id, target, cls, kind, render) {
   } catch (err) { box.textContent = 'Não foi possível abrir o relatório: ' + err.message; }
 }
 
+function showGapReport(entry, target, decide) {
+  return toggleReport(entry.id, target, 'gap-report', 'gap_report', (box, gap) => {
+    box.append(el('strong', 'Diagnóstico das fontes (antes da redação)'));
+    box.append(el('p', 'Mede o que as fontes anexadas cobrem para cada pergunta ou subtópico da sua ideia. "Lacuna" pode ser limitação da busca, não ausência de literatura.'));
+    const s = gap.summary || {};
+    box.append(el('p', `Boa: ${s.boa || 0} · parcial: ${s.parcial || 0} · lacuna: ${s.lacuna || 0} · ${s.sources || 0} fonte(s), ${s.chunks || 0} trecho(s)`));
+    const names = {boa: 'Boa cobertura', parcial: 'Cobertura parcial', lacuna: 'Lacuna'};
+    for (const q of gap.questions || []) {
+      const d = document.createElement('details'); d.className = 'reference-item';
+      d.append(el('summary', `${q.coverage === 'lacuna' ? '⚠ ' : ''}${names[q.coverage] || q.coverage}: ${q.text}`));
+      d.append(el('small', `${q.evidence_count} trecho(s) de ${(q.sources_covering || []).length} fonte(s)` + ((q.missing_terms || []).length ? ` · termos sem cobertura: ${q.missing_terms.join(', ')}` : '')));
+      for (const ev of q.evidence || []) {
+        const pages = ev.pages ? `p. ${ev.pages[0]}${ev.pages[1] !== ev.pages[0] ? '-' + ev.pages[1] : ''}` : 'sem página';
+        d.append(el('p', `${ev.source_name} · ${pages}`));
+        d.append(el('small', ev.excerpt || ''));
+      }
+      box.append(d);
+    }
+    if ((gap.suggestions || []).length) {
+      box.append(el('h4', 'Sugestões'));
+      for (const tip of gap.suggestions) box.append(el('p', tip));
+    }
+    for (const problem of gap.source_problems || []) {
+      box.append(el('p', `Atenção em "${problem.name}": ${problem.status}` + ((problem.ocr_pages_flagged || []).length ? ` · páginas sem texto (provável digitalização): ${problem.ocr_pages_flagged.join(', ')}` : ''), 'editorial-alert'));
+    }
+    if (!decide || entry.status !== 'awaiting_source_approval') return;
+    box.append(el('h4', 'Fontes que seguem para a redação'));
+    const checks = [];
+    for (const source of entry.sources || []) {
+      const label = document.createElement('label'); label.className = 'checkbox-line';
+      const input = document.createElement('input'); input.type = 'checkbox'; input.checked = true; input.value = source.id;
+      label.append(input, document.createTextNode(' ' + (source.name || source.id)));
+      checks.push(input); box.append(label);
+    }
+    const bar = document.createElement('div'); bar.className = 'downloads';
+    const approve = el('button', 'Aprovar e iniciar a redação'); approve.type = 'button';
+    const discard = el('button', 'Descartar'); discard.type = 'button';
+    const status = el('small', '');
+    const decideNow = async (decision) => {
+      approve.disabled = discard.disabled = true;
+      try {
+        const ids = checks.filter(c => c.checked).map(c => c.value);
+        if (decision === 'approve' && !ids.length) { status.textContent = 'Mantenha ao menos uma fonte.'; return; }
+        if (decision === 'approve' && !accountAccess?.admin && entry.model === 'gemini-3.1-pro-preview'
+            && !window.confirm('A redação vai usar Gemini Pro com sua chave. O Google poderá cobrar o uso. Continuar?')) return;
+        await request(`/jobs/${entry.id}/checkpoint`, {method: 'POST', body: JSON.stringify({decision, source_ids: decision === 'approve' ? ids : null})});
+        await loadJobs();
+      } catch (e) { status.textContent = e.message; }
+      finally { approve.disabled = discard.disabled = false; }
+    };
+    approve.addEventListener('click', () => decideNow('approve'));
+    discard.addEventListener('click', () => { if (window.confirm('Descartar esta pesquisa? O diagnóstico continua no histórico.')) decideNow('discard'); });
+    bar.append(approve, discard, status); box.append(bar);
+  });
+}
+
+function showContradictions(id, target) {
+  return toggleReport(id, target, 'contradictions-report', 'contradictions', (box, data) => {
+    box.append(el('strong', 'Possíveis divergências entre fontes (experimental)'));
+    box.append(el('p', 'Pares de trechos de fontes diferentes sobre o mesmo assunto, classificados por modelo de linguagem. Leia os dois trechos: datas, populações e métodos podem explicar a diferença.'));
+    const names = {convergente: 'Convergentes', divergente: 'Divergentes', contexto_diferente: 'Contextos diferentes', nao_comparavel: 'Não comparáveis', nao_classificado: 'Não classificado'};
+    for (const pair of data.pairs || []) {
+      const d = document.createElement('details'); d.className = 'reference-item';
+      d.append(el('summary', `${pair.relacao === 'divergente' ? '⚠ ' : ''}${names[pair.relacao] || pair.relacao}: ${pair.a.source_name} x ${pair.b.source_name}`));
+      if (pair.justificativa) d.append(el('p', pair.justificativa));
+      for (const side of [pair.a, pair.b]) {
+        const pages = side.pages ? `p. ${side.pages[0]}${side.pages[1] !== side.pages[0] ? '-' + side.pages[1] : ''}` : 'sem página';
+        d.append(el('p', `${side.source_name} · ${pages}`));
+        d.append(el('small', side.excerpt || ''));
+      }
+      if (!pair.citacoes_conferidas) d.append(el('small', 'As frases citadas pelo modelo não foram encontradas literalmente nos trechos e foram descartadas.'));
+      box.append(d);
+    }
+  });
+}
+
 function showShield(id, target) {
   return toggleReport(id, target, 'shield-report', 'shield', (box, shield) => {
     box.append(el('strong', 'Escudo de auditoria: o que pede atenção'));
@@ -461,7 +537,8 @@ async function loadCapabilities() {
 }
 
 function statusLabel(value) {
-  return ({queued:'Na fila',running:'Em execução',completed:'Concluído',failed:'Falhou'})[value] || value;
+  return ({queued:'Na fila',running:'Em execução',completed:'Concluído',failed:'Falhou',
+    awaiting_source_approval:'Aguardando sua aprovação',discarded:'Descartada'})[value] || value;
 }
 
 const AGENT_LABELS = {
@@ -535,6 +612,14 @@ async function loadJobs() {
         info.append(aud);
       }
       if (entry.error) {const err=document.createElement('small'); err.textContent=entry.error; info.append(err);}
+      if (entry.status === 'awaiting_source_approval') {
+        const g = entry.gap_summary || {};
+        info.append(el('small', `Diagnóstico pronto: ${g.boa || 0} ponto(s) com boa cobertura, ${g.parcial || 0} parcial(is), ${g.lacuna || 0} lacuna(s). A redação só começa depois da sua aprovação.`, 'scientific-warning'));
+        const actions = document.createElement('div'); actions.className = 'downloads';
+        const open = el('button', 'Ver diagnóstico e aprovar fontes'); open.type = 'button';
+        open.addEventListener('click', () => showGapReport(entry, info, true));
+        actions.append(open); info.append(actions);
+      }
       if (entry.status === 'completed' || entry.status === 'failed') {
         const files = document.createElement('div'); files.className='downloads';
         const available = entry.status === 'failed'
@@ -543,11 +628,16 @@ async function loadJobs() {
         for (const kind of available) {
           if (kind === 'neon' && !accountAccess?.admin) continue;
           const button = document.createElement('button'); button.type='button';
-          const labels={pdf:'Baixar PDF',latex:'Baixar LaTeX',audit:'Ver auditoria',references:'Conferir referências',neon:'Parecer Neon',manifest:'Manifesto de proveniência',declaration:'Rascunho da declaração de IA',evidence:'Citações e evidências',evidence_csv:'Matriz de evidências (CSV)',shield:'Escudo de auditoria',coverage:'Cobertura das fontes'};
+          if (kind === 'gap_report') {
+            const gb = el('button', 'Diagnóstico das fontes'); gb.type = 'button';
+            gb.addEventListener('click', () => showGapReport(entry, info, false));
+            files.append(gb); continue;
+          }
+          const labels={pdf:'Baixar PDF',latex:'Baixar LaTeX',audit:'Ver auditoria',references:'Conferir referências',neon:'Parecer Neon',manifest:'Manifesto de proveniência',declaration:'Rascunho da declaração de IA',evidence:'Citações e evidências',evidence_csv:'Matriz de evidências (CSV)',shield:'Escudo de auditoria',coverage:'Cobertura das fontes',contradictions:'Divergências entre fontes (experimental)'};
           button.textContent=labels[kind]||'Logs';
           if(kind==='shield'&&entry.shield_counts){const c=entry.shield_counts;button.textContent+=` (${c.alta||0} alta · ${c.media||0} média)`;}
           if(kind==='references'&&entry.editorial_alerts>0){button.textContent+=` (${entry.editorial_alerts} aviso${entry.editorial_alerts>1?'s':''} editorial${entry.editorial_alerts>1?'is':''})`;}
-          button.addEventListener('click', ()=>kind==='shield' ? showShield(entry.id, info) : kind==='coverage' ? showCoverage(entry.id, info) : kind==='evidence' ? showEvidenceReport(entry.id, info) : kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : kind==='neon' ? showNeonReport(entry.id, info) : download(entry.id,kind));
+          button.addEventListener('click', ()=>kind==='contradictions' ? showContradictions(entry.id, info) : kind==='shield' ? showShield(entry.id, info) : kind==='coverage' ? showCoverage(entry.id, info) : kind==='evidence' ? showEvidenceReport(entry.id, info) : kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : kind==='neon' ? showNeonReport(entry.id, info) : download(entry.id,kind));
           files.append(button);
         }
         info.append(files);
@@ -559,6 +649,35 @@ async function loadJobs() {
 }
 
 $('refresh').addEventListener('click', loadJobs);
+
+// M26: importação somente leitura do Zotero. A chave só trafega nestas requisições.
+function zoteroMessage(text) { $('zotero-message').textContent = text; }
+$('zotero-list').addEventListener('click', async () => {
+  const key = $('zotero-key').value.trim();
+  if (!key) { zoteroMessage('Cole a chave do Zotero.'); return; }
+  zoteroMessage('Consultando o Zotero...');
+  try {
+    const data = await (await request('/library/zotero/collections', {method: 'POST', body: JSON.stringify({api_key: key})})).json();
+    const select = $('zotero-collection');
+    select.replaceChildren(new Option('Biblioteca inteira (até 500 itens)', ''));
+    for (const c of data.items || []) select.append(new Option(`${c.name}${c.items != null ? ' (' + c.items + ')' : ''}`, c.key));
+    select.disabled = false; $('zotero-import').disabled = false;
+    zoteroMessage(`${(data.items || []).length} coleção(ões) encontrada(s).`);
+  } catch (e) { zoteroMessage(e.message); }
+});
+$('zotero-import').addEventListener('click', async () => {
+  const key = $('zotero-key').value.trim();
+  if (!key) { zoteroMessage('Cole a chave do Zotero.'); return; }
+  $('zotero-import').disabled = true; zoteroMessage('Importando metadados...');
+  try {
+    const body = {api_key: key, collection_key: $('zotero-collection').value || null};
+    const data = await (await request('/library/zotero/import', {method: 'POST', body: JSON.stringify(body)})).json();
+    zoteroMessage(`${data.items_imported} item(ns) importado(s) como .bib.`);
+    $('zotero-key').value = '';
+    await loadLibrary();
+  } catch (e) { zoteroMessage(e.message); }
+  finally { $('zotero-import').disabled = false; }
+});
 $('new-paper').addEventListener('submit', async (event) => {
   event.preventDefault();
   const button=$('submit'); button.disabled=true; $('submit-status').textContent='Salvando e iniciando...';
@@ -581,10 +700,17 @@ $('new-paper').addEventListener('submit', async (event) => {
       language:$('language').value,
       source_ids:[...selectedSourceIds],
       plotting:$('plotting').checked,
-      neon_review:$('neon-review').checked
+      neon_review:$('neon-review').checked,
+      preflight:$('preflight').checked
     };
+    if (payload.preflight && !payload.source_ids.length) {
+      $('submit-status').textContent = 'Selecione ao menos uma fonte da biblioteca para o diagnóstico.';
+      return;
+    }
     await request('/jobs', {method:'POST',body:JSON.stringify(payload)});
-    $('submit-status').textContent='Pesquisa enviada. Você pode fechar o navegador.';
+    $('submit-status').textContent = payload.preflight
+      ? 'Diagnóstico enviado. Quando terminar, aprove as fontes no histórico para iniciar a redação.'
+      : 'Pesquisa enviada. Você pode fechar o navegador.';
     $('new-paper').reset();applyModelAccess();selectedSourceIds.clear();updateSelectedCount();displayLibrary();await loadJobs();
   } catch (e) { $('submit-status').textContent=e.message; }
   finally {button.disabled = !accountAccess?.research_generation_enabled;}

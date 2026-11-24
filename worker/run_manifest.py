@@ -105,10 +105,12 @@ class RunManifest:
                 "status": "not_measured",
                 "reason": "O motor original não informa tokens nem custo por chamada.",
             },
-            "approvals": {
-                "status": "none_recorded",
-                "reason": "Checkpoints de validação humana (M12) ainda não implementados.",
-            },
+            # M12: decisões humanas registradas pela API (quem, quando, o quê).
+            "approvals": ({"status": "recorded", "events": list(record.get("approvals") or [])}
+                          if record.get("approvals") else
+                          {"status": "none_recorded",
+                           "reason": "Pesquisa iniciada sem o checkpoint de aprovação de fontes."}),
+            "mode": record.get("mode") or "generate",
             "limitations": [
                 "Modelos de linguagem não são determinísticos: repetir a execução com o mesmo manifesto pode gerar texto diferente.",
                 "O manifesto registra o que foi entregue aos agentes, não comprova a validade científica do manuscrito.",

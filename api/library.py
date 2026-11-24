@@ -70,8 +70,43 @@ def validate_signature(data: bytes, suffix: str) -> None:
 def exposed(record: dict) -> dict:
     return {key: record.get(key) for key in (
         "id", "name", "format", "size", "collection", "description", "sha256",
-        "created_at", "archived_at", "status",
+        "created_at", "archived_at", "status", "origin",
     )}
+
+
+def save_library_item(db, bucket, owner_uid: str, name: str, suffix: str, data: bytes,
+                      collection_name: str, description: str, origin: dict | None = None) -> dict:
+    """Grava original imutável no GCS e metadados no Firestore (upload e Zotero)."""
+    collection = db.collection("library_items")
+    existing = list(collection.where("owner_uid", "==", owner_uid).limit(MAX_ITEMS_PER_OWNER + 1).stream())
+    if sum(s.to_dict().get("status") == "active" for s in existing) >= MAX_ITEMS_PER_OWNER:
+        raise HTTPException(409, "Limite de 500 arquivos ativos atingido.")
+    if not data:
+        raise HTTPException(422, "Arquivo vazio.")
+    if len(data) > MAX_BYTES[suffix]:
+        raise HTTPException(413, "Arquivo acima do limite permitido.")
+    validate_signature(data, suffix)
+    item_id = uuid.uuid4().hex
+    # ID e UID são controlados pelo backend; o nome do usuário nunca vira caminho.
+    path = f"library/{owner_uid}/{item_id}/original{suffix}"
+    document = {
+        "id": item_id, "owner_uid": owner_uid,
+        "name": name, "format": suffix[1:], "size": len(data),
+        "description": description.strip(), "collection": collection_name.strip(),
+        "sha256": hashlib.sha256(data).hexdigest(), "object_path": path, "created_at": utc_now(),
+        "archived_at": "", "status": "active",
+    }
+    if origin:
+        document["origin"] = origin
+    blob = bucket.blob(path)
+    blob.upload_from_string(data, content_type=MIMES[suffix], if_generation_match=0)
+    try:
+        collection.document(item_id).create(document)
+    except Exception:
+        # Não deixar arquivo órfão se a criação no Firestore falhar.
+        blob.delete()
+        raise
+    return document
 
 
 def make_library_router(db, bucket, verify_user: Callable):
@@ -108,10 +143,6 @@ def make_library_router(db, bucket, verify_user: Callable):
         name, suffix = safe_filename(filename)
         if not collection_name.strip():
             raise HTTPException(422, "Informe uma coleção.")
-        # Evita criar armazenamento infinito acidentalmente.
-        existing = list(collection.where("owner_uid", "==", user["uid"]).limit(MAX_ITEMS_PER_OWNER + 1).stream())
-        if sum(s.to_dict().get("status") == "active" for s in existing) >= MAX_ITEMS_PER_OWNER:
-            raise HTTPException(409, "Limite de 500 arquivos ativos atingido.")
         chunks = []
         total = 0
         async for chunk in request.stream():
@@ -120,28 +151,8 @@ def make_library_router(db, bucket, verify_user: Callable):
                 raise HTTPException(413, "Arquivo acima do limite permitido.")
             chunks.append(chunk)
         data = b"".join(chunks)
-        if not data:
-            raise HTTPException(422, "Arquivo vazio.")
-        validate_signature(data, suffix)
-        item_id = uuid.uuid4().hex
-        # ID e UID são controlados pelo backend; o nome do usuário nunca vira caminho.
-        path = f"library/{user['uid']}/{item_id}/original{suffix}"
-        digest = hashlib.sha256(data).hexdigest()
-        document = {
-            "id": item_id, "owner_uid": user["uid"],
-            "name": name, "format": suffix[1:], "size": total,
-            "description": description.strip(), "collection": collection_name.strip(),
-            "sha256": digest, "object_path": path, "created_at": utc_now(),
-            "archived_at": "", "status": "active",
-        }
-        blob = bucket.blob(path)
-        blob.upload_from_string(data, content_type=MIMES[suffix], if_generation_match=0)
-        try:
-            collection.document(item_id).create(document)
-        except Exception:
-            # Não deixar arquivo órfão se a criação no Firestore falhar.
-            blob.delete()
-            raise
+        document = save_library_item(db, bucket, user["uid"], name, suffix, data,
+                                     collection_name, description)
         return {"item": exposed(document)}
 
     @router.get("/items/{item_id}/download")

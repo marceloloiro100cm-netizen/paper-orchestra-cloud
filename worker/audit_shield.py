@@ -32,7 +32,8 @@ def _stage(status, **extra):
     return {"status": status, **extra}
 
 
-def build_shield(audit: dict | None, references: dict | None, evidence: dict | None) -> dict:
+def build_shield(audit: dict | None, references: dict | None, evidence: dict | None,
+                 contradictions: dict | None = None) -> dict:
     items, stages = [], {}
 
     # Estágio 1: ponteiros e citações literais (M05).
@@ -110,6 +111,19 @@ def build_shield(audit: dict | None, references: dict | None, evidence: dict | N
     else:
         stages["4_suporte_semantico"] = _stage("nao_executado",
                                                motivo="Disponível com a leitura por trechos (V2) ligada.")
+
+    # M17 (experimental): possíveis divergências entre fontes.
+    if contradictions:
+        stages["5_divergencias_entre_fontes"] = _stage("executado_experimental", **contradictions.get("summary", {}))
+        for pair in contradictions.get("pairs", []):
+            if pair.get("relacao") == "divergente":
+                a, b = pair["a"], pair["b"]
+                items.append(_item("media", "5_divergencias_entre_fontes", "Possível divergência entre fontes",
+                                   f"{a['source_name']} x {b['source_name']}: {pair.get('justificativa', '')} "
+                                   "Ler os dois trechos antes de concluir.", a["chunk_id"]))
+    else:
+        stages["5_divergencias_entre_fontes"] = _stage("nao_executado",
+                                                       motivo="Experimental; ativado por SCRIPTORIUM_V2_CONTRADICTIONS.")
 
     # Triagem heurística local (já existente na V1).
     if audit:
