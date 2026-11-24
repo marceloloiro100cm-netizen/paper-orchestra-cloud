@@ -384,24 +384,13 @@ async function loadJobs() {
         warning.textContent = 'PDF gerado: números, resultados, referências e alegações de validação precisam de conferência humana.';
         info.append(warning);
       }
-      if (entry.reference_status === 'completed_with_limitations') {
-        const refStatus = document.createElement('small');
-        refStatus.className = 'scientific-warning';
-        refStatus.textContent = 'Metadados bibliográficos consultados em bases externas; confira cada referência antes de citar.';
-        info.append(refStatus);
-      }
       if (entry.neon_review_requested && entry.neon_review_status === 'unavailable') {
         const warning = document.createElement('small');
         warning.className = 'scientific-warning';
         warning.textContent = 'A revisão adicional com Neon falhou. O PDF principal continua disponível.';
         info.append(warning);
       }
-      if (entry.audit_status === 'human_review_required') {
-        const aud = document.createElement('small');
-        aud.className = 'scientific-warning';
-        aud.textContent = 'Triagem científica disponível' + (typeof entry.audit_findings === 'number' ? ` · ${entry.audit_findings} alerta(s)` : '') + '. A revisão humana continua obrigatória.';
-        info.append(aud);
-      } else if (entry.audit_status === 'unavailable') {
+      if (entry.audit_status === 'unavailable') {
         const aud = document.createElement('small');
         aud.className = 'scientific-warning';
         aud.textContent = 'A auditoria não pôde ser gerada; confira manualmente o artigo.';
