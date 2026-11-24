@@ -640,7 +640,6 @@
         <div id="library-list" role="status">Carregando biblioteca...</div>
 
         <div class="step-footer">
-          <span class="subtle">Arquivos e bibliografias ficam privados no Cloud Storage e não entram no GitHub.</span>
           <button type="button" class="btn" data-go-step="2">Continuar para Nova Pesquisa →</button>
         </div>
       </section>
@@ -666,10 +665,9 @@
           <div>
             <label for="language">Idioma do manuscrito</label>
             <select id="language">
-              <option value="en">Inglês (padrão do PaperOrchestra original)</option>
-              <option value="pt-BR">Português brasileiro (experimental)</option>
+              <option value="en">Inglês</option>
+              <option value="pt-BR" selected>Português</option>
             </select>
-            <p class="subtle" style="margin-top:6px">Português é uma preferência de redação e não garante tradução integral. Os modelos brasileiros são rascunhos experimentais e exigem revisão do manual da universidade; nenhuma conformidade normativa é certificada automaticamente.</p>
           </div>
           <div class="columns">
             <div>
@@ -678,7 +676,7 @@
                 <option value="iclr2025">ICLR 2025</option>
                 <option value="cvpr2025">CVPR 2025</option>
                 <option value="abnt-artigo">Brasil – Artigo (abnTeX2 experimental)</option>
-                <option value="abnt-dissertacao">Brasil – Estrutura de dissertação (experimental)</option>
+                <option value="abnt-dissertacao" selected>Brasil – Estrutura de dissertação (experimental)</option>
               </select>
             </div>
             <div>
@@ -727,7 +725,6 @@
         <div class="panel-header">
           <div>
             <h2>Histórico de pesquisas</h2>
-            <p class="subtle" style="margin:0">Manuscritos guardados no Cloud Storage. O navegador não precisa permanecer aberto.</p>
           </div>
           <button id="refresh" class="btn alt">Atualizar</button>
         </div>
