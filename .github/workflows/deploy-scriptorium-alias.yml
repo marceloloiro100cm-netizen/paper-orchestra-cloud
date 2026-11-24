@@ -1,0 +1,101 @@
+name: Scriptorium — publicar endereço scriptorium.web.app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - public/config.js
+      - public/app.js
+      - public/index.html
+      - firebase.json
+      - scripts/deploy-scriptorium-alias.sh
+      - scripts/authorize-scriptorium-domain.py
+      - .github/workflows/deploy-scriptorium-alias.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+# Mesmo grupo da hospedagem atual: publicar os dois sites sem concorrência.
+concurrency:
+  group: paper-orchestra-hosting
+  cancel-in-progress: false
+
+jobs:
+  scriptorium:
+    name: Criar domínio secundário e preservar hospedagem principal
+    if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validar a aplicação e os scripts sem alterar a nuvem
+        run: |
+          set -euo pipefail
+          test -f public/config.js
+          grep -q 'projectId: "paperorchestra-mestrado"' public/config.js
+          bash -n scripts/deploy-scriptorium-alias.sh
+          python3 -m py_compile scripts/authorize-scriptorium-domain.py
+          node --check public/app.js
+          node --check public/config.js
+          python3 - <<'PY'
+          import json
+          obj=json.load(open("firebase.json", encoding="utf-8"))
+          assert isinstance(obj["hosting"], dict)
+          assert obj["hosting"]["rewrites"][0]["source"] == "/api/**"
+          assert obj["hosting"]["rewrites"][0]["run"] == {
+              "serviceId": "paper-orchestra-api", "region": "southamerica-east1"
+          }
+          print("Configuração de Firebase Hosting original preservada.")
+          PY
+
+      - name: Autenticar por OIDC com o publicador atual
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/201655574048/locations/global/workloadIdentityPools/github-actions/providers/github-actions
+          service_account: paper-orchestra-deployer@paperorchestra-mestrado.iam.gserviceaccount.com
+          project_id: paperorchestra-mestrado
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: paperorchestra-mestrado
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar Firebase CLI
+        run: npm install --global firebase-tools@latest
+
+      - name: Registrar scriptorium.web.app e publicar a mesma aplicação
+        env:
+          GOOGLE_CLOUD_PROJECT: paperorchestra-mestrado
+        run: bash scripts/deploy-scriptorium-alias.sh
+
+      - name: Autorizar novo domínio no Firebase Authentication
+        run: python3 scripts/authorize-scriptorium-domain.py
+
+      - name: Confirmar backend compartilhado e acesso negado sem login
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 20 \
+            https://scriptorium.web.app/api/health \
+            -o /tmp/scriptorium-health.json
+          python3 - <<'PY'
+          import json
+          result=json.load(open("/tmp/scriptorium-health.json", encoding="utf-8"))
+          assert result.get("ok") is True, "A API compartilhada não responde."
+          print("API alcançável no novo domínio.")
+          PY
+          STATUS="$(curl --silent --show-error --max-time 20 -o /dev/null \
+            -w "%{http_code}" https://scriptorium.web.app/api/jobs)"
+          if [[ "$STATUS" != "401" ]]; then
+            echo "::error::/api/jobs no novo domínio precisa exigir autenticação HTTP 401, retornou $STATUS."
+            exit 1
+          fi
+          echo "SUCESSO: novo endereço publicado e protegido por login."
+          echo "ATENÇÃO: homologação de uma conta real e o deploy BYOK da Issue #17 continuam necessários."
