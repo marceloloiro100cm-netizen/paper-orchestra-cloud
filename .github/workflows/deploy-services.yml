@@ -47,6 +47,15 @@ jobs:
         with:
           project_id: paperorchestra-mestrado
 
+      - name: Provisionar e auditar IAM BYOK antes de publicar
+        shell: bash
+        env:
+          PROJECT_ID: paperorchestra-mestrado
+        run: |
+          set -euo pipefail
+          bash scripts/setup-byok-iam.sh
+          bash scripts/audit-byok-iam.sh
+
       - name: Construir API e worker sem alterar produção
         shell: bash
         env:
@@ -70,7 +79,7 @@ jobs:
           WORKER_IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/paper-orchestra/worker:agents-${GITHUB_SHA}"
           # Update de imagem somente: preservar variáveis de ambiente, serviços, IAM e Storage.
           gcloud run jobs update paper-orchestra-worker --image="$WORKER_IMAGE" --region="$REGION" --project="$PROJECT" --quiet
-          gcloud run services update paper-orchestra-api --image="$API_IMAGE" --update-env-vars="NEON_REVIEW_ENABLED=true" --region="$REGION" --project="$PROJECT" --quiet
+          gcloud run services update paper-orchestra-api --image="$API_IMAGE" --update-env-vars="NEON_REVIEW_ENABLED=true,BYOK_ENABLED=true" --region="$REGION" --project="$PROJECT" --quiet
 
       - name: Verificar que a API continua respondendo
         shell: bash
