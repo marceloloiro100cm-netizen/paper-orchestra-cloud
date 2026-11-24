@@ -114,6 +114,29 @@ class CredentialTests(unittest.TestCase):
             GeminiCredential(key="invalid").normalized
         self.assertNotIn("AQ.", str(error.exception))
 
+    def test_worker_credential_accepts_aq_key_format(self):
+        # Antes, get_worker_credential rejeitava o ponto das chaves "AQ.".
+        from credentials import get_worker_credential
+        key = "AQ." + "w" * 44
+        db = DB()
+        db.collection("research_credentials").document("guest").set({"status": "active"})
+
+        class Reader:
+            def access_secret_version(self, *, request):
+                payload = type("P", (), {"data": key.encode("utf-8")})
+                return type("R", (), {"payload": payload})
+
+        self.assertEqual(get_worker_credential(db, "p", "guest", client=Reader()), key)
+
+    def test_api_and_worker_share_key_pattern(self):
+        import importlib.util
+        from credentials import KEY_PATTERN
+        path = Path(__file__).resolve().parents[1] / "worker" / "byok.py"
+        spec = importlib.util.spec_from_file_location("worker_byok", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(module.KEY_PATTERN, KEY_PATTERN)
+
     def test_bad_uid_rejected(self):
         with self.assertRaises(ValueError):
             secret_id("../unsafe")

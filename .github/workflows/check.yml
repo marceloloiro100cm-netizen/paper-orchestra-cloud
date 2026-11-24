@@ -12,7 +12,8 @@ jobs:
       - name: Validate Python files
         run: |
           python -m pip install -q requests fastapi google-api-core
-          python -m compileall -q api/access.py api/credentials.py api/main.py worker/byok.py worker/runner.py worker/agent_progress.py worker/scientific_audit.py worker/reference_verification.py api/library.py worker/source_materials.py worker/neon_review.py
+          # Compila todos os módulos; a lista manual deixava arquivos novos de fora.
+          python -m compileall -q api worker
           python -m unittest discover -s tests -v
       - name: Validate JSON and JS
         run: |

@@ -14,6 +14,7 @@ from model_access import (FLASH_MODEL, PRO_MODEL, account_model_access,
                           allowed_models, validate_key_and_models)
 from access_requests import (request_access, pending_access_requests,
                              approve_access_request)
+from job_state import ACTIVE_STATUSES, claim_active_slot, reconcile
 
 import firebase_admin
 from firebase_admin import auth
@@ -23,7 +24,7 @@ from google.cloud import firestore, storage, run_v2
 from pydantic import BaseModel, Field, field_validator
 
 PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
-REGION = os.getenv("REGION", "us-east4")
+REGION = os.getenv("REGION", "southamerica-east1")
 BUCKET = os.environ["RESEARCH_BUCKET"]
 ALLOWED_EMAILS = {x.strip().lower() for x in os.getenv("ALLOWED_EMAILS", "").split(",") if x.strip()}
 JOB_NAME = f"projects/{PROJECT}/locations/{REGION}/jobs/paper-orchestra-worker"
@@ -91,10 +92,12 @@ app.include_router(make_library_router(db, bucket, current_user))
 def get_research(job_id: str, user: dict) -> dict:
     if not re.fullmatch(r"[0-9a-f]{32}", job_id):
         raise HTTPException(status_code=404, detail="Pesquisa não encontrada")
-    snap = db.collection("research_jobs").document(job_id).get()
+    ref = db.collection("research_jobs").document(job_id)
+    snap = ref.get()
     if not snap.exists or snap.to_dict().get("owner_uid") != user["uid"]:
         raise HTTPException(status_code=404, detail="Pesquisa não encontrada")
-    return snap.to_dict()
+    # Job interrompido sem atualizar o Firestore não fica "running" para sempre.
+    return reconcile(ref, snap.to_dict())
 
 
 def serializable(record: dict) -> dict:
@@ -239,7 +242,7 @@ def revoke_researcher(email: str, user: User):
 def list_researches(user: User):
     # Consulta simples, sem índices compostos. Ordenação em memória para acervo pessoal.
     docs = db.collection("research_jobs").where("owner_uid", "==", user["uid"]).limit(200).stream()
-    items = [serializable(s.to_dict()) for s in docs]
+    items = [serializable(reconcile(s.reference, s.to_dict())) for s in docs]
     items.sort(key=lambda x: x["created_at"], reverse=True)
     return {"items": items}
 
@@ -266,11 +269,14 @@ def create_research(payload: NewResearch, user: User):
         raise HTTPException(status_code=403, detail="A revisão Neon não está habilitada para esta conta.")
     if payload.neon_review and not NEON_REVIEW_ENABLED:
         raise HTTPException(status_code=409, detail="Revisão Neon indisponível até validar o acesso do worker.")
-    # Proteção de custos: uma geração por vez por conta.
+    # Proteção de custos: uma geração por vez por conta. Esta varredura cobre
+    # pesquisas criadas antes da trava transacional e reconcilia as travadas;
+    # a garantia contra requisições simultâneas está em claim_active_slot.
+    busy_detail = "Há uma pesquisa em execução. Finalize-a antes de iniciar outra."
     docs = db.collection("research_jobs").where("owner_uid", "==", owner_uid).limit(200).stream()
     for s in docs:
-        if s.to_dict().get("status") in ("queued", "running"):
-            raise HTTPException(status_code=409, detail="Há uma pesquisa em execução. Finalize-a antes de iniciar outra.")
+        if reconcile(s.reference, s.to_dict()).get("status") in ACTIVE_STATUSES:
+            raise HTTPException(status_code=409, detail=busy_detail)
     # Validar propriedade antes de iniciar tarefas caras ou armazenar a solicitação.
     source_ids = list(dict.fromkeys(payload.source_ids))
     if len(source_ids) > MAX_SELECTED_SOURCES:
@@ -317,7 +323,8 @@ def create_research(payload: NewResearch, user: User):
         "scientific_verification": "manual_required",
         "created_at": now, "finished_at": "", "files": [], "error": "",
     }
-    ref.set(record)
+    if not claim_active_slot(db, owner_uid, job_id, record):
+        raise HTTPException(status_code=409, detail=busy_detail)
     try:
         for name, content in (("idea_sparse.md", payload.idea), ("experimental_log.md", payload.experimental_log)):
             blob = bucket.blob(f"{prefix}/input/{name}")

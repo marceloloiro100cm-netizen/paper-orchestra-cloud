@@ -41,7 +41,7 @@ jobs:
           node-version: "22"
       - name: Validar sintaxe
         run: |
-          python -m compileall -q api/access.py api/access_requests.py api/model_access.py api/credentials.py api/main.py worker/byok.py worker/runner.py
+          python -m compileall -q api/job_state.py api/access.py api/access_requests.py api/model_access.py api/credentials.py api/main.py worker/byok.py worker/runner.py
           python -m py_compile scripts/check-public-onboarding.py tests/test_multiuser_cross_access.py
           node --check public/app.js
           bash -n scripts/setup-byok-iam.sh scripts/audit-byok-iam.sh scripts/bootstrap-cloudshell-unico.sh scripts/deploy-scriptorium-alias.sh
@@ -56,6 +56,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_model_access.py' -v
           python -m unittest discover -s tests -p 'test_access_requests.py' -v
           python -m unittest discover -s tests -p 'test_multiuser_cross_access.py' -v
+          python -m unittest discover -s tests -p 'test_job_state.py' -v
+          python -m unittest discover -s tests -p 'test_container_modules.py' -v
 
       - name: Diagnóstico público da API atual (sem token ou dados reais)
         run: python3 scripts/check-public-onboarding.py --diagnostic
