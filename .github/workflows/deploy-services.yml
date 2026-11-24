@@ -69,8 +69,30 @@ jobs:
           set -euo pipefail
           API_IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/paper-orchestra/api:agents-${GITHUB_SHA}"
           WORKER_IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/paper-orchestra/worker:agents-${GITHUB_SHA}"
-          gcloud builds submit api --tag="$API_IMAGE" --project="$PROJECT" --timeout=1800
-          gcloud builds submit worker --tag="$WORKER_IMAGE" --project="$PROJECT" --timeout=1800
+          # O deployer não é Viewer do projeto, então o gcloud não consegue
+          # transmitir os logs do build. Disparamos com --async e acompanhamos o
+          # status pela API do Cloud Build (cloudbuild.builds.get).
+          build() {
+            local dir="$1" image="$2" id status
+            id="$(gcloud builds submit "$dir" --tag="$image" --project="$PROJECT" --timeout=1800 \
+                    --async --format='value(id)')"
+            echo "Build de ${dir}: ${id}"
+            for _ in $(seq 1 180); do
+              status="$(gcloud builds describe "$id" --project="$PROJECT" --format='value(status)')"
+              case "$status" in
+                SUCCESS) echo "Build de ${dir} concluído."; return 0 ;;
+                FAILURE|INTERNAL_ERROR|TIMEOUT|CANCELLED|EXPIRED)
+                  echo "::error::Build de ${dir} terminou como ${status}."
+                  gcloud builds describe "$id" --project="$PROJECT" --format='value(failureInfo.detail,statusDetail)' || true
+                  echo "Logs: https://console.cloud.google.com/cloud-build/builds/${id}?project=${PROJECT}"
+                  return 1 ;;
+              esac
+              sleep 10
+            done
+            echo "::error::Build de ${dir} não terminou em 30 minutos."; return 1
+          }
+          build api "$API_IMAGE"
+          build worker "$WORKER_IMAGE"
 
       - name: Atualizar motor e API sem apagar configuração
         shell: bash
