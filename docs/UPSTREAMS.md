@@ -27,23 +27,23 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R12 | [Estudo MIT: citações por ponteiros](https://dspace.mit.edu/entities/publication/2994e161-6c34-4f88-973e-c13d1e8cd2ef) | artigo | não | não se aplica | - | M05, M10 |
 | R13 | [GapView (UC Irvine)](https://escholarship.org/uc/item/2zs4w991) | artigo | não | não se aplica | - | M09, M16 |
 | R14 | [FIRE (MBZUAI)](https://github.com/mbzuai-nlp/fire) | prototipo | não | a conferir | - | M22 |
-| R15 | [RA-RAG (POSTECH)](https://github.com/ml-postech/RA-RAG) | prototipo | não | a conferir | - | M18 |
-| R16 | [InRanker (UNICAMP)](https://github.com/unicamp-dl/InRanker) | prototipo | não | a conferir | - | M20 |
+| R15 | [RA-RAG (POSTECH)](https://github.com/ml-postech/RA-RAG) | prototipo | não | MIT | - | M18 |
+| R16 | [InRanker (UNICAMP)](https://github.com/unicamp-dl/InRanker) | prototipo | não | Apache-2.0 | - | M20 |
 | R17 | [FlagEmbedding (BAAI)](https://github.com/FlagOpen/FlagEmbedding) | biblioteca | não | MIT | - | M20 |
 | R18 | [olmOCR (AI2)](https://github.com/allenai/olmocr) | biblioteca | não | Apache-2.0 | - | M23 |
 | R19 | [SciELO](https://www.scielo.org/) | api | não | políticas próprias | - | M24 |
 | R20 | [BRAPCI](https://brapci.inf.br/) | api | não | a conferir | - | M24 |
 | R21 | [Zotero Web API v3](https://www.zotero.org/support/dev/web_api/v3/start) | api | não | termos do serviço | - | M26 |
 | R22 | [Better BibTeX for Zotero](https://github.com/retorquere/zotero-better-bibtex) | biblioteca | não | MIT | - | M26 |
-| R23 | [Citation.js](https://github.com/citation-js/citation-js) | biblioteca | não | a conferir | - | M27 |
+| R23 | [Citation.js](https://github.com/citation-js/citation-js) | biblioteca | não | MIT | - | M27 |
 | R24 | [CSL Styles](https://github.com/citation-style-language/styles) | biblioteca | não | CC-BY-SA-3.0 | - | M27 |
 | R25 | [IFRS: Instrução Normativa nº 16/2026 (IA generativa)](https://ifrs.edu.br/documentos/instrucao-normativa-ifrs-n-16-2026/) | normativo | sim | não se aplica | - | M11, M12 |
 | R26 | [PRISMA 2020](https://www.prisma-statement.org/prisma-2020-checklist) | normativo | não | não se aplica | - | M09, M16 |
 | R27 | [OWASP GenAI Security Project](https://genai.owasp.org/) | normativo | sim | não se aplica | - | M13 |
-| R28 | [OSV-Scanner (Google)](https://github.com/google/osv-scanner) | ferramenta | sim | a conferir | - | M15 |
+| R28 | [OSV-Scanner (Google)](https://github.com/google/osv-scanner) | ferramenta | sim | Apache-2.0 | - | M15 |
 | R29 | [Dependabot (GitHub)](https://docs.github.com/en/code-security/dependabot) | servico | sim | termos do serviço | - | M15 |
 | R30 | [FastAPI](https://github.com/fastapi/fastapi) | biblioteca | sim | MIT | >=0.115,<1 | V1 |
-| R31 | [Uvicorn](https://github.com/encode/uvicorn) | biblioteca | sim | BSD-3-Clause | >=0.30,<1 | V1 |
+| R31 | [Uvicorn](https://github.com/Kludex/uvicorn) | biblioteca | sim | BSD-3-Clause | >=0.30,<1 | V1 |
 | R32 | [Pydantic](https://github.com/pydantic/pydantic) | biblioteca | sim | MIT | >=2.5,<3 | V1 |
 | R33 | [Firebase Admin SDK para Python](https://github.com/firebase/firebase-admin-python) | biblioteca | sim | Apache-2.0 | >=6.5,<8 | V1 |
 | R34 | [Google Cloud Client Libraries para Python (Firestore, Storage, Run, Secret Manager)](https://github.com/googleapis/google-cloud-python) | biblioteca | sim | Apache-2.0 | faixas em api/requirements.txt e worker/requirements.txt | V1 |
@@ -52,7 +52,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R37 | [PyMuPDF](https://github.com/pymupdf/PyMuPDF) | biblioteca | sim | AGPL-3.0 | sem fixação (vem do requirements.txt do PaperOrchestra) | V1, M01, M23 |
 | R38 | [abnTeX2](https://github.com/abntex/abntex2) | biblioteca | sim | LPPL-1.3c | versão do pacote Debian texlive-publishers da imagem python:3.11-slim | V1, M27 |
 | R39 | [Firebase JavaScript SDK](https://github.com/firebase/firebase-js-sdk) | biblioteca | sim | Apache-2.0 | 11.10.0 | V1 |
-| R40 | [OSV-Scanner GitHub Action (workflows reutilizáveis)](https://github.com/google/osv-scanner-action) | ferramenta | sim | a conferir | v2.7.1 | M15 |
+| R40 | [OSV-Scanner GitHub Action (workflows reutilizáveis)](https://github.com/google/osv-scanner-action) | ferramenta | sim | Apache-2.0 | v2.7.1 | M15 |
 | R41 | [GitHub Actions usadas nos workflows (actions/checkout, setup-python, setup-node; google-github-actions/auth, setup-gcloud)](https://github.com/google-github-actions/auth) | ferramenta | sim | Apache-2.0 | checkout@v4, setup-python@v5, setup-node@v4, auth@v3, setup-gcloud@v3 | V1, M15 |
 | R42 | [Imagem base python:3.11-slim (Docker Official Images)](https://hub.docker.com/_/python) | ferramenta | sim | PSF-2.0 | python:3.11-slim (tag móvel, sem digest) | V1 |
 
@@ -387,8 +387,8 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Erros e correções:** https://github.com/ml-postech/RA-RAG/issues
 - **Avisos de segurança:** https://github.com/ml-postech/RA-RAG/security/advisories
 - **Histórico de mudanças:** -
-- **Licença (SPDX):** a conferir
-- **Situação da licença:** a conferir
+- **Licença (SPDX):** MIT
+- **Situação da licença:** confirmada pela API do GitHub (vigia de 24/11/2026)
 - **Licença dos pesos:** -
 - **Versão fixada:** -
 - **Versão instalada:** -
@@ -410,8 +410,8 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Erros e correções:** https://github.com/unicamp-dl/InRanker/issues
 - **Avisos de segurança:** https://github.com/unicamp-dl/InRanker/security/advisories
 - **Histórico de mudanças:** -
-- **Licença (SPDX):** a conferir
-- **Situação da licença:** a conferir (código e pesos separadamente)
+- **Licença (SPDX):** Apache-2.0
+- **Situação da licença:** confirmada pela API do GitHub (vigia de 24/11/2026); pesos a conferir separadamente
 - **Licença dos pesos:** a conferir
 - **Versão fixada:** -
 - **Versão instalada:** -
@@ -571,8 +571,8 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Erros e correções:** https://github.com/citation-js/citation-js/issues
 - **Avisos de segurança:** https://github.com/citation-js/citation-js/security/advisories
 - **Histórico de mudanças:** -
-- **Licença (SPDX):** a conferir
-- **Situação da licença:** a conferir por versão
+- **Licença (SPDX):** MIT
+- **Situação da licença:** confirmada pela API do GitHub (vigia de 24/11/2026)
 - **Licença dos pesos:** -
 - **Versão fixada:** -
 - **Versão instalada:** -
@@ -686,14 +686,14 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Erros e correções:** https://github.com/google/osv-scanner/issues
 - **Avisos de segurança:** https://github.com/google/osv-scanner/security/advisories
 - **Histórico de mudanças:** -
-- **Licença (SPDX):** a conferir
-- **Situação da licença:** a conferir pelo vigia semanal
+- **Licença (SPDX):** Apache-2.0
+- **Situação da licença:** confirmada pela API do GitHub (vigia de 24/11/2026)
 - **Licença dos pesos:** -
 - **Versão fixada:** -
 - **Versão instalada:** -
-- **Última versão revisada:** -
+- **Última versão revisada:** v2.7.1
 - **Onde é usado:** .github/workflows/osv-scanner-pr.yml, .github/workflows/osv-scanner-scheduled.yml
-- **Política de atualização:** Versão vem do R40 (workflow reutilizável).
+- **Política de atualização:** A versão usada vem do R40 (workflow reutilizável v2.7.1).
 - **Frequência de revisão:** mensal
 - **Risco:** -
 - **Nota de migração:** -
@@ -750,10 +750,10 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 
 ### R31 · Uvicorn
 
-- **Fonte canônica:** https://github.com/encode/uvicorn
-- **Versões:** https://github.com/encode/uvicorn/releases
-- **Erros e correções:** https://github.com/encode/uvicorn/issues
-- **Avisos de segurança:** https://github.com/encode/uvicorn/security/advisories
+- **Fonte canônica:** https://github.com/Kludex/uvicorn
+- **Versões:** https://github.com/Kludex/uvicorn/releases
+- **Erros e correções:** https://github.com/Kludex/uvicorn/issues
+- **Avisos de segurança:** https://github.com/Kludex/uvicorn/security/advisories
 - **Histórico de mudanças:** -
 - **Licença (SPDX):** BSD-3-Clause
 - **Situação da licença:** a conferir pelo vigia semanal
@@ -765,7 +765,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Política de atualização:** Dependabot semanal.
 - **Frequência de revisão:** mensal
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** Repositório movido de encode/uvicorn para Kludex/uvicorn (detectado pelo vigia em 24/11/2026).
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -920,8 +920,8 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Situação da licença:** a conferir pelo vigia semanal
 - **Licença dos pesos:** -
 - **Versão fixada:** versão do pacote Debian texlive-publishers da imagem python:3.11-slim
-- **Versão instalada:** -
-- **Última versão revisada:** -
+- **Versão instalada:** 1.9.7 (pacote Debian texlive-publishers)
+- **Última versão revisada:** 2018-11-24-v1.9.7-ctan
 - **Onde é usado:** worker/Dockerfile, worker/templates/abnt-artigo, worker/templates/abnt-dissertacao
 - **Política de atualização:** Semestral, junto com a revisão das NBR 6022, 10520 e 6023.
 - **Frequência de revisão:** semestral
@@ -962,8 +962,8 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Erros e correções:** https://github.com/google/osv-scanner-action/issues
 - **Avisos de segurança:** https://github.com/google/osv-scanner-action/security/advisories
 - **Histórico de mudanças:** -
-- **Licença (SPDX):** a conferir
-- **Situação da licença:** a conferir pelo vigia semanal
+- **Licença (SPDX):** Apache-2.0
+- **Situação da licença:** confirmada pela API do GitHub (vigia de 24/11/2026)
 - **Licença dos pesos:** -
 - **Versão fixada:** v2.7.1
 - **Versão instalada:** v2.7.1

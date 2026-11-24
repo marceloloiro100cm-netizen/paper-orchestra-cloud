@@ -10,407 +10,1421 @@
   ],
   "upstreams": [
     {
-      "id": "R01", "name": "Projeto Scriptorium (paper-orchestra-cloud)", "kind": "codigo_proprio",
+      "id": "R01",
+      "name": "Projeto Scriptorium (paper-orchestra-cloud)",
+      "kind": "codigo_proprio",
       "canonical_url": "https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud",
       "github": "marceloloiro100cm-netizen/paper-orchestra-cloud",
-      "license_spdx": "a definir", "license_status": "código próprio; o repositório ainda não tem arquivo LICENSE",
-      "adopted": true, "modules": ["V1", "M01-M27"], "used_in": ["api/", "worker/", "public/"],
-      "update_policy": "Todo PR: CI verde, revisão e plano de rollback.", "review_frequency": "por_pr",
+      "license_spdx": "a definir",
+      "license_status": "código próprio; o repositório ainda não tem arquivo LICENSE",
+      "adopted": true,
+      "modules": [
+        "V1",
+        "M01-M27"
+      ],
+      "used_in": [
+        "api/",
+        "worker/",
+        "public/"
+      ],
+      "update_policy": "Todo PR: CI verde, revisão e plano de rollback.",
+      "review_frequency": "por_pr",
       "risk": "Mudanças de schema, custo ou permissão exigem migração reversível.",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R02", "name": "PaperOrchestra original (Google Research)", "kind": "biblioteca",
+      "id": "R02",
+      "name": "PaperOrchestra original (Google Research)",
+      "kind": "biblioteca",
       "canonical_url": "https://github.com/google-research/paper-orchestra",
-      "github": "google-research/paper-orchestra", "track": "commits",
-      "license_spdx": "Apache-2.0", "license_status": "confirmada no LICENSE do commit fixado (24/11/2026)",
-      "pinned": "d9bae997e793a015ed38bb1605be9eb58c00284f", "installed_version": "d9bae997e793a015ed38bb1605be9eb58c00284f",
+      "github": "google-research/paper-orchestra",
+      "track": "commits",
+      "license_spdx": "Apache-2.0",
+      "license_status": "confirmada no LICENSE do commit fixado (24/11/2026)",
+      "pinned": "d9bae997e793a015ed38bb1605be9eb58c00284f",
+      "installed_version": "d9bae997e793a015ed38bb1605be9eb58c00284f",
       "latest_reviewed": "d9bae997e793a015ed38bb1605be9eb58c00284f",
-      "adopted": true, "modules": ["V1", "M25"], "used_in": ["worker/Dockerfile (ARG PAPER_ORCHESTRA_COMMIT)", "worker/runner.py"],
+      "adopted": true,
+      "modules": [
+        "V1",
+        "M25"
+      ],
+      "used_in": [
+        "worker/Dockerfile (ARG PAPER_ORCHESTRA_COMMIT)",
+        "worker/runner.py"
+      ],
       "update_policy": "Commit fixado no Dockerfile. Atualizar só por PR, depois de gerar uma pesquisa de teste e comparar PDF, LaTeX e logs.",
       "review_frequency": "mensal",
       "risk": "Não publica releases. Seu requirements.txt não fixa versões, então dependências transitivas (PyMuPDF, openai, streamlit etc.) mudam a cada build.",
       "migration_note": "Os IDs de modelo preview (gemini-3.1-pro-preview, gemini-3-flash-preview) vêm deste código.",
       "rollback_sha": "d9bae997e793a015ed38bb1605be9eb58c00284f",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R03", "name": "Docling", "kind": "biblioteca",
-      "canonical_url": "https://github.com/docling-project/docling", "github": "docling-project/docling", "pypi": ["docling"],
-      "license_spdx": "MIT", "license_status": "confirmada no plano V2 (24/11/2026)",
+      "id": "R03",
+      "name": "Docling",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/docling-project/docling",
+      "github": "docling-project/docling",
+      "pypi": [
+        "docling"
+      ],
+      "license_spdx": "MIT",
+      "license_status": "confirmada no plano V2 (24/11/2026)",
       "model_weights_license": "a conferir (modelos de layout e tabelas baixados em tempo de execução)",
-      "adopted": false, "modules": ["M01", "M19", "M23"],
-      "update_policy": "Release mensal; alerta de segurança imediato; versão fixada no build.", "review_frequency": "mensal",
+      "adopted": false,
+      "modules": [
+        "M01",
+        "M19",
+        "M23"
+      ],
+      "update_policy": "Release mensal; alerta de segurança imediato; versão fixada no build.",
+      "review_frequency": "mensal",
       "risk": "Uso alto de CPU e RAM; baixa pesos de modelos durante o build ou a execução.",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R04", "name": "Docling-Parse", "kind": "biblioteca",
-      "canonical_url": "https://github.com/docling-project/docling-parse", "github": "docling-project/docling-parse", "pypi": ["docling-parse"],
-      "license_spdx": "MIT", "license_status": "confirmada no plano V2 (24/11/2026)",
-      "adopted": false, "modules": ["M01", "M02", "M19"],
-      "update_policy": "Mesma matriz de versões do Docling.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R04",
+      "name": "Docling-Parse",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/docling-project/docling-parse",
+      "github": "docling-project/docling-parse",
+      "pypi": [
+        "docling-parse"
+      ],
+      "license_spdx": "MIT",
+      "license_status": "confirmada no plano V2 (24/11/2026)",
+      "adopted": false,
+      "modules": [
+        "M01",
+        "M02",
+        "M19"
+      ],
+      "update_policy": "Mesma matriz de versões do Docling.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R05", "name": "FAISS (Meta)", "kind": "biblioteca",
-      "canonical_url": "https://github.com/facebookresearch/faiss", "github": "facebookresearch/faiss", "pypi": ["faiss-cpu"],
-      "license_spdx": "MIT", "license_status": "confirmada no plano V2 (24/11/2026)",
-      "adopted": false, "modules": ["M03", "M04"],
-      "update_policy": "Ciclo mensal; mudar a versão dos embeddings força reindexação controlada.", "review_frequency": "mensal",
+      "id": "R05",
+      "name": "FAISS (Meta)",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/facebookresearch/faiss",
+      "github": "facebookresearch/faiss",
+      "pypi": [
+        "faiss-cpu"
+      ],
+      "license_spdx": "MIT",
+      "license_status": "confirmada no plano V2 (24/11/2026)",
+      "adopted": false,
+      "modules": [
+        "M03",
+        "M04"
+      ],
+      "update_policy": "Ciclo mensal; mudar a versão dos embeddings força reindexação controlada.",
+      "review_frequency": "mensal",
       "risk": "Índice serializado no GCS não é banco distribuído; reavaliar para muitos usuários.",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R06", "name": "SQLite FTS5", "kind": "biblioteca",
-      "canonical_url": "https://www.sqlite.org/fts5.html", "changelog_url": "https://www.sqlite.org/changes.html",
-      "license_spdx": "blessing", "license_status": "domínio público (SQLite); validar a distribuição usada no contêiner",
-      "adopted": false, "modules": ["M03", "M04"],
-      "update_policy": "Acompanhar o release log do SQLite e a versão empacotada no Python da imagem.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R06",
+      "name": "SQLite FTS5",
+      "kind": "biblioteca",
+      "canonical_url": "https://www.sqlite.org/fts5.html",
+      "changelog_url": "https://www.sqlite.org/changes.html",
+      "license_spdx": "blessing",
+      "license_status": "domínio público (SQLite); validar a distribuição usada no contêiner",
+      "adopted": false,
+      "modules": [
+        "M03",
+        "M04"
+      ],
+      "update_policy": "Acompanhar o release log do SQLite e a versão empacotada no Python da imagem.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R07", "name": "LangExtract (Google)", "kind": "biblioteca",
-      "canonical_url": "https://github.com/google/langextract", "github": "google/langextract", "pypi": ["langextract"],
-      "license_spdx": "Apache-2.0", "license_status": "confirmada no plano V2 (24/11/2026)",
-      "adopted": false, "modules": ["M02", "M05", "M06", "M08", "M17", "M25"],
-      "update_policy": "Releases e issues mensalmente.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R07",
+      "name": "LangExtract (Google)",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/google/langextract",
+      "github": "google/langextract",
+      "pypi": [
+        "langextract"
+      ],
+      "license_spdx": "Apache-2.0",
+      "license_status": "confirmada no plano V2 (24/11/2026)",
+      "adopted": false,
+      "modules": [
+        "M02",
+        "M05",
+        "M06",
+        "M08",
+        "M17",
+        "M25"
+      ],
+      "update_policy": "Releases e issues mensalmente.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R08", "name": "Crossref REST API", "kind": "api",
+      "id": "R08",
+      "name": "Crossref REST API",
+      "kind": "api",
       "canonical_url": "https://www.crossref.org/documentation/retrieve-metadata/",
       "changelog_url": "https://www.crossref.org/categories/rest-api/",
-      "license_spdx": "termos do serviço", "license_status": "metadados e serviço com termos próprios",
-      "adopted": true, "modules": ["V1", "M06", "M07", "M18"], "used_in": ["worker/reference_verification.py", "worker/editorial_status.py"],
-      "update_policy": "Mensal e antes de cada release: campos, filtros, cotas e etiqueta (polite pool).", "review_frequency": "mensal",
+      "license_spdx": "termos do serviço",
+      "license_status": "metadados e serviço com termos próprios",
+      "adopted": true,
+      "modules": [
+        "V1",
+        "M06",
+        "M07",
+        "M18"
+      ],
+      "used_in": [
+        "worker/reference_verification.py",
+        "worker/editorial_status.py"
+      ],
+      "update_policy": "Mensal e antes de cada release: campos, filtros, cotas e etiqueta (polite pool).",
+      "review_frequency": "mensal",
       "risk": "Indisponibilidade vira 'inconclusivo', nunca 'inexistente'.",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R09", "name": "OpenAlex API", "kind": "api",
+      "id": "R09",
+      "name": "OpenAlex API",
+      "kind": "api",
       "canonical_url": "https://docs.openalex.org/",
-      "license_spdx": "termos do serviço", "license_status": "dados com termos próprios",
-      "adopted": true, "modules": ["V1", "M06", "M18"], "used_in": ["worker/reference_verification.py"],
-      "update_policy": "Mensal: documentação, changelog e exigência de chave (OPENALEX_API_KEY).", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "license_spdx": "termos do serviço",
+      "license_status": "dados com termos próprios",
+      "adopted": true,
+      "modules": [
+        "V1",
+        "M06",
+        "M18"
+      ],
+      "used_in": [
+        "worker/reference_verification.py"
+      ],
+      "update_policy": "Mensal: documentação, changelog e exigência de chave (OPENALEX_API_KEY).",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R10", "name": "Semantic Scholar API", "kind": "api",
+      "id": "R10",
+      "name": "Semantic Scholar API",
+      "kind": "api",
       "canonical_url": "https://www.semanticscholar.org/product/api",
-      "license_spdx": "termos do serviço", "license_status": "dados com termos próprios",
-      "adopted": true, "modules": ["V1", "M06"], "used_in": ["worker/reference_verification.py"],
-      "update_policy": "Mensal: limites de requisição e campos.", "review_frequency": "mensal",
+      "license_spdx": "termos do serviço",
+      "license_status": "dados com termos próprios",
+      "adopted": true,
+      "modules": [
+        "V1",
+        "M06"
+      ],
+      "used_in": [
+        "worker/reference_verification.py"
+      ],
+      "update_policy": "Mensal: limites de requisição e campos.",
+      "review_frequency": "mensal",
       "risk": "Sem chave dedicada, 429 é frequente; tratado como inconclusivo.",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R11", "name": "Retraction Watch via Crossref", "kind": "api",
+      "id": "R11",
+      "name": "Retraction Watch via Crossref",
+      "kind": "api",
       "canonical_url": "https://www.crossref.org/documentation/retrieve-metadata/retraction-watch/",
       "changelog_url": "https://www.crossref.org/blog/retraction-watch-retractions-now-in-the-crossref-api/",
-      "license_spdx": "termos do serviço", "license_status": "dados abertos pela Crossref; conferir termos antes de sincronizar o CSV",
-      "adopted": true, "modules": ["M07"], "used_in": ["worker/editorial_status.py"],
+      "license_spdx": "termos do serviço",
+      "license_status": "dados abertos pela Crossref; conferir termos antes de sincronizar o CSV",
+      "adopted": true,
+      "modules": [
+        "M07"
+      ],
+      "used_in": [
+        "worker/editorial_status.py"
+      ],
       "update_policy": "Mensal. O CSV completo (gitlab.com/crossref/retraction-watch-data) ainda não é sincronizado.",
       "review_frequency": "mensal",
       "risk": "Ausência de aviso nas bases não prova que a obra nunca foi retratada.",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R12", "name": "Estudo MIT: citações por ponteiros", "kind": "artigo",
+      "id": "R12",
+      "name": "Estudo MIT: citações por ponteiros",
+      "kind": "artigo",
       "canonical_url": "https://dspace.mit.edu/entities/publication/2994e161-6c34-4f88-973e-c13d1e8cd2ef",
-      "license_spdx": "não se aplica", "license_status": "artigo científico; implementar o princípio com código próprio",
-      "adopted": false, "modules": ["M05", "M10"],
-      "update_policy": "Acompanhar revisões e trabalhos relacionados.", "review_frequency": "trimestral",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "license_spdx": "não se aplica",
+      "license_status": "artigo científico; implementar o princípio com código próprio",
+      "adopted": false,
+      "modules": [
+        "M05",
+        "M10"
+      ],
+      "update_policy": "Acompanhar revisões e trabalhos relacionados.",
+      "review_frequency": "trimestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R13", "name": "GapView (UC Irvine)", "kind": "artigo",
+      "id": "R13",
+      "name": "GapView (UC Irvine)",
+      "kind": "artigo",
       "canonical_url": "https://escholarship.org/uc/item/2zs4w991",
-      "license_spdx": "não se aplica", "license_status": "referência de pesquisa",
-      "adopted": false, "modules": ["M09", "M16"],
-      "update_policy": "Revisitar a cada semestre.", "review_frequency": "semestral",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "license_spdx": "não se aplica",
+      "license_status": "referência de pesquisa",
+      "adopted": false,
+      "modules": [
+        "M09",
+        "M16"
+      ],
+      "update_policy": "Revisitar a cada semestre.",
+      "review_frequency": "semestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R14", "name": "FIRE (MBZUAI)", "kind": "prototipo",
-      "canonical_url": "https://github.com/mbzuai-nlp/fire", "github": "mbzuai-nlp/fire", "track": "commits",
-      "license_spdx": "a conferir", "license_status": "a conferir",
-      "adopted": false, "modules": ["M22"],
-      "update_policy": "Trimestral; se copiar código, fixar commit e conferir licença.", "review_frequency": "trimestral",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R14",
+      "name": "FIRE (MBZUAI)",
+      "kind": "prototipo",
+      "canonical_url": "https://github.com/mbzuai-nlp/fire",
+      "github": "mbzuai-nlp/fire",
+      "track": "commits",
+      "license_spdx": "a conferir",
+      "license_status": "a conferir",
+      "adopted": false,
+      "modules": [
+        "M22"
+      ],
+      "update_policy": "Trimestral; se copiar código, fixar commit e conferir licença.",
+      "review_frequency": "trimestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R15", "name": "RA-RAG (POSTECH)", "kind": "prototipo",
-      "canonical_url": "https://github.com/ml-postech/RA-RAG", "github": "ml-postech/RA-RAG", "track": "commits",
-      "license_spdx": "a conferir", "license_status": "a conferir",
-      "adopted": false, "modules": ["M18"],
-      "update_policy": "Trimestral; não instalar automaticamente.", "review_frequency": "trimestral",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R15",
+      "name": "RA-RAG (POSTECH)",
+      "kind": "prototipo",
+      "canonical_url": "https://github.com/ml-postech/RA-RAG",
+      "github": "ml-postech/RA-RAG",
+      "track": "commits",
+      "license_spdx": "MIT",
+      "license_status": "confirmada pela API do GitHub (vigia de 24/11/2026)",
+      "adopted": false,
+      "modules": [
+        "M18"
+      ],
+      "update_policy": "Trimestral; não instalar automaticamente.",
+      "review_frequency": "trimestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R16", "name": "InRanker (UNICAMP)", "kind": "prototipo",
-      "canonical_url": "https://github.com/unicamp-dl/InRanker", "github": "unicamp-dl/InRanker", "track": "commits",
-      "license_spdx": "a conferir", "license_status": "a conferir (código e pesos separadamente)",
+      "id": "R16",
+      "name": "InRanker (UNICAMP)",
+      "kind": "prototipo",
+      "canonical_url": "https://github.com/unicamp-dl/InRanker",
+      "github": "unicamp-dl/InRanker",
+      "track": "commits",
+      "license_spdx": "Apache-2.0",
+      "license_status": "confirmada pela API do GitHub (vigia de 24/11/2026); pesos a conferir separadamente",
       "model_weights_license": "a conferir",
-      "adopted": false, "modules": ["M20"],
-      "update_policy": "Trimestral; repositório e model card.", "review_frequency": "trimestral",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "adopted": false,
+      "modules": [
+        "M20"
+      ],
+      "update_policy": "Trimestral; repositório e model card.",
+      "review_frequency": "trimestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R17", "name": "FlagEmbedding (BAAI)", "kind": "biblioteca",
-      "canonical_url": "https://github.com/FlagOpen/FlagEmbedding", "github": "FlagOpen/FlagEmbedding", "pypi": ["FlagEmbedding"],
-      "license_spdx": "MIT", "license_status": "código confirmado no plano V2; pesos a conferir",
+      "id": "R17",
+      "name": "FlagEmbedding (BAAI)",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/FlagOpen/FlagEmbedding",
+      "github": "FlagOpen/FlagEmbedding",
+      "pypi": [
+        "FlagEmbedding"
+      ],
+      "license_spdx": "MIT",
+      "license_status": "código confirmado no plano V2; pesos a conferir",
       "model_weights_license": "a conferir por modelo",
-      "adopted": false, "modules": ["M20"],
-      "update_policy": "Mensal: releases e model cards.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "adopted": false,
+      "modules": [
+        "M20"
+      ],
+      "update_policy": "Mensal: releases e model cards.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R18", "name": "olmOCR (AI2)", "kind": "biblioteca",
-      "canonical_url": "https://github.com/allenai/olmocr", "github": "allenai/olmocr", "pypi": ["olmocr"],
-      "license_spdx": "Apache-2.0", "license_status": "código confirmado no plano V2; pesos e endpoint separados",
+      "id": "R18",
+      "name": "olmOCR (AI2)",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/allenai/olmocr",
+      "github": "allenai/olmocr",
+      "pypi": [
+        "olmocr"
+      ],
+      "license_spdx": "Apache-2.0",
+      "license_status": "código confirmado no plano V2; pesos e endpoint separados",
       "model_weights_license": "a conferir",
-      "adopted": false, "modules": ["M23"],
-      "update_policy": "Mensal: releases e modelos.", "review_frequency": "mensal",
+      "adopted": false,
+      "modules": [
+        "M23"
+      ],
+      "update_policy": "Mensal: releases e modelos.",
+      "review_frequency": "mensal",
       "risk": "OCR remoto pode transferir dados pessoais; priorizar processamento privado.",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R19", "name": "SciELO", "kind": "api",
+      "id": "R19",
+      "name": "SciELO",
+      "kind": "api",
       "canonical_url": "https://www.scielo.org/",
-      "license_spdx": "políticas próprias", "license_status": "metadados com políticas e licenças aplicáveis",
-      "adopted": false, "modules": ["M24"],
-      "update_policy": "Mensal: termos e endpoints oficiais.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "license_spdx": "políticas próprias",
+      "license_status": "metadados com políticas e licenças aplicáveis",
+      "adopted": false,
+      "modules": [
+        "M24"
+      ],
+      "update_policy": "Mensal: termos e endpoints oficiais.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R20", "name": "BRAPCI", "kind": "api",
+      "id": "R20",
+      "name": "BRAPCI",
+      "kind": "api",
       "canonical_url": "https://brapci.inf.br/",
-      "license_spdx": "a conferir", "license_status": "termos e acesso a conferir; não presumir API",
-      "adopted": false, "modules": ["M24"],
-      "update_policy": "Mensal: site e políticas; sem scraping agressivo.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "license_spdx": "a conferir",
+      "license_status": "termos e acesso a conferir; não presumir API",
+      "adopted": false,
+      "modules": [
+        "M24"
+      ],
+      "update_policy": "Mensal: site e políticas; sem scraping agressivo.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R21", "name": "Zotero Web API v3", "kind": "api",
+      "id": "R21",
+      "name": "Zotero Web API v3",
+      "kind": "api",
       "canonical_url": "https://www.zotero.org/support/dev/web_api/v3/start",
-      "license_spdx": "termos do serviço", "license_status": "API com autenticação e políticas próprias",
-      "adopted": false, "modules": ["M26"],
-      "update_policy": "Mensal: documentação e anúncios; credenciais só no Secret Manager.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "license_spdx": "termos do serviço",
+      "license_status": "API com autenticação e políticas próprias",
+      "adopted": false,
+      "modules": [
+        "M26"
+      ],
+      "update_policy": "Mensal: documentação e anúncios; credenciais só no Secret Manager.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R22", "name": "Better BibTeX for Zotero", "kind": "biblioteca",
-      "canonical_url": "https://github.com/retorquere/zotero-better-bibtex", "github": "retorquere/zotero-better-bibtex",
-      "license_spdx": "MIT", "license_status": "confirmada no plano V2 (24/11/2026)",
-      "adopted": false, "modules": ["M26"],
-      "update_policy": "Changelog mensal; opção do lado do cliente.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R22",
+      "name": "Better BibTeX for Zotero",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/retorquere/zotero-better-bibtex",
+      "github": "retorquere/zotero-better-bibtex",
+      "license_spdx": "MIT",
+      "license_status": "confirmada no plano V2 (24/11/2026)",
+      "adopted": false,
+      "modules": [
+        "M26"
+      ],
+      "update_policy": "Changelog mensal; opção do lado do cliente.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R23", "name": "Citation.js", "kind": "biblioteca",
-      "canonical_url": "https://github.com/citation-js/citation-js", "github": "citation-js/citation-js", "npm": ["citation-js"],
-      "license_spdx": "a conferir", "license_status": "a conferir por versão",
-      "adopted": false, "modules": ["M27"],
-      "update_policy": "Mensal: releases e issues.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R23",
+      "name": "Citation.js",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/citation-js/citation-js",
+      "github": "citation-js/citation-js",
+      "npm": [
+        "citation-js"
+      ],
+      "license_spdx": "MIT",
+      "license_status": "confirmada pela API do GitHub (vigia de 24/11/2026)",
+      "adopted": false,
+      "modules": [
+        "M27"
+      ],
+      "update_policy": "Mensal: releases e issues.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R24", "name": "CSL Styles", "kind": "biblioteca",
-      "canonical_url": "https://github.com/citation-style-language/styles", "github": "citation-style-language/styles", "track": "commits",
-      "license_spdx": "CC-BY-SA-3.0", "license_status": "a conferir: licença por estilo",
-      "adopted": false, "modules": ["M27"],
-      "update_policy": "Commit fixado; novos estilos passam por testes de snapshot.", "review_frequency": "semestral",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R24",
+      "name": "CSL Styles",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/citation-style-language/styles",
+      "github": "citation-style-language/styles",
+      "track": "commits",
+      "license_spdx": "CC-BY-SA-3.0",
+      "license_status": "a conferir: licença por estilo",
+      "adopted": false,
+      "modules": [
+        "M27"
+      ],
+      "update_policy": "Commit fixado; novos estilos passam por testes de snapshot.",
+      "review_frequency": "semestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R25", "name": "IFRS: Instrução Normativa nº 16/2026 (IA generativa)", "kind": "normativo",
+      "id": "R25",
+      "name": "IFRS: Instrução Normativa nº 16/2026 (IA generativa)",
+      "kind": "normativo",
       "canonical_url": "https://ifrs.edu.br/documentos/instrucao-normativa-ifrs-n-16-2026/",
       "release_url": "https://ifrs.edu.br/wp-content/uploads/2026/05/Anexo-IN-IAGen.pdf",
-      "license_spdx": "não se aplica", "license_status": "normativa institucional",
+      "license_spdx": "não se aplica",
+      "license_status": "normativa institucional",
       "installed_version": "IN 16/2026 de 27/05/2026",
-      "adopted": true, "modules": ["M11", "M12"], "used_in": ["worker/ai_declaration.py"],
+      "adopted": true,
+      "modules": [
+        "M11",
+        "M12"
+      ],
+      "used_in": [
+        "worker/ai_declaration.py"
+      ],
       "update_policy": "Semestral e sempre que a norma ou o anexo mudar; revisão humana do texto da declaração.",
       "review_frequency": "semestral",
       "risk": "O texto do Anexo (declaração) ainda não foi conferido item a item; o rascunho gerado não afirma conformidade.",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R26", "name": "PRISMA 2020", "kind": "normativo",
+      "id": "R26",
+      "name": "PRISMA 2020",
+      "kind": "normativo",
       "canonical_url": "https://www.prisma-statement.org/prisma-2020-checklist",
-      "license_spdx": "não se aplica", "license_status": "diretriz de relato científico",
-      "adopted": false, "modules": ["M09", "M16"],
-      "update_policy": "Semestral.", "review_frequency": "semestral",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "license_spdx": "não se aplica",
+      "license_status": "diretriz de relato científico",
+      "adopted": false,
+      "modules": [
+        "M09",
+        "M16"
+      ],
+      "update_policy": "Semestral.",
+      "review_frequency": "semestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R27", "name": "OWASP GenAI Security Project", "kind": "normativo",
+      "id": "R27",
+      "name": "OWASP GenAI Security Project",
+      "kind": "normativo",
       "canonical_url": "https://genai.owasp.org/",
-      "license_spdx": "não se aplica", "license_status": "guia de segurança",
-      "adopted": true, "modules": ["M13"], "used_in": ["worker/document_guard.py"],
-      "update_policy": "Mensal; CVEs críticos imediatamente.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "license_spdx": "não se aplica",
+      "license_status": "guia de segurança",
+      "adopted": true,
+      "modules": [
+        "M13"
+      ],
+      "used_in": [
+        "worker/document_guard.py"
+      ],
+      "update_policy": "Mensal; CVEs críticos imediatamente.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R28", "name": "OSV-Scanner (Google)", "kind": "ferramenta",
-      "canonical_url": "https://github.com/google/osv-scanner", "github": "google/osv-scanner",
-      "license_spdx": "a conferir", "license_status": "a conferir pelo vigia semanal",
-      "adopted": true, "modules": ["M15"], "used_in": [".github/workflows/osv-scanner-pr.yml", ".github/workflows/osv-scanner-scheduled.yml"],
-      "update_policy": "Versão vem do R40 (workflow reutilizável).", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R28",
+      "name": "OSV-Scanner (Google)",
+      "kind": "ferramenta",
+      "canonical_url": "https://github.com/google/osv-scanner",
+      "github": "google/osv-scanner",
+      "license_spdx": "Apache-2.0",
+      "license_status": "confirmada pela API do GitHub (vigia de 24/11/2026)",
+      "adopted": true,
+      "modules": [
+        "M15"
+      ],
+      "used_in": [
+        ".github/workflows/osv-scanner-pr.yml",
+        ".github/workflows/osv-scanner-scheduled.yml"
+      ],
+      "update_policy": "A versão usada vem do R40 (workflow reutilizável v2.7.1).",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24",
+      "latest_reviewed": "v2.7.1"
     },
     {
-      "id": "R29", "name": "Dependabot (GitHub)", "kind": "servico",
+      "id": "R29",
+      "name": "Dependabot (GitHub)",
+      "kind": "servico",
       "canonical_url": "https://docs.github.com/en/code-security/dependabot",
-      "license_spdx": "termos do serviço", "license_status": "serviço GitHub",
-      "adopted": true, "modules": ["M15"], "used_in": [".github/dependabot.yml"],
-      "update_policy": "PRs semanais de pip e GitHub Actions.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "license_spdx": "termos do serviço",
+      "license_status": "serviço GitHub",
+      "adopted": true,
+      "modules": [
+        "M15"
+      ],
+      "used_in": [
+        ".github/dependabot.yml"
+      ],
+      "update_policy": "PRs semanais de pip e GitHub Actions.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R30", "name": "FastAPI", "kind": "biblioteca",
-      "canonical_url": "https://github.com/fastapi/fastapi", "github": "fastapi/fastapi", "pypi": ["fastapi"],
-      "license_spdx": "MIT", "license_status": "a conferir pelo vigia semanal",
-      "pinned": ">=0.115,<1", "adopted": true, "modules": ["V1"], "used_in": ["api/requirements.txt"],
-      "update_policy": "Dependabot semanal; testes da API antes do merge.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R30",
+      "name": "FastAPI",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/fastapi/fastapi",
+      "github": "fastapi/fastapi",
+      "pypi": [
+        "fastapi"
+      ],
+      "license_spdx": "MIT",
+      "license_status": "a conferir pelo vigia semanal",
+      "pinned": ">=0.115,<1",
+      "adopted": true,
+      "modules": [
+        "V1"
+      ],
+      "used_in": [
+        "api/requirements.txt"
+      ],
+      "update_policy": "Dependabot semanal; testes da API antes do merge.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R31", "name": "Uvicorn", "kind": "biblioteca",
-      "canonical_url": "https://github.com/encode/uvicorn", "github": "encode/uvicorn", "pypi": ["uvicorn"],
-      "license_spdx": "BSD-3-Clause", "license_status": "a conferir pelo vigia semanal",
-      "pinned": ">=0.30,<1", "adopted": true, "modules": ["V1"], "used_in": ["api/requirements.txt"],
-      "update_policy": "Dependabot semanal.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R31",
+      "name": "Uvicorn",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/Kludex/uvicorn",
+      "github": "Kludex/uvicorn",
+      "pypi": [
+        "uvicorn"
+      ],
+      "license_spdx": "BSD-3-Clause",
+      "license_status": "a conferir pelo vigia semanal",
+      "pinned": ">=0.30,<1",
+      "adopted": true,
+      "modules": [
+        "V1"
+      ],
+      "used_in": [
+        "api/requirements.txt"
+      ],
+      "update_policy": "Dependabot semanal.",
+      "review_frequency": "mensal",
+      "migration_note": "Repositório movido de encode/uvicorn para Kludex/uvicorn (detectado pelo vigia em 24/11/2026).",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R32", "name": "Pydantic", "kind": "biblioteca",
-      "canonical_url": "https://github.com/pydantic/pydantic", "github": "pydantic/pydantic", "pypi": ["pydantic"],
-      "license_spdx": "MIT", "license_status": "a conferir pelo vigia semanal",
-      "pinned": ">=2.5,<3", "adopted": true, "modules": ["V1"], "used_in": ["api/requirements.txt"],
-      "update_policy": "Dependabot semanal.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R32",
+      "name": "Pydantic",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/pydantic/pydantic",
+      "github": "pydantic/pydantic",
+      "pypi": [
+        "pydantic"
+      ],
+      "license_spdx": "MIT",
+      "license_status": "a conferir pelo vigia semanal",
+      "pinned": ">=2.5,<3",
+      "adopted": true,
+      "modules": [
+        "V1"
+      ],
+      "used_in": [
+        "api/requirements.txt"
+      ],
+      "update_policy": "Dependabot semanal.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R33", "name": "Firebase Admin SDK para Python", "kind": "biblioteca",
-      "canonical_url": "https://github.com/firebase/firebase-admin-python", "github": "firebase/firebase-admin-python", "pypi": ["firebase-admin"],
-      "license_spdx": "Apache-2.0", "license_status": "a conferir pelo vigia semanal",
-      "pinned": ">=6.5,<8", "adopted": true, "modules": ["V1"], "used_in": ["api/requirements.txt", "worker/requirements.txt"],
-      "update_policy": "Dependabot semanal; revisar mudanças de verificação de token.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R33",
+      "name": "Firebase Admin SDK para Python",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/firebase/firebase-admin-python",
+      "github": "firebase/firebase-admin-python",
+      "pypi": [
+        "firebase-admin"
+      ],
+      "license_spdx": "Apache-2.0",
+      "license_status": "a conferir pelo vigia semanal",
+      "pinned": ">=6.5,<8",
+      "adopted": true,
+      "modules": [
+        "V1"
+      ],
+      "used_in": [
+        "api/requirements.txt",
+        "worker/requirements.txt"
+      ],
+      "update_policy": "Dependabot semanal; revisar mudanças de verificação de token.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R34", "name": "Google Cloud Client Libraries para Python (Firestore, Storage, Run, Secret Manager)", "kind": "biblioteca",
+      "id": "R34",
+      "name": "Google Cloud Client Libraries para Python (Firestore, Storage, Run, Secret Manager)",
+      "kind": "biblioteca",
       "canonical_url": "https://github.com/googleapis/google-cloud-python",
-      "pypi": ["google-cloud-firestore", "google-cloud-storage", "google-cloud-run", "google-cloud-secret-manager"],
-      "license_spdx": "Apache-2.0", "license_status": "a conferir pelo vigia semanal",
+      "pypi": [
+        "google-cloud-firestore",
+        "google-cloud-storage",
+        "google-cloud-run",
+        "google-cloud-secret-manager"
+      ],
+      "license_spdx": "Apache-2.0",
+      "license_status": "a conferir pelo vigia semanal",
       "pinned": "faixas em api/requirements.txt e worker/requirements.txt",
-      "adopted": true, "modules": ["V1"], "used_in": ["api/requirements.txt", "worker/requirements.txt"],
-      "update_policy": "Dependabot semanal.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "adopted": true,
+      "modules": [
+        "V1"
+      ],
+      "used_in": [
+        "api/requirements.txt",
+        "worker/requirements.txt"
+      ],
+      "update_policy": "Dependabot semanal.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R35", "name": "Google Gen AI SDK para Python (google-genai)", "kind": "biblioteca",
-      "canonical_url": "https://github.com/googleapis/python-genai", "github": "googleapis/python-genai", "pypi": ["google-genai"],
-      "license_spdx": "Apache-2.0", "license_status": "a conferir pelo vigia semanal",
-      "pinned": ">=2.34.0,<3", "adopted": true, "modules": ["V1", "M25"], "used_in": ["worker/requirements.txt", "worker/neon_review.py"],
-      "update_policy": "Dependabot semanal; conferir IDs de modelo e preços na documentação oficial.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R35",
+      "name": "Google Gen AI SDK para Python (google-genai)",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/googleapis/python-genai",
+      "github": "googleapis/python-genai",
+      "pypi": [
+        "google-genai"
+      ],
+      "license_spdx": "Apache-2.0",
+      "license_status": "a conferir pelo vigia semanal",
+      "pinned": ">=2.34.0,<3",
+      "adopted": true,
+      "modules": [
+        "V1",
+        "M25"
+      ],
+      "used_in": [
+        "worker/requirements.txt",
+        "worker/neon_review.py"
+      ],
+      "update_policy": "Dependabot semanal; conferir IDs de modelo e preços na documentação oficial.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R36", "name": "Requests", "kind": "biblioteca",
-      "canonical_url": "https://github.com/psf/requests", "github": "psf/requests", "pypi": ["requests"],
-      "license_spdx": "Apache-2.0", "license_status": "a conferir pelo vigia semanal",
-      "pinned": ">=2.31,<3", "adopted": true, "modules": ["V1", "M07"], "used_in": ["worker/requirements.txt", "worker/reference_verification.py"],
-      "update_policy": "Dependabot semanal.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R36",
+      "name": "Requests",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/psf/requests",
+      "github": "psf/requests",
+      "pypi": [
+        "requests"
+      ],
+      "license_spdx": "Apache-2.0",
+      "license_status": "a conferir pelo vigia semanal",
+      "pinned": ">=2.31,<3",
+      "adopted": true,
+      "modules": [
+        "V1",
+        "M07"
+      ],
+      "used_in": [
+        "worker/requirements.txt",
+        "worker/reference_verification.py"
+      ],
+      "update_policy": "Dependabot semanal.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R37", "name": "PyMuPDF", "kind": "biblioteca",
-      "canonical_url": "https://github.com/pymupdf/PyMuPDF", "github": "pymupdf/PyMuPDF", "pypi": ["PyMuPDF"],
-      "license_spdx": "AGPL-3.0", "license_status": "a conferir: licença dupla (AGPL-3.0 ou comercial da Artifex)",
+      "id": "R37",
+      "name": "PyMuPDF",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/pymupdf/PyMuPDF",
+      "github": "pymupdf/PyMuPDF",
+      "pypi": [
+        "PyMuPDF"
+      ],
+      "license_spdx": "AGPL-3.0",
+      "license_status": "a conferir: licença dupla (AGPL-3.0 ou comercial da Artifex)",
       "pinned": "sem fixação (vem do requirements.txt do PaperOrchestra)",
-      "adopted": true, "modules": ["V1", "M01", "M23"], "used_in": ["worker/source_materials.py", "worker/scientific_audit.py", "worker/neon_review.py"],
+      "adopted": true,
+      "modules": [
+        "V1",
+        "M01",
+        "M23"
+      ],
+      "used_in": [
+        "worker/source_materials.py",
+        "worker/scientific_audit.py",
+        "worker/neon_review.py"
+      ],
       "update_policy": "Fixar versão no worker/requirements.txt antes da V2; revisar obrigações da AGPL para serviço em rede.",
       "review_frequency": "mensal",
       "risk": "AGPL: o serviço é acessível pela rede. O código do projeto é público, o que ajuda, mas a conformidade precisa ser conferida.",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R38", "name": "abnTeX2", "kind": "biblioteca",
-      "canonical_url": "https://github.com/abntex/abntex2", "github": "abntex/abntex2",
-      "license_spdx": "LPPL-1.3c", "license_status": "a conferir pelo vigia semanal",
+      "id": "R38",
+      "name": "abnTeX2",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/abntex/abntex2",
+      "github": "abntex/abntex2",
+      "license_spdx": "LPPL-1.3c",
+      "license_status": "a conferir pelo vigia semanal",
       "pinned": "versão do pacote Debian texlive-publishers da imagem python:3.11-slim",
-      "adopted": true, "modules": ["V1", "M27"], "used_in": ["worker/Dockerfile", "worker/templates/abnt-artigo", "worker/templates/abnt-dissertacao"],
-      "update_policy": "Semestral, junto com a revisão das NBR 6022, 10520 e 6023.", "review_frequency": "semestral",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "adopted": true,
+      "modules": [
+        "V1",
+        "M27"
+      ],
+      "used_in": [
+        "worker/Dockerfile",
+        "worker/templates/abnt-artigo",
+        "worker/templates/abnt-dissertacao"
+      ],
+      "update_policy": "Semestral, junto com a revisão das NBR 6022, 10520 e 6023.",
+      "review_frequency": "semestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24",
+      "installed_version": "1.9.7 (pacote Debian texlive-publishers)",
+      "latest_reviewed": "2018-11-24-v1.9.7-ctan"
     },
     {
-      "id": "R39", "name": "Firebase JavaScript SDK", "kind": "biblioteca",
-      "canonical_url": "https://github.com/firebase/firebase-js-sdk", "github": "firebase/firebase-js-sdk", "npm": ["firebase"],
-      "license_spdx": "Apache-2.0", "license_status": "a conferir pelo vigia semanal",
-      "pinned": "11.10.0", "installed_version": "11.10.0",
-      "adopted": true, "modules": ["V1"], "used_in": ["public/app.js (import do CDN www.gstatic.com/firebasejs/11.10.0)"],
-      "update_policy": "Mensal; o Dependabot não cobre imports por URL, então a atualização é manual.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R39",
+      "name": "Firebase JavaScript SDK",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/firebase/firebase-js-sdk",
+      "github": "firebase/firebase-js-sdk",
+      "npm": [
+        "firebase"
+      ],
+      "license_spdx": "Apache-2.0",
+      "license_status": "a conferir pelo vigia semanal",
+      "pinned": "11.10.0",
+      "installed_version": "11.10.0",
+      "adopted": true,
+      "modules": [
+        "V1"
+      ],
+      "used_in": [
+        "public/app.js (import do CDN www.gstatic.com/firebasejs/11.10.0)"
+      ],
+      "update_policy": "Mensal; o Dependabot não cobre imports por URL, então a atualização é manual.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R40", "name": "OSV-Scanner GitHub Action (workflows reutilizáveis)", "kind": "ferramenta",
-      "canonical_url": "https://github.com/google/osv-scanner-action", "github": "google/osv-scanner-action",
-      "license_spdx": "a conferir", "license_status": "a conferir pelo vigia semanal",
-      "pinned": "v2.7.1", "installed_version": "v2.7.1", "latest_reviewed": "v2.7.1",
-      "adopted": true, "modules": ["M15"], "used_in": [".github/workflows/osv-scanner-pr.yml", ".github/workflows/osv-scanner-scheduled.yml"],
-      "update_policy": "Dependabot (github-actions) e vigia semanal; versão igual à dos exemplos oficiais.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "id": "R40",
+      "name": "OSV-Scanner GitHub Action (workflows reutilizáveis)",
+      "kind": "ferramenta",
+      "canonical_url": "https://github.com/google/osv-scanner-action",
+      "github": "google/osv-scanner-action",
+      "license_spdx": "Apache-2.0",
+      "license_status": "confirmada pela API do GitHub (vigia de 24/11/2026)",
+      "pinned": "v2.7.1",
+      "installed_version": "v2.7.1",
+      "latest_reviewed": "v2.7.1",
+      "adopted": true,
+      "modules": [
+        "M15"
+      ],
+      "used_in": [
+        ".github/workflows/osv-scanner-pr.yml",
+        ".github/workflows/osv-scanner-scheduled.yml"
+      ],
+      "update_policy": "Dependabot (github-actions) e vigia semanal; versão igual à dos exemplos oficiais.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R41", "name": "GitHub Actions usadas nos workflows (actions/checkout, setup-python, setup-node; google-github-actions/auth, setup-gcloud)", "kind": "ferramenta",
+      "id": "R41",
+      "name": "GitHub Actions usadas nos workflows (actions/checkout, setup-python, setup-node; google-github-actions/auth, setup-gcloud)",
+      "kind": "ferramenta",
       "canonical_url": "https://github.com/google-github-actions/auth",
-      "license_spdx": "Apache-2.0", "license_status": "a conferir",
+      "license_spdx": "Apache-2.0",
+      "license_status": "a conferir",
       "pinned": "checkout@v4, setup-python@v5, setup-node@v4, auth@v3, setup-gcloud@v3",
-      "adopted": true, "modules": ["V1", "M15"], "used_in": [".github/workflows/"],
-      "update_policy": "Dependabot (github-actions) semanal.", "review_frequency": "mensal",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "adopted": true,
+      "modules": [
+        "V1",
+        "M15"
+      ],
+      "used_in": [
+        ".github/workflows/"
+      ],
+      "update_policy": "Dependabot (github-actions) semanal.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     },
     {
-      "id": "R42", "name": "Imagem base python:3.11-slim (Docker Official Images)", "kind": "ferramenta",
-      "canonical_url": "https://hub.docker.com/_/python", "changelog_url": "https://github.com/docker-library/python",
-      "license_spdx": "PSF-2.0", "license_status": "Python sob PSF; pacotes Debian com licenças próprias",
+      "id": "R42",
+      "name": "Imagem base python:3.11-slim (Docker Official Images)",
+      "kind": "ferramenta",
+      "canonical_url": "https://hub.docker.com/_/python",
+      "changelog_url": "https://github.com/docker-library/python",
+      "license_spdx": "PSF-2.0",
+      "license_status": "Python sob PSF; pacotes Debian com licenças próprias",
       "pinned": "python:3.11-slim (tag móvel, sem digest)",
-      "adopted": true, "modules": ["V1"], "used_in": ["api/Dockerfile", "worker/Dockerfile"],
+      "adopted": true,
+      "modules": [
+        "V1"
+      ],
+      "used_in": [
+        "api/Dockerfile",
+        "worker/Dockerfile"
+      ],
       "update_policy": "Semestral; planejar a troca de Python antes do fim do suporte do 3.11 (outubro de 2027).",
       "review_frequency": "semestral",
       "risk": "Tag móvel: cada build pode receber outra versão do Debian e do TeX Live.",
-      "owner": "marceloloiro100cm-netizen", "last_checked": "2026-11-24"
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24"
     }
   ],
   "modules": [
-    {"id": "M01", "name": "Parsing estrutural de documentos", "priority": "P1", "wave": 1, "decision": "Integrar biblioteca mantida", "upstreams": ["R03", "R04", "R01"], "depends_on": [], "status": "nao_iniciado", "next_step": "Escolher 30 PDFs de referência (corpus dourado) e prototipar docling_adapter.py num Job separado."},
-    {"id": "M02", "name": "Evidência visual por página e coordenadas", "priority": "P1", "wave": 1, "decision": "Adaptar parser + construir internamente", "upstreams": ["R04", "R07", "R01"], "depends_on": ["M01"], "status": "nao_iniciado", "next_step": "Depende do M01."},
-    {"id": "M03", "name": "Fragmentação e indexação persistente", "priority": "P1", "wave": 1, "decision": "Construir internamente com bibliotecas estáveis", "upstreams": ["R05", "R06", "R01"], "depends_on": ["M01"], "status": "nao_iniciado", "next_step": "Depende do M01; definir política de retenção dos índices derivados."},
-    {"id": "M04", "name": "Recuperação híbrida BM25 + vetores", "priority": "P1", "wave": 2, "decision": "Construir adaptador, não incorporar framework completo", "upstreams": ["R05", "R06", "R01"], "depends_on": ["M03"], "status": "nao_iniciado", "next_step": "Definir política de privacidade para embeddings externos."},
-    {"id": "M05", "name": "Citações por ponteiros resolvidos", "priority": "P1", "wave": 2, "decision": "Padrão científico MIT; implementação própria", "upstreams": ["R12", "R07", "R01"], "depends_on": ["M02", "M04"], "status": "nao_iniciado", "next_step": "Depende do M02 e do M04."},
-    {"id": "M06", "name": "Escudo de auditoria científica em camadas", "priority": "P1", "wave": 3, "decision": "Evoluir módulo existente", "upstreams": ["R07", "R08", "R09", "R10", "R01"], "depends_on": ["M02", "M05"], "status": "parcial", "files": ["worker/scientific_audit.py", "worker/reference_verification.py"], "next_step": "A V1 já faz auditoria heurística e conferência de metadados; os estágios de ponteiro e suporte semântico dependem do M05."},
-    {"id": "M07", "name": "Detecção de retratações e atualizações editoriais", "priority": "P1", "wave": 3, "decision": "Integrar dados oficiais", "upstreams": ["R11", "R08", "R01"], "depends_on": ["M06"], "status": "parcial", "files": ["worker/editorial_status.py", "worker/reference_verification.py"], "next_step": "Implementado via Crossref REST (inclui Retraction Watch). Falta sincronizar o CSV completo e reavaliar ao reabrir um manuscrito."},
-    {"id": "M08", "name": "Matriz de Evidências e proveniência", "priority": "P1", "wave": 2, "decision": "Construir recurso próprio", "upstreams": ["R07", "R01"], "depends_on": ["M02", "M05", "M06"], "status": "nao_iniciado", "next_step": "Depende de chunks com localizador (M02)."},
-    {"id": "M09", "name": "Mapa de omissões e cobertura", "priority": "P1", "wave": 4, "decision": "Construir com inspiração em estudos", "upstreams": ["R13", "R01"], "depends_on": ["M03", "M04"], "status": "nao_iniciado", "next_step": "Depende da recuperação (M04)."},
-    {"id": "M10", "name": "Abstenção quando há evidência insuficiente", "priority": "P1", "wave": 2, "decision": "Regra própria de geração e avaliação", "upstreams": ["R01", "R12"], "depends_on": ["M04", "M06"], "status": "nao_iniciado", "next_step": "Depende de recuperação com scores (M04)."},
-    {"id": "M11", "name": "Declaração institucional de uso de IA", "priority": "P1", "wave": 0, "decision": "Implementar política normativa própria", "upstreams": ["R25", "R01"], "depends_on": ["M14"], "status": "parcial", "files": ["worker/ai_declaration.py"], "next_step": "Gera rascunho a partir do manifesto. Falta conferir item a item com o Anexo da IN 16/2026 e registrar a aprovação do orientador (M12)."},
-    {"id": "M12", "name": "Checkpoints de validação humana", "priority": "P1", "wave": 4, "decision": "Desenvolver internamente", "upstreams": ["R01", "R25"], "depends_on": ["M08", "M14"], "status": "nao_iniciado", "next_step": "Exige dividir o motor original em etapas retomáveis."},
-    {"id": "M13", "name": "Segurança de documentos e isolamento", "priority": "P1", "wave": 0, "decision": "Reforçar controles atuais", "upstreams": ["R27", "R01"], "depends_on": [], "status": "parcial", "files": ["worker/document_guard.py", "worker/source_materials.py", "api/library.py"], "next_step": "Feito: neutralização de delimitadores, remoção de caracteres invisíveis e sinais de instrução embutida. Falta varredura de malware no upload e quarentena."},
-    {"id": "M14", "name": "Proveniência e rastreabilidade de execução", "priority": "P1", "wave": 0, "decision": "Ampliar artefatos internos", "upstreams": ["R01"], "depends_on": ["M13"], "status": "parcial", "files": ["worker/run_manifest.py"], "next_step": "Manifesto por execução com versões, hashes e eventos. O motor original não expõe tokens nem prompts por chamada; custos ficam como não medidos."},
-    {"id": "M15", "name": "Orçamento, telemetria e regressão", "priority": "P1", "wave": 0, "decision": "Evoluir CI e controle de custos", "upstreams": ["R28", "R29", "R40", "R01"], "depends_on": ["M14"], "status": "parcial", "files": [".github/dependabot.yml", ".github/workflows/osv-scanner-pr.yml", ".github/workflows/osv-scanner-scheduled.yml", ".github/workflows/watch-upstreams.yml", "scripts/upstreams.py"], "next_step": "Feito: Dependabot, OSV-Scanner e vigia de upstreams. Falta orçamento por etapa e cancelamento de Job pelo navegador."},
-    {"id": "M16", "name": "GapView: diagnóstico pré-pesquisa", "priority": "P2", "wave": 4, "decision": "Artigo como referência; desenvolver internamente", "upstreams": ["R13", "R01"], "depends_on": ["M03", "M04", "M09"], "status": "nao_iniciado", "next_step": "Depende do M09."},
-    {"id": "M17", "name": "Detecção de contradições entre estudos", "priority": "P2", "wave": 3, "decision": "Inspiração acadêmica e implementação própria", "upstreams": ["R07", "R01"], "depends_on": ["M08", "M19"], "status": "nao_iniciado", "next_step": "Depende do M08."},
-    {"id": "M18", "name": "Confiabilidade contextual das fontes", "priority": "P2", "wave": 3, "decision": "RA-RAG como referência; lógica própria", "upstreams": ["R15", "R08", "R09", "R01"], "depends_on": ["M06", "M07"], "status": "nao_iniciado", "next_step": "Pode reaproveitar o status editorial do M07."},
-    {"id": "M19", "name": "Granularidade inteligente de fragmentos", "priority": "P2", "wave": 1, "decision": "Método próprio com avaliação", "upstreams": ["R03", "R04", "R01"], "depends_on": ["M01", "M03"], "status": "nao_iniciado", "next_step": "Depende do M01."},
-    {"id": "M20", "name": "Reranking especializado", "priority": "P2", "wave": 2, "decision": "Testar InRanker versus alternativa mantida", "upstreams": ["R16", "R17", "R01"], "depends_on": ["M04", "M19"], "status": "nao_iniciado", "next_step": "Benchmark cego em corpus de educação pt-BR."},
-    {"id": "M21", "name": "Fichamentos persistentes e cache", "priority": "P2", "wave": 4, "decision": "Construir no GCS/Firestore", "upstreams": ["R01"], "depends_on": ["M03", "M14"], "status": "nao_iniciado", "next_step": "Pode usar os hashes do manifesto (M14) como chave."},
-    {"id": "M22", "name": "FIRE: auditoria iterativa e parada dinâmica", "priority": "P2", "wave": 4, "decision": "Prototipar algoritmo em adaptador isolado", "upstreams": ["R14", "R01"], "depends_on": ["M06", "M08", "M10", "M15"], "status": "nao_iniciado", "next_step": "Conferir licença do R14 antes de qualquer cópia."},
-    {"id": "M23", "name": "OCR seletivo e documentos complexos", "priority": "P2", "wave": 1, "decision": "Fallback sob demanda, não OCR universal", "upstreams": ["R18", "R03", "R01"], "depends_on": ["M01", "M02", "M13"], "status": "nao_iniciado", "next_step": "Depende do M01; conferir pesos e local de download."},
-    {"id": "M24", "name": "Metadados brasileiros: SciELO e BRAPCI", "priority": "P2", "wave": 3, "decision": "Adaptadores restritos e revisão manual", "upstreams": ["R19", "R20", "R01"], "depends_on": ["M06"], "status": "nao_iniciado", "next_step": "Confirmar se há API oficial da SciELO e os termos da BRAPCI antes de codificar."},
-    {"id": "M25", "name": "Revisão adversarial de argumentos", "priority": "P2", "wave": 4, "decision": "Agente interno; não 'peer review' real", "upstreams": ["R01", "R07"], "depends_on": ["M08", "M09", "M12"], "status": "parcial", "files": ["worker/neon_review.py"], "next_step": "A revisão crítica opcional da V1 existe; falta acesso restrito à matriz de evidências (M08)."},
-    {"id": "M26", "name": "Importação Zotero somente leitura", "priority": "P2", "wave": 5, "decision": "API oficial; Better BibTeX como opção cliente", "upstreams": ["R21", "R22", "R01"], "depends_on": ["M13", "M14"], "status": "nao_iniciado", "next_step": "Hoje a biblioteca já aceita .bib e .ris exportados do Zotero."},
-    {"id": "M27", "name": "Exportação bibliográfica e estilos", "priority": "P2", "wave": 5, "decision": "Reutilizar CSL + Citation.js quando adequado", "upstreams": ["R23", "R24", "R38", "R01"], "depends_on": ["M06", "M11", "M24"], "status": "parcial", "files": ["worker/templates/abnt-artigo", "worker/templates/abnt-dissertacao"], "next_step": "Templates ABNT (abnTeX2) existem; falta exportação CSL e testes de estilo."}
+    {
+      "id": "M01",
+      "name": "Parsing estrutural de documentos",
+      "priority": "P1",
+      "wave": 1,
+      "decision": "Integrar biblioteca mantida",
+      "upstreams": [
+        "R03",
+        "R04",
+        "R01"
+      ],
+      "depends_on": [],
+      "status": "nao_iniciado",
+      "next_step": "Escolher 30 PDFs de referência (corpus dourado) e prototipar docling_adapter.py num Job separado."
+    },
+    {
+      "id": "M02",
+      "name": "Evidência visual por página e coordenadas",
+      "priority": "P1",
+      "wave": 1,
+      "decision": "Adaptar parser + construir internamente",
+      "upstreams": [
+        "R04",
+        "R07",
+        "R01"
+      ],
+      "depends_on": [
+        "M01"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Depende do M01."
+    },
+    {
+      "id": "M03",
+      "name": "Fragmentação e indexação persistente",
+      "priority": "P1",
+      "wave": 1,
+      "decision": "Construir internamente com bibliotecas estáveis",
+      "upstreams": [
+        "R05",
+        "R06",
+        "R01"
+      ],
+      "depends_on": [
+        "M01"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Depende do M01; definir política de retenção dos índices derivados."
+    },
+    {
+      "id": "M04",
+      "name": "Recuperação híbrida BM25 + vetores",
+      "priority": "P1",
+      "wave": 2,
+      "decision": "Construir adaptador, não incorporar framework completo",
+      "upstreams": [
+        "R05",
+        "R06",
+        "R01"
+      ],
+      "depends_on": [
+        "M03"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Definir política de privacidade para embeddings externos."
+    },
+    {
+      "id": "M05",
+      "name": "Citações por ponteiros resolvidos",
+      "priority": "P1",
+      "wave": 2,
+      "decision": "Padrão científico MIT; implementação própria",
+      "upstreams": [
+        "R12",
+        "R07",
+        "R01"
+      ],
+      "depends_on": [
+        "M02",
+        "M04"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Depende do M02 e do M04."
+    },
+    {
+      "id": "M06",
+      "name": "Escudo de auditoria científica em camadas",
+      "priority": "P1",
+      "wave": 3,
+      "decision": "Evoluir módulo existente",
+      "upstreams": [
+        "R07",
+        "R08",
+        "R09",
+        "R10",
+        "R01"
+      ],
+      "depends_on": [
+        "M02",
+        "M05"
+      ],
+      "status": "parcial",
+      "files": [
+        "worker/scientific_audit.py",
+        "worker/reference_verification.py"
+      ],
+      "next_step": "A V1 já faz auditoria heurística e conferência de metadados; os estágios de ponteiro e suporte semântico dependem do M05."
+    },
+    {
+      "id": "M07",
+      "name": "Detecção de retratações e atualizações editoriais",
+      "priority": "P1",
+      "wave": 3,
+      "decision": "Integrar dados oficiais",
+      "upstreams": [
+        "R11",
+        "R08",
+        "R01"
+      ],
+      "depends_on": [
+        "M06"
+      ],
+      "status": "parcial",
+      "files": [
+        "worker/editorial_status.py",
+        "worker/reference_verification.py"
+      ],
+      "next_step": "Implementado via Crossref REST (inclui Retraction Watch). Falta sincronizar o CSV completo e reavaliar ao reabrir um manuscrito."
+    },
+    {
+      "id": "M08",
+      "name": "Matriz de Evidências e proveniência",
+      "priority": "P1",
+      "wave": 2,
+      "decision": "Construir recurso próprio",
+      "upstreams": [
+        "R07",
+        "R01"
+      ],
+      "depends_on": [
+        "M02",
+        "M05",
+        "M06"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Depende de chunks com localizador (M02)."
+    },
+    {
+      "id": "M09",
+      "name": "Mapa de omissões e cobertura",
+      "priority": "P1",
+      "wave": 4,
+      "decision": "Construir com inspiração em estudos",
+      "upstreams": [
+        "R13",
+        "R01"
+      ],
+      "depends_on": [
+        "M03",
+        "M04"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Depende da recuperação (M04)."
+    },
+    {
+      "id": "M10",
+      "name": "Abstenção quando há evidência insuficiente",
+      "priority": "P1",
+      "wave": 2,
+      "decision": "Regra própria de geração e avaliação",
+      "upstreams": [
+        "R01",
+        "R12"
+      ],
+      "depends_on": [
+        "M04",
+        "M06"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Depende de recuperação com scores (M04)."
+    },
+    {
+      "id": "M11",
+      "name": "Declaração institucional de uso de IA",
+      "priority": "P1",
+      "wave": 0,
+      "decision": "Implementar política normativa própria",
+      "upstreams": [
+        "R25",
+        "R01"
+      ],
+      "depends_on": [
+        "M14"
+      ],
+      "status": "parcial",
+      "files": [
+        "worker/ai_declaration.py"
+      ],
+      "next_step": "Gera rascunho a partir do manifesto. Falta conferir item a item com o Anexo da IN 16/2026 e registrar a aprovação do orientador (M12)."
+    },
+    {
+      "id": "M12",
+      "name": "Checkpoints de validação humana",
+      "priority": "P1",
+      "wave": 4,
+      "decision": "Desenvolver internamente",
+      "upstreams": [
+        "R01",
+        "R25"
+      ],
+      "depends_on": [
+        "M08",
+        "M14"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Exige dividir o motor original em etapas retomáveis."
+    },
+    {
+      "id": "M13",
+      "name": "Segurança de documentos e isolamento",
+      "priority": "P1",
+      "wave": 0,
+      "decision": "Reforçar controles atuais",
+      "upstreams": [
+        "R27",
+        "R01"
+      ],
+      "depends_on": [],
+      "status": "parcial",
+      "files": [
+        "worker/document_guard.py",
+        "worker/source_materials.py",
+        "api/library.py"
+      ],
+      "next_step": "Feito: neutralização de delimitadores, remoção de caracteres invisíveis e sinais de instrução embutida. Falta varredura de malware no upload e quarentena."
+    },
+    {
+      "id": "M14",
+      "name": "Proveniência e rastreabilidade de execução",
+      "priority": "P1",
+      "wave": 0,
+      "decision": "Ampliar artefatos internos",
+      "upstreams": [
+        "R01"
+      ],
+      "depends_on": [
+        "M13"
+      ],
+      "status": "parcial",
+      "files": [
+        "worker/run_manifest.py"
+      ],
+      "next_step": "Manifesto por execução com versões, hashes e eventos. O motor original não expõe tokens nem prompts por chamada; custos ficam como não medidos."
+    },
+    {
+      "id": "M15",
+      "name": "Orçamento, telemetria e regressão",
+      "priority": "P1",
+      "wave": 0,
+      "decision": "Evoluir CI e controle de custos",
+      "upstreams": [
+        "R28",
+        "R29",
+        "R40",
+        "R01"
+      ],
+      "depends_on": [
+        "M14"
+      ],
+      "status": "parcial",
+      "files": [
+        ".github/dependabot.yml",
+        ".github/workflows/osv-scanner-pr.yml",
+        ".github/workflows/osv-scanner-scheduled.yml",
+        ".github/workflows/watch-upstreams.yml",
+        "scripts/upstreams.py"
+      ],
+      "next_step": "Feito: Dependabot, OSV-Scanner e vigia de upstreams. Falta orçamento por etapa e cancelamento de Job pelo navegador."
+    },
+    {
+      "id": "M16",
+      "name": "GapView: diagnóstico pré-pesquisa",
+      "priority": "P2",
+      "wave": 4,
+      "decision": "Artigo como referência; desenvolver internamente",
+      "upstreams": [
+        "R13",
+        "R01"
+      ],
+      "depends_on": [
+        "M03",
+        "M04",
+        "M09"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Depende do M09."
+    },
+    {
+      "id": "M17",
+      "name": "Detecção de contradições entre estudos",
+      "priority": "P2",
+      "wave": 3,
+      "decision": "Inspiração acadêmica e implementação própria",
+      "upstreams": [
+        "R07",
+        "R01"
+      ],
+      "depends_on": [
+        "M08",
+        "M19"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Depende do M08."
+    },
+    {
+      "id": "M18",
+      "name": "Confiabilidade contextual das fontes",
+      "priority": "P2",
+      "wave": 3,
+      "decision": "RA-RAG como referência; lógica própria",
+      "upstreams": [
+        "R15",
+        "R08",
+        "R09",
+        "R01"
+      ],
+      "depends_on": [
+        "M06",
+        "M07"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Pode reaproveitar o status editorial do M07."
+    },
+    {
+      "id": "M19",
+      "name": "Granularidade inteligente de fragmentos",
+      "priority": "P2",
+      "wave": 1,
+      "decision": "Método próprio com avaliação",
+      "upstreams": [
+        "R03",
+        "R04",
+        "R01"
+      ],
+      "depends_on": [
+        "M01",
+        "M03"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Depende do M01."
+    },
+    {
+      "id": "M20",
+      "name": "Reranking especializado",
+      "priority": "P2",
+      "wave": 2,
+      "decision": "Testar InRanker versus alternativa mantida",
+      "upstreams": [
+        "R16",
+        "R17",
+        "R01"
+      ],
+      "depends_on": [
+        "M04",
+        "M19"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Benchmark cego em corpus de educação pt-BR."
+    },
+    {
+      "id": "M21",
+      "name": "Fichamentos persistentes e cache",
+      "priority": "P2",
+      "wave": 4,
+      "decision": "Construir no GCS/Firestore",
+      "upstreams": [
+        "R01"
+      ],
+      "depends_on": [
+        "M03",
+        "M14"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Pode usar os hashes do manifesto (M14) como chave."
+    },
+    {
+      "id": "M22",
+      "name": "FIRE: auditoria iterativa e parada dinâmica",
+      "priority": "P2",
+      "wave": 4,
+      "decision": "Prototipar algoritmo em adaptador isolado",
+      "upstreams": [
+        "R14",
+        "R01"
+      ],
+      "depends_on": [
+        "M06",
+        "M08",
+        "M10",
+        "M15"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Conferir licença do R14 antes de qualquer cópia."
+    },
+    {
+      "id": "M23",
+      "name": "OCR seletivo e documentos complexos",
+      "priority": "P2",
+      "wave": 1,
+      "decision": "Fallback sob demanda, não OCR universal",
+      "upstreams": [
+        "R18",
+        "R03",
+        "R01"
+      ],
+      "depends_on": [
+        "M01",
+        "M02",
+        "M13"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Depende do M01; conferir pesos e local de download."
+    },
+    {
+      "id": "M24",
+      "name": "Metadados brasileiros: SciELO e BRAPCI",
+      "priority": "P2",
+      "wave": 3,
+      "decision": "Adaptadores restritos e revisão manual",
+      "upstreams": [
+        "R19",
+        "R20",
+        "R01"
+      ],
+      "depends_on": [
+        "M06"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Confirmar se há API oficial da SciELO e os termos da BRAPCI antes de codificar."
+    },
+    {
+      "id": "M25",
+      "name": "Revisão adversarial de argumentos",
+      "priority": "P2",
+      "wave": 4,
+      "decision": "Agente interno; não 'peer review' real",
+      "upstreams": [
+        "R01",
+        "R07"
+      ],
+      "depends_on": [
+        "M08",
+        "M09",
+        "M12"
+      ],
+      "status": "parcial",
+      "files": [
+        "worker/neon_review.py"
+      ],
+      "next_step": "A revisão crítica opcional da V1 existe; falta acesso restrito à matriz de evidências (M08)."
+    },
+    {
+      "id": "M26",
+      "name": "Importação Zotero somente leitura",
+      "priority": "P2",
+      "wave": 5,
+      "decision": "API oficial; Better BibTeX como opção cliente",
+      "upstreams": [
+        "R21",
+        "R22",
+        "R01"
+      ],
+      "depends_on": [
+        "M13",
+        "M14"
+      ],
+      "status": "nao_iniciado",
+      "next_step": "Hoje a biblioteca já aceita .bib e .ris exportados do Zotero."
+    },
+    {
+      "id": "M27",
+      "name": "Exportação bibliográfica e estilos",
+      "priority": "P2",
+      "wave": 5,
+      "decision": "Reutilizar CSL + Citation.js quando adequado",
+      "upstreams": [
+        "R23",
+        "R24",
+        "R38",
+        "R01"
+      ],
+      "depends_on": [
+        "M06",
+        "M11",
+        "M24"
+      ],
+      "status": "parcial",
+      "files": [
+        "worker/templates/abnt-artigo",
+        "worker/templates/abnt-dissertacao"
+      ],
+      "next_step": "Templates ABNT (abnTeX2) existem; falta exportação CSL e testes de estilo."
+    }
   ]
 }

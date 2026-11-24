@@ -5,8 +5,12 @@
 # imagem base (R42). Esses são acompanhados pelo workflow "Vigiar upstreams".
 version: 2
 updates:
+  # increase-if-necessary: só abre PR quando a versão nova sai da faixa
+  # declarada (ex.: nova versão major). Sem isso, cada release vira um PR
+  # que apenas sobe o limite mínimo, mesmo já sendo aceito pela faixa.
   - package-ecosystem: "pip"
     directory: "/api"
+    versioning-strategy: "increase-if-necessary"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -18,6 +22,7 @@ updates:
         update-types: ["minor", "patch"]
   - package-ecosystem: "pip"
     directory: "/worker"
+    versioning-strategy: "increase-if-necessary"
     schedule:
       interval: "weekly"
       day: "monday"
