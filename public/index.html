@@ -3,143 +3,781 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#131d2e">
-  <title>PaperOrchestra — Laboratório Acadêmico</title>
+  <meta name="theme-color" content="#1466B8">
+  <title>Scriptorium MPIE — Laboratório de Pesquisa</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='115 40 282 432'%3E%3Cpath fill='%232779C9' d='M251.5 48 C234 114,186 196,130 274 C126 280,126 287,131 293 C156 322,174 352,184 386 L256 386 L256 238 L251.5 238 Z'/%3E%3Cpath fill='%23145DA6' d='M260.5 48 C278 114,326 196,382 274 C386 280,386 287,381 293 C356 322,338 352,328 386 L256 386 L256 238 L260.5 238 Z'/%3E%3Crect x='249.5' y='246' width='13' height='140' fill='%23F4B93B'/%3E%3Ccircle cx='256' cy='236' r='24' fill='%23F4B93B'/%3E%3Cpath fill='none' stroke='%23F4B93B' stroke-width='13' stroke-linecap='round' stroke-linejoin='round' d='M196 276 L196 306 L224 334 L224 386 M316 276 L316 306 L288 334 L288 386'/%3E%3Ccircle cx='196' cy='272' r='16' fill='%23F4B93B'/%3E%3Ccircle cx='316' cy='272' r='16' fill='%23F4B93B'/%3E%3Cpath fill='%231466B8' d='M184 402 L328 402 L338 456 C339 461,335 466,330 466 L182 466 C177 466,173 461,174 456 Z'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
   <style>
-    :root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#132235;background:#f5f7fa}
-    *{box-sizing:border-box}body{margin:0}button,input,textarea,select{font:inherit}button{cursor:pointer}
-    header{background:#131d2e;color:white;padding:20px max(20px,calc((100vw - 1120px)/2))}
-    .head{display:flex;align-items:center;justify-content:space-between;gap:12px}
-    header h1{font-size:clamp(1.15rem,3vw,1.65rem);margin:0}header p{margin:5px 0 0;color:#bac7d7;font-size:.88rem}
-    main{width:min(1120px,100%);padding:20px;margin:auto}
-    .panel{background:white;border:1px solid #dfe5ed;border-radius:16px;padding:22px;margin-bottom:18px;box-shadow:0 2px 8px #24324f08}
-    h2{font-size:1.14rem;margin:0 0 14px}p{line-height:1.5}.subtle{color:#57667d;font-size:.91rem}
-    .columns{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    label{display:block;font-weight:620;font-size:.88rem;margin:13px 0 6px}
-    input[type=text],textarea,select{width:100%;background:#fff;border:1px solid #bdc8d7;border-radius:9px;padding:12px;color:#17263a}
-    textarea{min-height:170px;resize:vertical}input:focus,textarea:focus,select:focus{outline:2px solid #598ee0;outline-offset:1px}
-    .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
-    .btn{border:1px solid #304e80;background:#254675;color:white;padding:11px 18px;border-radius:9px;font-weight:600}
-    .btn.alt{background:white;color:#254675}.btn:disabled{opacity:.55;cursor:wait}
-    .status{background:#f0f4fa;border-radius:9px;padding:10px 12px;margin:10px 0;color:#1a3658}
-    .warning{background:#fff8e6;border:1px solid #f2dfaa;padding:12px;border-radius:9px;font-size:.91rem}
-    .pill{font-size:.75rem;font-weight:700;border-radius:20px;padding:5px 9px;background:#e6eefb;color:#204779}
-    .item{border-top:1px solid #e6e9ef;padding:15px 0;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
-    .item strong{display:block;margin-bottom:5px}.item small{display:block;color:#65758a;margin:3px 0}
-    .downloads{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
-    .downloads button{border:1px solid #abc1d8;padding:6px 10px;background:#fff;border-radius:6px;color:#254675}
-    .agent-detail{margin-top:12px;padding:10px 12px;background:#f7f9fc;border:1px solid #e0e7ef;border-radius:9px}
-    .agent-detail summary{font-weight:650;color:#254675;cursor:pointer}
-    .agent-detail>small{display:block;margin:8px 0;color:#63718a}
-    .agent-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;border-top:1px solid #e3eaf2;font-size:.85rem}
-    .agent-state{font-weight:650;text-align:right;white-space:nowrap}
-    .agent-completed{color:#166534}.agent-running{color:#1d4e89}
-    .agent-waiting,.agent-disabled{color:#66758b}.agent-failed{color:#b42318}
-    .scientific-warning{display:block;color:#8a5a00!important;margin:10px 0!important}
-    .scientific-audit-report{margin:14px 0;padding:14px;border:1px solid #c8d4e3;border-radius:10px;background:#f7fafc}
-    .scientific-audit-report p{margin:7px 0 11px;font-size:.87rem}
-    .audit-finding{padding:10px 0;border-top:1px solid #dce4ed}
-    .audit-finding small{display:block;color:#5f6c80;margin-top:6px;overflow-wrap:anywhere}
-    .neon-report{border:1px solid #bdcde2;border-radius:10px;background:#f8fbff;padding:12px;margin:12px 0}
-    .neon-report h4{font-size:.9rem;margin:12px 0 5px}
-    .neon-report p,.neon-report li{font-size:.87rem}
-    .neon-report ul{padding-left:20px}
+    :root {
+      --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-serif: 'Newsreader', Georgia, serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 
-    .reference-item{border-top:1px solid #dce4ed;padding:10px 0;max-width:100%;overflow-wrap:anywhere}
-    .reference-item summary{cursor:pointer;font-weight:600;color:#21466f;font-size:.88rem}
-    .reference-item small{display:block;color:#64748b;margin-top:7px}
-    .reference-item a{display:inline-block;font-size:.87rem;margin-bottom:10px;color:#205f9b}
-    .library-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .library-item{border-top:1px solid #e0e7ef;padding:12px 0;display:flex;align-items:flex-start;gap:12px;justify-content:space-between;overflow-wrap:anywhere}
-    .library-item label{margin:0;display:flex;gap:8px;align-items:flex-start;font-weight:600}
-    .library-meta{font-size:.79rem;color:#596d83;margin-top:5px}
-    .library-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
-    .library-actions button{border:1px solid #afc2d9;border-radius:7px;background:white;color:#21436d;padding:6px 9px;font-size:.8rem}
-    .library-note{font-size:.83rem;color:#57667d}
-    @media(max-width:700px){.library-grid{grid-template-columns:1fr}.library-item{flex-direction:column}}
+      /* Identidade Visual MPIE — Modo Claro (Estúdio Editorial) */
+      --bg-page: #F7F9FC;
+      --bg-surface: #FFFFFF;
+      --bg-subtle: #EFF4FA;
+      --bg-input: #F8FAFD;
+      --border-main: #D8E3F0;
+      --border-soft: #E8EFF7;
+      --text-primary: #0F1C2E;
+      --text-secondary: #3B4F68;
+      --text-muted: #5F748E;
+      --mpie-blue: #1466B8;
+      --mpie-blue-hover: #0E4F92;
+      --mpie-blue-soft: #E8F2FC;
+      --mpie-blue-text: #105396;
+      --mpie-gold: #F4B93B;
+      --mpie-gold-soft: #FEF7E4;
+      --mpie-gold-text: #8A5A00;
+      --warn-bg: #FFFBEB;
+      --warn-border: #F4D88A;
+      --warn-text: #7A4F00;
+      --ok-text: #166534;
+      --err-text: #B42318;
+      --shadow-sm: 0 2px 10px rgba(15, 28, 46, 0.04);
+    }
 
+    html[data-theme="black"] {
+      /* Identidade Visual MPIE — Modo Black */
+      --bg-page: #070A0F;
+      --bg-surface: #101622;
+      --bg-subtle: #161F30;
+      --bg-input: #0B1019;
+      --border-main: #24324A;
+      --border-soft: #1B2639;
+      --text-primary: #F1F5FA;
+      --text-secondary: #C1CFE0;
+      --text-muted: #8699B3;
+      --mpie-blue: #4B9CE8;
+      --mpie-blue-hover: #6CB2F2;
+      --mpie-blue-soft: rgba(75, 156, 232, 0.15);
+      --mpie-blue-text: #7CC0FA;
+      --mpie-gold: #F6C143;
+      --mpie-gold-soft: rgba(246, 193, 67, 0.15);
+      --mpie-gold-text: #FAD26B;
+      --warn-bg: rgba(246, 193, 67, 0.10);
+      --warn-border: rgba(246, 193, 67, 0.35);
+      --warn-text: #FCD87A;
+      --ok-text: #6EE7B7;
+      --err-text: #FDA4AF;
+      --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.35);
+    }
 
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      background: var(--bg-page);
+      color: var(--text-primary);
+      line-height: 1.55;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: background-color 180ms ease, color 180ms ease;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
 
+    /* Cabeçalho fixo com símbolo Pena-Circuito livre e botão Modo Black */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-main);
+      padding: 12px max(20px, calc((100vw - 1024px) / 2));
+      transition: background-color 180ms ease, border-color 180ms ease;
+    }
+    .head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+    .brand-logo {
+      height: 46px;
+      width: auto;
+      flex-shrink: 0;
+      display: block;
+    }
+    .brand-text { min-width: 0; }
+    .brand-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    header h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+      font-weight: 600;
+      line-height: 1.1;
+      margin: 0;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+    .mpie-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: var(--mpie-gold-soft);
+      color: var(--mpie-gold-text);
+    }
+    header p {
+      margin: 3px 0 0;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    #identity {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-main);
+      border-radius: 10px;
+      padding: 6px 11px;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #identity:empty { display: none; }
 
-    .hidden{display:none!important}#identity{font-size:.85rem;color:#d5deec;overflow-wrap:anywhere}
-    .loading{opacity:.7}.check{display:flex;gap:8px;align-items:center;margin-top:13px}.check label{margin:0}
-    footer{text-align:center;padding:12px 24px 30px;color:#728097;font-size:.83rem}
-    @media(max-width:700px){main{padding:12px}.panel{padding:17px}.columns{grid-template-columns:1fr}.head{align-items:flex-start}.item{flex-direction:column}}
+    .theme-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border-main);
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: opacity 150ms ease, border-color 150ms ease;
+    }
+    .theme-btn:hover { border-color: var(--mpie-blue); }
+
+    /* Container principal */
+    main {
+      flex: 1;
+      width: min(1024px, 100%);
+      padding: 26px 20px 32px;
+      margin: 0 auto;
+    }
+
+    /* Stepper editorial de 3 passos */
+    .stepper {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    .step-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-align: left;
+      padding: 13px 15px;
+      border-radius: 16px;
+      border: 1px solid var(--border-main);
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    }
+    .step-btn:hover { border-color: var(--mpie-blue); }
+    .step-btn.active {
+      background: var(--bg-surface);
+      border-color: var(--mpie-blue);
+      box-shadow: inset 0 0 0 1px var(--mpie-blue), var(--shadow-sm);
+    }
+    .step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 600;
+      flex-shrink: 0;
+      background: var(--mpie-gold-soft);
+      color: var(--mpie-gold-text);
+    }
+    .step-btn.active .step-num {
+      background: var(--mpie-blue);
+      color: #FFFFFF;
+    }
+    html[data-theme="black"] .step-btn.active .step-num { color: #070A0F; }
+    .step-title { font-size: 0.84rem; font-weight: 650; display: block; line-height: 1.25; }
+    .step-sub { font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 2px; }
+
+    /* Painéis */
+    .panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-main);
+      border-radius: 18px;
+      padding: 26px;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow-sm);
+      transition: background-color 180ms ease, border-color 180ms ease;
+    }
+    .panel h2 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.35rem, 2.4vw, 1.7rem);
+      font-weight: 600;
+      margin: 0 0 10px;
+      color: var(--text-primary);
+      line-height: 1.2;
+    }
+    .panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 14px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    p { line-height: 1.55; margin: 0 0 12px; }
+    .subtle { color: var(--text-secondary); font-size: 0.88rem; }
+    .library-note { font-size: 0.84rem; color: var(--mpie-blue-text); font-weight: 500; margin: 12px 0; }
+
+    /* Formulários */
+    .columns, .library-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.84rem;
+      color: var(--text-secondary);
+      margin: 14px 0 6px;
+    }
+    input[type=text], input[type=file], textarea, select {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-main);
+      border-radius: 11px;
+      padding: 11px 13px;
+      color: var(--text-primary);
+      font-size: 0.92rem;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+    input[type=file] { padding: 8px 11px; }
+    textarea { min-height: 165px; resize: vertical; }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--mpie-blue);
+      box-shadow: 0 0 0 3px var(--mpie-blue-soft);
+    }
+    input::placeholder, textarea::placeholder { color: var(--text-muted); }
+
+    /* Botões */
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+    .step-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 22px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-soft);
+    }
+    .btn {
+      border: 1px solid var(--mpie-blue);
+      background: var(--mpie-blue);
+      color: #FFFFFF;
+      padding: 10px 18px;
+      border-radius: 11px;
+      font-weight: 600;
+      font-size: 0.86rem;
+      transition: background-color 150ms ease, opacity 150ms ease;
+    }
+    html[data-theme="black"] .btn { color: #070A0F; }
+    .btn:hover { background: var(--mpie-blue-hover); border-color: var(--mpie-blue-hover); }
+    .btn.alt {
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      border-color: var(--border-main);
+    }
+    .btn.alt:hover { border-color: var(--mpie-blue); }
+    .btn:disabled { opacity: 0.55; cursor: wait; }
+
+    /* Checkboxes */
+    .check {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-main);
+    }
+    .check input[type=checkbox] {
+      margin-top: 3px;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--mpie-blue);
+      flex-shrink: 0;
+    }
+    .check label { margin: 0; color: var(--text-primary); cursor: pointer; }
+
+    /* Avisos e status */
+    .status {
+      background: var(--bg-subtle);
+      border-radius: 10px;
+      padding: 10px 13px;
+      margin: 10px 0;
+      color: var(--text-primary);
+    }
+    .warning {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      color: var(--warn-text);
+      padding: 13px 15px;
+      border-radius: 12px;
+      font-size: 0.86rem;
+      margin-top: 14px;
+    }
+    .pill {
+      font-size: 0.74rem;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 5px 11px;
+      background: var(--mpie-blue-soft);
+      color: var(--mpie-blue-text);
+      white-space: nowrap;
+    }
+
+    /* Itens dinâmicos da Biblioteca (gerados por app.js) */
+    .library-item {
+      border-top: 1px solid var(--border-soft);
+      padding: 14px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      justify-content: space-between;
+      overflow-wrap: anywhere;
+    }
+    .library-item label {
+      margin: 0;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-weight: 600;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+    .library-item input[type=checkbox] {
+      margin-top: 3px;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--mpie-blue);
+      flex-shrink: 0;
+    }
+    .library-meta { font-size: 0.79rem; color: var(--text-muted); margin-top: 5px; }
+    .library-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
+    .library-actions button {
+      border: 1px solid var(--border-main);
+      border-radius: 8px;
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      padding: 6px 10px;
+      font-size: 0.79rem;
+      font-weight: 500;
+    }
+    .library-actions button:hover { border-color: var(--mpie-blue); color: var(--mpie-blue-text); }
+
+    /* Itens dinâmicos do Histórico de Pesquisas (gerados por app.js) */
+    .item {
+      border-top: 1px solid var(--border-soft);
+      padding: 18px 0;
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .item strong { display: block; margin-bottom: 5px; color: var(--text-primary); font-size: 1rem; }
+    .item small { display: block; color: var(--text-muted); margin: 3px 0; }
+    .downloads { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+    .downloads button {
+      border: 1px solid var(--border-main);
+      padding: 7px 11px;
+      background: var(--bg-subtle);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+    .downloads button:hover { border-color: var(--mpie-blue); color: var(--mpie-blue-text); }
+
+    /* Painel dos 5 agentes (gerado por app.js) */
+    .agent-detail {
+      margin-top: 12px;
+      padding: 12px 14px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-main);
+      border-radius: 12px;
+    }
+    .agent-detail summary { font-weight: 650; color: var(--mpie-blue-text); cursor: pointer; font-size: 0.88rem; }
+    .agent-detail > small { display: block; margin: 8px 0; color: var(--text-muted); }
+    .agent-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+      border-top: 1px solid var(--border-soft);
+      font-size: 0.84rem;
+    }
+    .agent-state { font-weight: 650; text-align: right; white-space: nowrap; }
+    .agent-completed { color: var(--ok-text); }
+    .agent-running { color: var(--mpie-blue-text); }
+    .agent-waiting, .agent-disabled { color: var(--text-muted); }
+    .agent-failed { color: var(--err-text); }
+
+    /* Relatórios inline de Auditoria, Referências e Neon (gerados por app.js) */
+    .scientific-warning { display: block; color: var(--mpie-gold-text) !important; margin: 10px 0 !important; font-weight: 500; }
+    .scientific-audit-report, .neon-report {
+      margin: 14px 0;
+      padding: 15px;
+      border: 1px solid var(--border-main);
+      border-radius: 12px;
+      background: var(--bg-subtle);
+    }
+    .scientific-audit-report p, .neon-report p, .neon-report li { margin: 7px 0 10px; font-size: 0.87rem; color: var(--text-secondary); }
+    .neon-report h4 { font-size: 0.9rem; margin: 12px 0 5px; color: var(--text-primary); }
+    .neon-report ul { padding-left: 20px; }
+    .audit-finding { padding: 10px 0; border-top: 1px solid var(--border-soft); }
+    .audit-finding small { display: block; color: var(--text-muted); margin-top: 6px; overflow-wrap: anywhere; }
+    .reference-item { border-top: 1px solid var(--border-soft); padding: 10px 0; max-width: 100%; overflow-wrap: anywhere; }
+    .reference-item summary { cursor: pointer; font-weight: 600; color: var(--mpie-blue-text); font-size: 0.88rem; }
+    .reference-item small { display: block; color: var(--text-muted); margin-top: 6px; }
+    .reference-item a { display: inline-block; font-size: 0.86rem; margin-bottom: 8px; color: var(--mpie-blue-text); }
+
+    /* Utilitários de visibilidade (sem conflito com app.js) */
+    .hidden { display: none !important; }
+    .step-hidden { display: none !important; }
+    .loading { opacity: 0.7; }
+
+    footer {
+      text-align: center;
+      padding: 14px 20px 30px;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 760px) {
+      header { padding: 10px 14px; }
+      header p { display: none; }
+      #identity { display: none; }
+      main { padding: 16px 12px 24px; }
+      .stepper { grid-template-columns: 1fr; }
+      .panel { padding: 18px; }
+      .columns, .library-grid { grid-template-columns: 1fr; }
+      .item, .library-item { flex-direction: column; }
+    }
   </style>
 </head>
 <body>
-<header><div class="head"><div><h1>🎻 PaperOrchestra</h1><p>Seu laboratório acadêmico na nuvem</p></div><div style="text-align:right"><div id="identity"></div><button id="logout" class="btn alt hidden" style="margin-top:8px;font-size:.8rem;padding:6px 10px">Sair</button></div></div></header>
-<main>
-  <section id="login-panel" class="panel">
-    <h2>Acesso ao laboratório</h2>
-    <p>Seus projetos e manuscritos permanecem armazenados no Google Cloud. Entre com a conta Google autorizada.</p>
-    <button id="login" class="btn">Entrar com Google</button>
-    <p id="auth-status" class="subtle"></p>
-  </section>
-  <div id="workspace" class="hidden">
-    <section class="panel" id="library-panel">
-      <div class="head"><h2>Biblioteca acadêmica permanente</h2><button class="btn alt" type="button" id="refresh-library">Atualizar</button></div>
-      <p class="subtle">Guarde PDFs, DOCX, BibTeX, RIS ou TXT na sua conta. Arquivos e bibliografias não entram no GitHub. Selecione até oito fontes para a próxima pesquisa; documentos anexados são contexto, não resultados verificados.</p>
-      <div class="library-grid">
-        <div><label for="library-file">Arquivo</label><input id="library-file" type="file" accept=".pdf,.docx,.bib,.ris,.txt" /></div>
-        <div><label for="library-collection">Coleção (assunto ou capítulo)</label><input id="library-collection" type="text" maxlength="60" value="Geral" placeholder="Ex.: Revisão bibliográfica"/></div>
+  <header>
+    <div class="head">
+      <div class="brand">
+        <svg class="brand-logo" viewBox="115 40 282 432" role="img" aria-label="Logo Pena-Circuito Scriptorium MPIE">
+          <defs>
+            <linearGradient id="scrBlueL" x1="15%" y1="10%" x2="85%" y2="90%"><stop offset="0%" stop-color="#6CB2EA"/><stop offset="100%" stop-color="#1159A4"/></linearGradient>
+            <linearGradient id="scrBlueR" x1="10%" y1="12%" x2="90%" y2="88%"><stop offset="0%" stop-color="#4A97DC"/><stop offset="100%" stop-color="#0E4B8C"/></linearGradient>
+            <linearGradient id="scrGold" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FAD46B"/><stop offset="100%" stop-color="#DF9B1D"/></linearGradient>
+          </defs>
+          <path fill="url(#scrBlueL)" d="M251.5 48 C234 114,186 196,130 274 C126 280,126 287,131 293 C156 322,174 352,184 386 L256 386 L256 238 L251.5 238 Z"/>
+          <path fill="url(#scrBlueR)" d="M260.5 48 C278 114,326 196,382 274 C386 280,386 287,381 293 C356 322,338 352,328 386 L256 386 L256 238 L260.5 238 Z"/>
+          <rect x="249.5" y="246" width="13" height="140" fill="url(#scrGold)"/>
+          <circle cx="256" cy="236" r="24" fill="url(#scrGold)"/>
+          <path fill="none" stroke="url(#scrGold)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" d="M196 276 L196 306 L224 334 L224 386 M316 276 L316 306 L288 334 L288 386"/>
+          <circle cx="196" cy="272" r="16" fill="url(#scrGold)"/>
+          <circle cx="316" cy="272" r="16" fill="url(#scrGold)"/>
+          <path fill="url(#scrBlueR)" d="M184 402 L328 402 L338 456 C339 461,335 466,330 466 L182 466 C177 466,173 461,174 456 Z"/>
+        </svg>
+        <div class="brand-text">
+          <div class="brand-title-row">
+            <h1>Scriptorium</h1>
+            <span class="mpie-badge">MPIE</span>
+          </div>
+          <p>Orquestrador de Pesquisa · Mestrado Profissional em Informática na Educação</p>
+        </div>
       </div>
-      <label for="library-description">Descrição opcional</label>
-      <input id="library-description" type="text" maxlength="300" placeholder="Por que este documento é relevante?"/>
-      <div class="actions"><button class="btn" type="button" id="upload-library">Guardar na biblioteca</button><span id="library-message" role="status" class="subtle"></span></div>
-      <label for="library-filter">Buscar na biblioteca</label>
-      <input id="library-filter" type="text" placeholder="Filtrar por nome, coleção ou descrição"/>
-      <p id="selected-count" class="library-note">0 fonte(s) selecionada(s) para a próxima pesquisa</p>
-      <div id="library-list" role="status">Carregando biblioteca…</div>
+
+      <div class="header-controls">
+        <div id="identity"></div>
+        <button type="button" id="theme-toggle" class="theme-btn" aria-pressed="false">
+          <span id="theme-icon" aria-hidden="true">🌙</span>
+          <span id="theme-label">Modo Black</span>
+        </button>
+        <button id="logout" class="btn alt hidden" style="padding:7px 12px;font-size:.8rem">Sair</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="login-panel" class="panel">
+      <h2>Acesso ao laboratório</h2>
+      <p class="subtle">Seus projetos e manuscritos permanecem armazenados no Google Cloud. Entre com a conta Google autorizada.</p>
+      <div class="actions">
+        <button id="login" class="btn">Entrar com Google</button>
+      </div>
+      <p id="auth-status" class="subtle" style="margin-top:10px"></p>
     </section>
-    <section class="panel">
-      <h2>Nova pesquisa</h2><p class="library-note">Você pode anexar documentos marcando-os na biblioteca acima. O original permanecerá guardado independentemente da geração do artigo.</p>
-      <p class="subtle">O PaperOrchestra organiza e redige o manuscrito a partir de <b>materiais reais</b>. Não invente resultados para completar o formulário. Os dados são armazenados de modo privado.</p>
-      <form id="new-paper">
-        <label for="title">Nome interno do projeto</label>
-        <input id="title" type="text" maxlength="120" minlength="3" required placeholder="Ex.: Perspectivas políticas na leitura por IAs">
-        <div class="columns">
-          <div><label for="idea">Ideia de pesquisa</label><textarea id="idea" required minlength="40" maxlength="150000" placeholder="Problema, hipótese, perguntas, método e contexto..."></textarea></div>
-          <div><label for="log">Registros e resultados reais</label><textarea id="log" required minlength="40" maxlength="150000" placeholder="Descrição de dados, observações, resultados verificáveis e limitações..."></textarea></div>
+
+    <div id="workspace" class="hidden">
+      <!-- Navegação em 3 etapas (Estúdio Editorial) -->
+      <nav class="stepper" aria-label="Etapas do fluxo de pesquisa">
+        <button type="button" class="step-btn active" data-step="1">
+          <span class="step-num">01</span>
+          <span>
+            <span class="step-title">Selecionar Fontes</span>
+            <span class="step-sub" id="step-sub-1">Biblioteca privada (até 8)</span>
+          </span>
+        </button>
+        <button type="button" class="step-btn" data-step="2">
+          <span class="step-num">02</span>
+          <span>
+            <span class="step-title">Configurar Pesquisa</span>
+            <span class="step-sub" id="step-sub-2">Escopo, template e modelos</span>
+          </span>
+        </button>
+        <button type="button" class="step-btn" data-step="3">
+          <span class="step-num">03</span>
+          <span>
+            <span class="step-title">Execuções e Auditorias</span>
+            <span class="step-sub" id="step-sub-3">Histórico, agentes e pareceres</span>
+          </span>
+        </button>
+      </nav>
+
+      <!-- ETAPA 1: BIBLIOTECA ACADÊMICA PERMANENTE -->
+      <section class="panel" id="library-panel" data-step-panel="1">
+        <div class="panel-header">
+          <div>
+            <h2>Biblioteca acadêmica permanente</h2>
+            <p class="subtle" style="margin:0">Guarde PDFs, DOCX, BibTeX, RIS ou TXT na sua conta. Selecione até oito fontes para a próxima pesquisa; documentos anexados são contexto, não resultados verificados.</p>
+          </div>
+          <button class="btn alt" type="button" id="refresh-library">Atualizar</button>
         </div>
-        <div><label for="language">Idioma do manuscrito</label>
-          <select id="language">
-            <option value="en">Inglês (padrão do PaperOrchestra original)</option>
-            <option value="pt-BR">Português brasileiro (experimental)</option>
-          </select>
-          <p class="subtle">Português é uma preferência de redação e não garante tradução integral. Os modelos brasileiros são rascunhos experimentais e exigem revisão do manual da universidade; nenhuma conformidade normativa é certificada automaticamente.</p>
+
+        <div class="library-grid">
+          <div><label for="library-file">Arquivo</label><input id="library-file" type="file" accept=".pdf,.docx,.bib,.ris,.txt" /></div>
+          <div><label for="library-collection">Coleção (assunto ou capítulo)</label><input id="library-collection" type="text" maxlength="60" value="Geral" placeholder="Ex.: Revisão bibliográfica"/></div>
         </div>
-        <div class="columns">
-          <div><label for="template">Modelo de artigo</label><select id="template"><option value="iclr2025">ICLR 2025</option><option value="cvpr2025">CVPR 2025</option>
-                  <option value="abnt-artigo">Brasil — Artigo (abnTeX2 experimental)</option>
-                  <option value="abnt-dissertacao">Brasil — Estrutura de dissertação (experimental)</option></select></div>
-          <div><label for="model">Modelo de IA</label><select id="model"><option value="gemini-3-flash-preview">Gemini 3 Flash (teste econômico)</option><option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (maior capacidade)</option></select></div>
+        <label for="library-description">Descrição opcional</label>
+        <input id="library-description" type="text" maxlength="300" placeholder="Por que este documento é relevante?"/>
+        <div class="actions">
+          <button class="btn" type="button" id="upload-library">Guardar na biblioteca</button>
+          <span id="library-message" role="status" class="subtle"></span>
         </div>
-        <div><label for="reflection-model">Modelo para o agente de revisão</label>
-          <select id="reflection-model">
-            <option value="">Mesmo modelo usado na redação</option>
-            <option value="gemini-3-flash-preview">Gemini 3 Flash (revisão econômica)</option>
-            <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (revisão aprofundada)</option>
-          </select>
-          <p class="subtle">Os agentes já estão integrados. Escolher um modelo mais avançado pode aumentar o custo das revisões.</p></div>
-        <div class="check"><input id="plotting" type="checkbox"><label for="plotting">Gerar gráficos com IA (mais chamadas e custo)</label></div>
-        <div class="check hidden" id="neon-panel"><input id="neon-review" type="checkbox">
-          <label for="neon-review">Revisão crítica adicional com Gemini 4 Neon (opcional, chamada paga)</label></div>
-        <p class="subtle hidden" id="neon-explanation">Após a geração do PDF, o Neon faz um parecer independente sobre argumentos e evidências. Uma chamada extra por manuscrito, com nível de raciocínio Low. Não altera o texto e não substitui a revisão humana.</p>
-        <div class="warning" style="margin-top:18px"><strong>Aviso acadêmico:</strong> o PaperOrchestra estrutura e escreve, mas não comprova métricas, experimentos ou citações. O teste inicial gerou alegações de verificação sem evidências de validação. Revise sempre antes de utilizar o conteúdo.</div>
-        <div class="warning" style="margin-top:18px">A geração pode levar dezenas de minutos e gerar cobrança das APIs. É possível fechar o navegador e acompanhar depois; o trabalho continua no Cloud Run Job.</div>
-        <div class="actions"><button type="submit" class="btn" id="submit">Iniciar geração</button><span id="submit-status" class="subtle" role="status"></span></div>
-      </form>
-    </section>
-    <section class="panel">
-      <div class="head"><h2>Histórico de pesquisas</h2><button id="refresh" class="btn alt">Atualizar</button></div>
-      <p class="subtle">Manuscritos guardados no Cloud Storage. O navegador não precisa permanecer aberto.</p>
-      <div id="research-list" role="status">Carregando…</div>
-    </section>
-  </div>
-</main>
-<footer>Projeto acadêmico independente • Baseado no PaperOrchestra de código aberto • Revise referências e resultados antes de divulgar.</footer>
-<script src="/config.js"></script>
-<script type="module" src="/app.js"></script>
+
+        <label for="library-filter">Buscar na biblioteca</label>
+        <input id="library-filter" type="text" placeholder="Filtrar por nome, coleção ou descrição"/>
+        <p id="selected-count" class="library-note">0 fonte(s) selecionada(s) para a próxima pesquisa</p>
+        <div id="library-list" role="status">Carregando biblioteca...</div>
+
+        <div class="step-footer">
+          <span class="subtle">Arquivos e bibliografias ficam privados no Cloud Storage e não entram no GitHub.</span>
+          <button type="button" class="btn" data-go-step="2">Continuar para Nova Pesquisa →</button>
+        </div>
+      </section>
+
+      <!-- ETAPA 2: NOVA PESQUISA -->
+      <section class="panel step-hidden" id="new-paper-panel" data-step-panel="2">
+        <div class="panel-header">
+          <div>
+            <h2>Nova pesquisa</h2>
+            <p class="subtle" style="margin:0">O Scriptorium organiza e redige o manuscrito a partir de <b>materiais reais</b>. Não invente resultados para completar o formulário.</p>
+          </div>
+        </div>
+
+        <p class="library-note">Você pode anexar documentos marcando-os na Etapa 01 (Biblioteca). O original permanecerá guardado independentemente da geração do artigo.</p>
+
+        <form id="new-paper">
+          <label for="title">Nome interno do projeto</label>
+          <input id="title" type="text" maxlength="120" minlength="3" required placeholder="Ex.: Perspectivas políticas na leitura por IAs">
+          <div class="columns">
+            <div><label for="idea">Ideia de pesquisa</label><textarea id="idea" required minlength="40" maxlength="150000" placeholder="Problema, hipótese, perguntas, método e contexto..."></textarea></div>
+            <div><label for="log">Registros e resultados reais</label><textarea id="log" required minlength="40" maxlength="150000" placeholder="Descrição de dados, observações, resultados verificáveis e limitações..."></textarea></div>
+          </div>
+          <div>
+            <label for="language">Idioma do manuscrito</label>
+            <select id="language">
+              <option value="en">Inglês (padrão do PaperOrchestra original)</option>
+              <option value="pt-BR">Português brasileiro (experimental)</option>
+            </select>
+            <p class="subtle" style="margin-top:6px">Português é uma preferência de redação e não garante tradução integral. Os modelos brasileiros são rascunhos experimentais e exigem revisão do manual da universidade; nenhuma conformidade normativa é certificada automaticamente.</p>
+          </div>
+          <div class="columns">
+            <div>
+              <label for="template">Modelo de artigo</label>
+              <select id="template">
+                <option value="iclr2025">ICLR 2025</option>
+                <option value="cvpr2025">CVPR 2025</option>
+                <option value="abnt-artigo">Brasil – Artigo (abnTeX2 experimental)</option>
+                <option value="abnt-dissertacao">Brasil – Estrutura de dissertação (experimental)</option>
+              </select>
+            </div>
+            <div>
+              <label for="model">Modelo de IA</label>
+              <select id="model">
+                <option value="gemini-3-flash-preview">Gemini 3 Flash (teste econômico)</option>
+                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (maior capacidade)</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label for="reflection-model">Modelo para o agente de revisão</label>
+            <select id="reflection-model">
+              <option value="">Mesmo modelo usado na redação</option>
+              <option value="gemini-3-flash-preview">Gemini 3 Flash (revisão econômica)</option>
+              <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (revisão aprofundada)</option>
+            </select>
+            <p class="subtle" style="margin-top:6px">Os agentes já estão integrados. Escolher um modelo mais avançado pode aumentar o custo das revisões.</p>
+          </div>
+
+          <div class="check">
+            <input id="plotting" type="checkbox">
+            <label for="plotting">Gerar gráficos com IA (mais chamadas e custo)</label>
+          </div>
+          <div class="check hidden" id="neon-panel">
+            <input id="neon-review" type="checkbox">
+            <label for="neon-review">Revisão crítica adicional com Gemini 4 Neon (opcional, chamada paga)</label>
+          </div>
+          <p class="subtle hidden" id="neon-explanation" style="margin-top:8px">Após a geração do PDF, o Neon faz um parecer independente sobre argumentos e evidências. Uma chamada extra por manuscrito, com nível de raciocínio Low. Não altera o texto e não substitui a revisão humana.</p>
+
+          <div class="warning"><strong>Aviso acadêmico:</strong> o Scriptorium estrutura e escreve, mas não comprova métricas, experimentos ou citações. Revise sempre antes de utilizar o conteúdo.</div>
+          <div class="warning"><strong>Aviso:</strong> a geração pode levar dezenas de minutos e gerar cobrança das APIs. É possível fechar o navegador e acompanhar depois; o trabalho continua no Cloud Run Job.</div>
+
+          <div class="step-footer">
+            <button type="button" class="btn alt" data-go-step="1">← Voltar às Fontes</button>
+            <div class="actions" style="margin-top:0">
+              <span id="submit-status" class="subtle" role="status"></span>
+              <button type="submit" class="btn" id="submit">Iniciar geração</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <!-- ETAPA 3: HISTÓRICO, AGENTES E AUDITORIAS -->
+      <section class="panel step-hidden" id="history-panel" data-step-panel="3">
+        <div class="panel-header">
+          <div>
+            <h2>Histórico de pesquisas</h2>
+            <p class="subtle" style="margin:0">Manuscritos guardados no Cloud Storage. O navegador não precisa permanecer aberto.</p>
+          </div>
+          <button id="refresh" class="btn alt">Atualizar</button>
+        </div>
+        <div id="research-list" role="status">Carregando...</div>
+      </section>
+    </div>
+  </main>
+
+  <footer>Scriptorium MPIE • Projeto acadêmico independente baseado no PaperOrchestra • Revise referências e resultados antes de divulgar.</footer>
+
+  <!-- Camada exclusivamente visual (Modo Black + navegação entre as 3 etapas, sem tocar no core) -->
+  <script>
+    (function () {
+      const root = document.documentElement;
+      const toggle = document.getElementById('theme-toggle');
+      const icon = document.getElementById('theme-icon');
+      const label = document.getElementById('theme-label');
+      const themeMeta = document.querySelector('meta[name="theme-color"]');
+
+      function applyTheme(mode) {
+        const isBlack = mode === 'black';
+        if (isBlack) {
+          root.setAttribute('data-theme', 'black');
+          toggle.setAttribute('aria-pressed', 'true');
+          icon.textContent = '☀️';
+          label.textContent = 'Modo Claro';
+          if (themeMeta) themeMeta.setAttribute('content', '#070A0F');
+        } else {
+          root.removeAttribute('data-theme');
+          toggle.setAttribute('aria-pressed', 'false');
+          icon.textContent = '🌙';
+          label.textContent = 'Modo Black';
+          if (themeMeta) themeMeta.setAttribute('content', '#1466B8');
+        }
+        try { localStorage.setItem('scriptorium_mpie_theme', mode); } catch (_) {}
+      }
+
+      let initial = 'light';
+      try {
+        const saved = localStorage.getItem('scriptorium_mpie_theme');
+        if (saved === 'black' || saved === 'light') initial = saved;
+      } catch (_) {}
+      applyTheme(initial);
+
+      toggle.addEventListener('click', function () {
+        applyTheme(root.getAttribute('data-theme') === 'black' ? 'light' : 'black');
+      });
+
+      function setStep(stepNum) {
+        document.querySelectorAll('.step-btn').forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-step') === String(stepNum));
+        });
+        document.querySelectorAll('[data-step-panel]').forEach(function (panel) {
+          panel.classList.toggle('step-hidden', panel.getAttribute('data-step-panel') !== String(stepNum));
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      document.querySelectorAll('[data-step], [data-go-step]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          setStep(btn.getAttribute('data-step') || btn.getAttribute('data-go-step'));
+        });
+      });
+
+      // Espelha o contador de fontes selecionadas no subtítulo da Etapa 01
+      const selCount = document.getElementById('selected-count');
+      const sub1 = document.getElementById('step-sub-1');
+      if (selCount && sub1 && typeof MutationObserver !== 'undefined') {
+        new MutationObserver(function () {
+          const m = (selCount.textContent || '').match(/\d+/);
+          if (m) sub1.textContent = m[0] + '/8 fonte(s) anexada(s)';
+        }).observe(selCount, { childList: true, characterData: true, subtree: true });
+      }
+    })();
+  </script>
+  <script src="/config.js"></script>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>
