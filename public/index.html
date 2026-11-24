@@ -896,48 +896,7 @@
 
     
         .kanban-source-hidden { display: none !important; }
-        /* Polimento visual do histórico sem modificar seus dados nem avisos */
-    /* Cartões polidos de Execuções no Histórico (Etapa 3) */
-    #research-list { display: flex; flex-direction: column; gap: 14px; }
-    .item {
-      background: var(--bg-subtle);
-      border: 1px solid var(--border-main);
-      border-radius: 16px;
-      padding: 18px 20px;
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      align-items: flex-start;
-    }
-    .item strong { font-family: var(--font-serif); font-size: 1.15rem; display: block; margin-bottom: 4px; color: var(--text-primary); }
-    .item small { display: block; color: var(--text-muted); margin: 3px 0; font-size: 0.8rem; }
-    .pill { font-size: 0.74rem; font-weight: 700; border-radius: 999px; padding: 5px 12px; background: var(--mpie-blue-soft); color: var(--mpie-blue-text); white-space: nowrap; }
-    .downloads { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
-    .downloads button { border: 1px solid var(--border-main); padding: 7px 12px; background: var(--bg-surface); border-radius: 9px; color: var(--text-primary); font-size: 0.8rem; font-weight: 600; }
-    .downloads button:hover { border-color: var(--mpie-blue); color: var(--mpie-blue-text); }
-    .agent-detail { margin-top: 12px; padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-main); border-radius: 12px; }
-    .agent-detail summary { font-weight: 650; color: var(--mpie-blue-text); cursor: pointer; font-size: 0.86rem; }
-    .agent-detail > small { display: block; margin: 8px 0; color: var(--text-muted); }
-    .agent-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border-soft); font-size: 0.84rem; }
-    .agent-state { font-weight: 650; text-align: right; white-space: nowrap; }
-    .agent-completed { color: var(--ok-text); }
-    .agent-running { color: var(--mpie-blue-text); }
-    .agent-waiting, .agent-disabled { color: var(--text-muted); }
-    .agent-failed { color: var(--err-text); }
-    .scientific-warning { display: block; color: var(--mpie-gold-text) !important; margin: 10px 0 !important; font-weight: 600; }
-    .scientific-audit-report, .neon-report { margin: 14px 0; padding: 15px; border: 1px solid var(--border-main); border-radius: 12px; background: var(--bg-surface); }
-    .scientific-audit-report p, .neon-report p, .neon-report li { margin: 7px 0 10px; font-size: 0.86rem; color: var(--text-secondary); }
-    .neon-report h4 { font-size: 0.9rem; margin: 12px 0 5px; color: var(--text-primary); }
-    .neon-report ul { padding-left: 20px; }
-    .audit-finding { padding: 10px 0; border-top: 1px solid var(--border-soft); }
-    .audit-finding small { display: block; color: var(--text-muted); margin-top: 6px; overflow-wrap: anywhere; }
-    .reference-item { border-top: 1px solid var(--border-soft); padding: 10px 0; max-width: 100%; overflow-wrap: anywhere; }
-    .reference-item summary { cursor: pointer; font-weight: 600; color: var(--mpie-blue-text); font-size: 0.88rem; }
-    .reference-item small { display: block; color: var(--text-muted); margin-top: 6px; }
-    .reference-item a { display: inline-block; font-size: 0.86rem; margin-bottom: 8px; color: var(--mpie-blue-text); }
-
-
-    .library-item {
+        .library-item {
       border-top: 1px solid var(--border-soft);
       padding: 14px 0;
       display: flex;
@@ -1064,6 +1023,48 @@
       .columns, .library-grid { grid-template-columns: 1fr; }
       .item, .library-item { flex-direction: column; }
     }
+    /* Polimento visual do histórico sem modificar seus dados nem avisos */
+    /* Cartões polidos de Execuções no Histórico (Etapa 3) */
+    #research-list { display: flex; flex-direction: column; gap: 14px; }
+    .item {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-main);
+      border-radius: 16px;
+      padding: 18px 20px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .item strong { font-family: var(--font-serif); font-size: 1.15rem; display: block; margin-bottom: 4px; color: var(--text-primary); }
+    .item small { display: block; color: var(--text-muted); margin: 3px 0; font-size: 0.8rem; }
+    .pill { font-size: 0.74rem; font-weight: 700; border-radius: 999px; padding: 5px 12px; background: var(--mpie-blue-soft); color: var(--mpie-blue-text); white-space: nowrap; }
+    .downloads { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+    .downloads button { border: 1px solid var(--border-main); padding: 7px 12px; background: var(--bg-surface); border-radius: 9px; color: var(--text-primary); font-size: 0.8rem; font-weight: 600; }
+    .downloads button:hover { border-color: var(--mpie-blue); color: var(--mpie-blue-text); }
+    .agent-detail { margin-top: 12px; padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-main); border-radius: 12px; }
+    .agent-detail summary { font-weight: 650; color: var(--mpie-blue-text); cursor: pointer; font-size: 0.86rem; }
+    .agent-detail > small { display: block; margin: 8px 0; color: var(--text-muted); }
+    .agent-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border-soft); font-size: 0.84rem; }
+    .agent-state { font-weight: 650; text-align: right; white-space: nowrap; }
+    .agent-completed { color: var(--ok-text); }
+    .agent-running { color: var(--mpie-blue-text); }
+    .agent-waiting, .agent-disabled { color: var(--text-muted); }
+    .agent-failed { color: var(--err-text); }
+    .scientific-warning { display: block; color: var(--mpie-gold-text) !important; margin: 10px 0 !important; font-weight: 600; }
+    .scientific-audit-report, .neon-report { margin: 14px 0; padding: 15px; border: 1px solid var(--border-main); border-radius: 12px; background: var(--bg-surface); }
+    .scientific-audit-report p, .neon-report p, .neon-report li { margin: 7px 0 10px; font-size: 0.86rem; color: var(--text-secondary); }
+    .neon-report h4 { font-size: 0.9rem; margin: 12px 0 5px; color: var(--text-primary); }
+    .neon-report ul { padding-left: 20px; }
+    .audit-finding { padding: 10px 0; border-top: 1px solid var(--border-soft); }
+    .audit-finding small { display: block; color: var(--text-muted); margin-top: 6px; overflow-wrap: anywhere; }
+    .reference-item { border-top: 1px solid var(--border-soft); padding: 10px 0; max-width: 100%; overflow-wrap: anywhere; }
+    .reference-item summary { cursor: pointer; font-weight: 600; color: var(--mpie-blue-text); font-size: 0.88rem; }
+    .reference-item small { display: block; color: var(--text-muted); margin-top: 6px; }
+    .reference-item a { display: inline-block; font-size: 0.86rem; margin-bottom: 8px; color: var(--mpie-blue-text); }
+
+
+
   </style>
 </head>
 <body>
