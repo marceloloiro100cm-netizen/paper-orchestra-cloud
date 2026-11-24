@@ -1,5 +1,7 @@
 # Novo endereço Scriptorium — scriptorium.web.app
 
+> **Situação em 24/11/2026 — ENDEREÇO EXATO INDISPONÍVEL.** O Firebase Hosting recusou a criação do site ID `scriptorium` (HTTP 400: `scriptorium is reserved by another project`). O workflow de cadastro foi pausado para evitar falhas recorrentes. Não houve mudança no domínio atual, no login, nos dados ou no Cloud Run. Para continuar, o responsável deve escolher outro identificador global (por exemplo, `scriptorium-mpie`, sujeito à verificação de disponibilidade). Não executar manualmente o workflow sem antes editar o SITE_ID e conferir a nova URL em todos os scripts. Os bloqueios de IAM BYOK da Issue #17 continuam independentes.
+
 A implementação usa o [multisite oficial do Firebase Hosting](https://firebase.google.com/docs/hosting/multisites), **não** uma migração de projeto ou renomeação do site padrão.
 
 ## Objetivo
@@ -13,7 +15,7 @@ A implementação usa o [multisite oficial do Firebase Hosting](https://firebase
 
 ## Implementação
 
-O workflow `.github/workflows/deploy-scriptorium-alias.yml` roda quando seus arquivos ou a interface são alterados na `main` (e pode ser iniciado manualmente).
+O workflow `.github/workflows/deploy-scriptorium-alias.yml` ficou **somente manual e suspenso até a escolha de um nome disponível**. Não é executado automaticamente nas mudanças da interface.
 
 1. Autentica no Google Cloud com a conta de serviço atual do publicador, via OIDC.
 2. Consulta os sites de Hosting do projeto, cria `scriptorium` apenas se ainda não pertencer a este projeto; não tenta invadir nomes já registrados em outros projetos.

@@ -1,16 +1,9 @@
 name: Scriptorium — publicar endereço scriptorium.web.app
 
+# ATENÇÃO: o Firebase rejeitou SITE_ID=scriptorium (nome global já reservado).
+# Não repetir tentativas em todos os deploys de frontend. Ao escolher outro
+# nome de site, atualizar o script e a documentação antes de iniciar manualmente.
 on:
-  push:
-    branches: [main]
-    paths:
-      - public/config.js
-      - public/app.js
-      - public/index.html
-      - firebase.json
-      - scripts/deploy-scriptorium-alias.sh
-      - scripts/authorize-scriptorium-domain.py
-      - .github/workflows/deploy-scriptorium-alias.yml
   workflow_dispatch:
 
 permissions:
