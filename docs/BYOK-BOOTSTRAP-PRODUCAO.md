@@ -72,6 +72,15 @@ workflow **Bootstrap IAM BYOK (único)** (`.github/workflows/bootstrap-byok-iam.
    deployer os dois papéis temporários (mesmo antes de expirarem) e roda a
    auditoria final. Se algo falhar, a expiração de 1 hora remove os papéis do mesmo jeito.
 
+### Permissões de build do deployer
+
+Se o deploy falhar em `gcloud builds submit` com acesso negado ao bucket
+`paperorchestra-mestrado_cloudbuild`, conceda de novo, pelo Console e por 1 hora,
+só **Administrador de IAM do projeto** ao deployer e rode o mesmo workflow com
+`modo=permissoes-deploy` e `confirmacao=CONFIRMO-BYOK`. Ele concede
+`roles/serviceusage.serviceUsageConsumer` e `roles/storage.admin` com condição
+limitada ao bucket de fontes do Cloud Build, e remove o papel temporário ao final.
+
 Esta é a única exceção à regra abaixo: a concessão é feita por um humano, dura no
 máximo 1 hora e é revogada pelo próprio workflow.
 
