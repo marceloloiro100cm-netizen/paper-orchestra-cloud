@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Autoriza scriptorium.web.app na configuração de login Firebase do projeto.
+"""Autoriza scriptoriummpie.web.app na configuração de login Firebase do projeto.
 
 Faz GET, acrescenta exclusivamente o domínio novo ao conjunto existente
 e faz PATCH com updateMask=authorizedDomains, sem alterar provedores,
@@ -15,7 +15,7 @@ from urllib import error, parse, request
 
 
 PROJECT = "paperorchestra-mestrado"
-NEW_DOMAIN = "scriptorium.web.app"
+NEW_DOMAIN = "scriptoriummpie.web.app"
 CONFIG_URL = f"https://identitytoolkit.googleapis.com/admin/v2/projects/{PROJECT}/config"
 
 
@@ -57,7 +57,7 @@ def main() -> None:
     if not isinstance(domains, list) or not all(isinstance(item, str) for item in domains):
         raise RuntimeError("Lista atual de domínios não retornada; nenhuma alteração realizada")
     if NEW_DOMAIN in domains:
-        print("Domínio scriptorium.web.app já autorizado para login Google.")
+        print("Domínio scriptoriummpie.web.app já autorizado para login Google.")
         return
 
     # Falha fechada: não sobrescrever a lista de domínios se não houver confirmação
@@ -74,7 +74,7 @@ def main() -> None:
     if NEW_DOMAIN not in verified or not set(domains).issubset(set(verified)):
         raise RuntimeError("A autorização do novo domínio não foi confirmada; revisar IAM")
 
-    print("CONFIRMADO: scriptorium.web.app autorizado no Firebase Authentication.")
+    print("CONFIRMADO: scriptoriummpie.web.app autorizado no Firebase Authentication.")
     print("Domínios existentes preservados; nenhum usuário ou método de login alterado.")
 
 
