@@ -1205,6 +1205,8 @@
     .gemini-setup > summary { cursor: pointer; padding: 12px 15px; font-weight: 700; color: var(--mpie-blue-text); }
     .gemini-setup > summary:focus-visible { outline: 3px solid var(--mpie-blue); outline-offset: -3px; }
     .gemini-setup-body { padding: 5px 15px 16px; }
+    .billing-split { margin: 8px 0 12px; padding: 10px 12px; border-left: 3px solid var(--mpie-blue); background: var(--bg-surface); border-radius: 8px; }
+    .billing-split p { margin: 6px 0; font-size: 0.86rem; color: var(--text-secondary); }
     .gemini-steps { margin: 6px 0 13px; padding-left: 21px; }
     .gemini-steps > li { padding: 5px 0 8px; overflow-wrap: anywhere; }
     .gemini-steps .actions { margin: 7px 0 0; }
@@ -1298,8 +1300,14 @@
         <div id="guest-credential" class="hidden">
           <p id="gemini-key-ready" class="subtle hidden" role="status">Chave cadastrada. Você já pode iniciar pesquisas; o acesso real aos modelos será confirmado durante a execução.</p>
           <details class="gemini-setup" id="gemini-setup-details">
-            <summary id="gemini-setup-title">Conectar minha chave Gemini — primeiro acesso</summary>
+            <summary id="gemini-setup-title">Conectar minha chave Gemini (primeiro acesso)</summary>
             <div class="gemini-setup-body">
+              <div class="billing-split" role="note">
+                <strong>Quem paga o quê</strong>
+                <p><strong>Servidor e armazenamento:</strong> projeto do Scriptorium, mantido pelo administrador.</p>
+                <p><strong>Tokens de IA</strong> (redação, embeddings, diagnóstico, verificações e parecer Neon): <strong>a sua chave Gemini</strong>, no projeto Google em que você a criou. Isso vale para todos, inclusive o administrador.</p>
+                <p>No nível gratuito, alguns modelos funcionam dentro de limites. Gemini Pro, Neon e limites maiores exigem o nível pago, ativado no próprio AI Studio (Set up billing, com pré-pagamento). O consumo aparece no AI Studio, em Dashboard &gt; Usage.</p>
+              </div>
               <p class="subtle">Não é preciso ter assinatura Google AI Pro ou Ultra. A chave pode funcionar com recursos gratuitos, conforme a disponibilidade do seu projeto.</p>
               <p class="subtle">Ao salvar, o Scriptorium fará testes curtos com os modelos para descobrir quais funcionam. Eles podem gerar um pequeno consumo da API Gemini associado ao projeto da sua chave.</p>
               <ol class="gemini-steps">
@@ -1335,7 +1343,7 @@
             <button class="btn" type="button" id="invite-researcher">Autorizar acesso</button>
             <button class="btn alt" type="button" id="revoke-researcher">Revogar acesso</button>
           </div>
-          <p class="subtle">Convidados precisam conectar a própria chave Gemini. A aprovação não utiliza os tokens do administrador.</p>
+          <p class="subtle">Cada pesquisador conecta a própria chave Gemini; os tokens de IA nunca saem do projeto do Scriptorium nem da chave de outra pessoa.</p>
           <div class="actions">
             <button class="btn alt" type="button" id="refresh-access-requests">Atualizar solicitações</button>
           </div>
@@ -1596,7 +1604,7 @@
               <div class="switch-row hidden" id="neon-panel">
                 <label for="neon-review">
                   Parecer crítico Gemini 4 Neon
-                  <span class="switch-sub">Chamada extra pós-PDF (raciocínio Low, não altera o texto).</span>
+                  <span class="switch-sub">Chamada extra pós-PDF na sua chave Gemini (exige nível pago; não altera o texto).</span>
                 </label>
                 <input id="neon-review" type="checkbox">
               </div>

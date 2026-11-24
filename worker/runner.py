@@ -35,6 +35,9 @@ OWNER_UID = os.environ["RESEARCH_OWNER_UID"]
 BASE = Path("/app/orchestra")
 # Plano V2, Onda 1: contexto por trechos recuperados. Desligado por padrão.
 V2_RETRIEVAL = os.getenv("SCRIPTORIUM_V2_RETRIEVAL", "false").lower() == "true"
+# Separação de custos: o projeto paga infraestrutura; tokens de IA saem da chave
+# Gemini pessoal de quem gera. Vertex do projeto só com exceção explícita.
+ALLOW_PROJECT_AI = os.getenv("SCRIPTORIUM_ALLOW_PROJECT_AI", "false").lower() == "true"
 # Onda 2: embeddings Gemini na busca e na matriz de evidências (envio de trechos
 # autorizado pelo responsável em 24/11/2026). Só vale com V2_RETRIEVAL ligado.
 V2_EMBEDDINGS = os.getenv("SCRIPTORIUM_V2_EMBEDDINGS", "true").lower() == "true"
@@ -130,11 +133,13 @@ def main():
     auth_mode = data.get("ai_auth_mode", "admin_vertex")
     if auth_mode not in ("admin_vertex", "user_gemini"):
         raise RuntimeError("Modo de autenticação de IA inválido")
+    if auth_mode == "admin_vertex" and not ALLOW_PROJECT_AI:
+        # Fail-closed: nenhum token de geração no projeto de infraestrutura.
+        raise RuntimeError("Uso de IA pelo projeto de infraestrutura desativado. "
+                           "Conecte sua chave Gemini pessoal e inicie a pesquisa novamente.")
     # Registros anteriores permanecem na modalidade administrativa legada.
     agent_env = (personal_agent_environment(os.environ, client, PROJECT, OWNER_UID)
                  if auth_mode == "user_gemini" else dict(os.environ))
-    if auth_mode == "user_gemini" and data.get("neon_review_requested"):
-        raise RuntimeError("Revisão Neon central bloqueada para pesquisadores BYOK")
     global MANIFEST
     # Recebe só campos selecionados do ambiente; nenhuma chave entra no manifesto.
     MANIFEST = RunManifest(RESEARCH_ID, OWNER_UID, data, os.environ, Path(__file__).resolve().parent)
@@ -426,11 +431,16 @@ def main():
             print("Escudo de auditoria indisponível:", repr(exc), flush=True)
         # Parecer Neon totalmente opcional, isolado do pipeline original.
         # Falhas não invalidam PDF já gerado nem disparam múltiplas cobranças.
-        if data.get("neon_review_requested") and auth_mode == "admin_vertex":
+        if data.get("neon_review_requested"):
             update(stage="Revisão crítica opcional com Gemini Neon", neon_review_status="running")
             try:
+                # Tokens do Neon na chave pessoal de quem gera (não no projeto).
+                neon_client = None
+                if auth_mode == "user_gemini":
+                    from google import genai
+                    neon_client = genai.Client(api_key=agent_env["GEMINI_API_KEY"])
                 review = generate_review(
-                    pdf, raw / "idea_sparse.md", raw / "experimental_log.md"
+                    pdf, raw / "idea_sparse.md", raw / "experimental_log.md", client=neon_client
                 )
                 review_path = root / "neon_critical_review.json"
                 review_path.write_text(

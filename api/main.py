@@ -34,6 +34,14 @@ JOB_NAME = f"projects/{PROJECT}/locations/{REGION}/jobs/paper-orchestra-worker"
 NEON_REVIEW_ENABLED = os.getenv("NEON_REVIEW_ENABLED", "false").lower() == "true"
 # Fails closed until IAM has been provisioned and audited in deployment.
 BYOK_ENABLED = os.getenv("BYOK_ENABLED", "false").lower() == "true"
+# Separação de custos: infraestrutura no projeto do Scriptorium; tokens de IA
+# sempre na chave Gemini pessoal de quem gera, inclusive o administrador.
+# Só com esta variável em "true" o administrador volta a usar o Vertex do projeto.
+PROJECT_AI = os.getenv("SCRIPTORIUM_ALLOW_PROJECT_AI", "false").lower() == "true"
+
+
+def uses_project_ai(access: dict) -> bool:
+    return bool(access.get("admin")) and PROJECT_AI
 
 if not ALLOWED_EMAILS:
     raise RuntimeError("ALLOWED_EMAILS vazio: por segurança, a API não inicia.")
@@ -143,6 +151,7 @@ def serializable(record: dict) -> dict:
         "neon_review_status": record.get("neon_review_status", "not_available"),
         "reference_status": record.get("reference_status", "not_available"),
         "mode": record.get("mode", "generate"),
+        "ai_billing": "projeto" if record.get("ai_auth_mode", "admin_vertex") == "admin_vertex" else "chave_pessoal",
         "checkpoint": record.get("checkpoint"),
         "approvals": record.get("approvals", []),
         "gap_summary": record.get("gap_summary"),
@@ -178,15 +187,20 @@ def capabilities(user: User):
 @app.get("/api/account/access")
 def account_access(user: User):
     access = get_access(db, user, ALLOWED_EMAILS)
+    project_ai = uses_project_ai(access)
     models = ({"status": "admin_vertex", "verified_models": [FLASH_MODEL, PRO_MODEL]}
-              if access["admin"] else account_model_access(db, user["uid"]))
-    available = [FLASH_MODEL, PRO_MODEL] if access["admin"] else allowed_models(models)
+              if project_ai else account_model_access(db, user["uid"]))
+    available = [FLASH_MODEL, PRO_MODEL] if project_ai else allowed_models(models)
     return {"admin": access["admin"], "byok_ready": BYOK_ENABLED and access["byok_ready"],
             "multiuser_enabled": BYOK_ENABLED,
-            "research_generation_enabled": access["admin"] or
+            "research_generation_enabled": project_ai or
                 (BYOK_ENABLED and access["byok_ready"] and bool(available)),
             "allowed_models": available,
-            "model_access": models}
+            "model_access": models,
+            # Quem paga cada parte, para a interface mostrar com clareza.
+            "billing": {"infrastructure": "projeto Scriptorium (administrador)",
+                        "ai_tokens": "projeto Scriptorium (Vertex)" if project_ai
+                                     else "chave Gemini pessoal de quem gera a pesquisa"}}
 
 
 @app.post("/api/account/request-access", status_code=202)
@@ -218,8 +232,6 @@ def approve_access(request_id: str, user: User):
 def save_personal_credential(payload: GeminiCredential, user: User):
     if not BYOK_ENABLED:
         raise HTTPException(status_code=503, detail="Credenciais individuais indisponíveis até aprovação da infraestrutura.")
-    if is_admin(user, ALLOWED_EMAILS):
-        raise HTTPException(status_code=409, detail="A conta administradora usa a configuração existente.")
     # Chave enviada somente pela sessão autenticada. Nunca retorna o valor.
     try:
         key = payload.normalized
@@ -245,8 +257,6 @@ def save_personal_credential(payload: GeminiCredential, user: User):
 def remove_personal_credential(user: User):
     if not BYOK_ENABLED:
         raise HTTPException(status_code=503, detail="Credenciais individuais indisponíveis até aprovação da infraestrutura.")
-    if is_admin(user, ALLOWED_EMAILS):
-        raise HTTPException(status_code=409, detail="A credencial do administrador não é gerenciada aqui.")
     try:
         return delete_credential(db, PROJECT, user["uid"])
     except Exception:
@@ -287,11 +297,12 @@ def list_researches(user: User):
 def create_research(payload: NewResearch, user: User):
     owner_uid = user["uid"]
     access = get_access(db, user, ALLOWED_EMAILS)
-    if not (access["admin"] or (BYOK_ENABLED and access["byok_ready"])):
+    project_ai = uses_project_ai(access)
+    if not (project_ai or (BYOK_ENABLED and access["byok_ready"])):
         # Bloqueia antes de armazenar materiais ou iniciar Cloud Run.
         raise HTTPException(status_code=409, detail="Configure sua chave Gemini antes de iniciar uma pesquisa.")
     # Permissões efetivas no backend: não confiar em opções ocultas no navegador.
-    if not access["admin"]:
+    if not project_ai:
         access_models = allowed_models(account_model_access(db, owner_uid))
         if payload.model not in access_models or (
             payload.reflection_model and payload.reflection_model not in access_models
@@ -345,7 +356,8 @@ def create_research(payload: NewResearch, user: User):
         "mode": "preflight" if payload.preflight else "generate",
         "approvals": [],
         "template": payload.template, "model": payload.model,
-        "ai_auth_mode": "admin_vertex" if access["admin"] else "user_gemini",
+        # Tokens sempre na chave pessoal, salvo exceção explícita (PROJECT_AI).
+        "ai_auth_mode": "admin_vertex" if project_ai else "user_gemini",
         "reflection_model": payload.reflection_model or payload.model,
         "plotting": payload.plotting,
         "language": payload.language,
@@ -427,8 +439,8 @@ def decide_checkpoint(job_id: str, payload: CheckpointDecision, user: User):
 def access_allows_generation(user: dict, record: dict) -> bool:
     """Revalida o acesso no momento da aprovação (a chave pode ter sido removida)."""
     access = get_access(db, user, ALLOWED_EMAILS)
-    if access["admin"]:
-        return True
+    if record.get("ai_auth_mode") == "admin_vertex":
+        return uses_project_ai(access)
     if not (BYOK_ENABLED and access["byok_ready"]):
         return False
     allowed = allowed_models(account_model_access(db, user["uid"]))

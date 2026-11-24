@@ -222,7 +222,7 @@ function showGapReport(entry, target, decide) {
       try {
         const ids = checks.filter(c => c.checked).map(c => c.value);
         if (decision === 'approve' && !ids.length) { status.textContent = 'Mantenha ao menos uma fonte.'; return; }
-        if (decision === 'approve' && !accountAccess?.admin && entry.model === 'gemini-3.1-pro-preview'
+        if (decision === 'approve' && entry.ai_billing === 'chave_pessoal' && entry.model === 'gemini-3.1-pro-preview'
             && !window.confirm('A redação vai usar Gemini Pro com sua chave. O Google poderá cobrar o uso. Continuar?')) return;
         await request(`/jobs/${entry.id}/checkpoint`, {method: 'POST', body: JSON.stringify({decision, source_ids: decision === 'approve' ? ids : null})});
         await loadJobs();
@@ -652,7 +652,8 @@ async function loadJobs() {
       const info = document.createElement('div');
       const title = document.createElement('strong'); title.textContent = entry.title; info.append(title);
       const date = document.createElement('small');
-      date.textContent = `Criada em ${new Date(entry.created_at).toLocaleString('pt-BR')} • ${entry.stage || 'Aguardando'}`;
+      date.textContent = `Criada em ${new Date(entry.created_at).toLocaleString('pt-BR')} • ${entry.stage || 'Aguardando'}`
+        + (entry.ai_billing === 'chave_pessoal' ? ' • tokens na sua chave Gemini' : entry.ai_billing === 'projeto' ? ' • tokens no projeto (anterior à separação)' : '');
       info.append(date);
       const agents = agentPanel(entry.agents);
       if (agents) info.append(agents);
@@ -665,7 +666,7 @@ async function loadJobs() {
       if (entry.neon_review_requested && entry.neon_review_status === 'unavailable') {
         const warning = document.createElement('small');
         warning.className = 'scientific-warning';
-        warning.textContent = 'A revisão adicional com Neon falhou. O PDF principal continua disponível.';
+        warning.textContent = 'A revisão com Neon falhou. Ela usa a sua chave Gemini e exige o nível pago no AI Studio. O PDF principal continua disponível.';
         info.append(warning);
       }
       if (entry.audit_status === 'unavailable') {
@@ -749,7 +750,7 @@ $('new-paper').addEventListener('submit', async (event) => {
       $('submit-status').textContent = 'Primeiro conecte e verifique sua chave Gemini.';
       return;
     }
-    if (!accountAccess.admin && $('model').value === 'gemini-3.1-pro-preview') {
+    if ($('model').value === 'gemini-3.1-pro-preview' && accountAccess.model_access?.status !== 'admin_vertex') {
       if (!window.confirm('A pesquisa vai usar Gemini Pro com sua chave. O Google poderá cobrar o uso da API no projeto dessa chave. Deseja continuar?')) {
         $('submit-status').textContent = 'Pesquisa não iniciada.';
         return;
@@ -800,13 +801,16 @@ function applyModelAccess() {
   $('reflection-model').value = '';
   // O modelo de imagem usado pelo worker é diferente do Pro textual;
   // não presumir que a chave possa criar imagens só porque gera texto Pro.
-  const canPlot = !!accountAccess?.admin;
+  // Só a exceção "IA pelo projeto" (ou a API anterior) libera gráficos; com chave
+  // pessoal o modelo de imagem ainda não é testado na verificação da chave.
+  const projectAi = accountAccess?.model_access?.status === 'admin_vertex' || !!accountAccess?.legacy_backend;
+  const canPlot = projectAi;
   $('plotting').checked = canPlot && $('plotting').checked;
   $('plotting').disabled = !canPlot;
   $('plotting').closest('.switch-row')?.classList.toggle('hidden', !canPlot);
   const message = $('model-access-summary');
-  if (accountAccess?.admin) {
-    message.textContent = 'Modelos disponíveis na infraestrutura administrativa.';
+  if (projectAi) {
+    message.textContent = 'Modelos pelo projeto do Scriptorium (exceção ou API anterior).';
   } else if (allowed.has(pro)) {
     message.textContent = 'Sua chave foi testada: modelo avançado disponível. O uso pode gerar custos na sua conta Google.';
   } else if (allowed.has(flash)) {
@@ -890,13 +894,15 @@ async function loadAccountAccess() {
     const response = await request('/account/access', { signal: controller.signal });
     accountAccess = await response.json();
     $('workspace').classList.remove('access-pending', 'access-setup');
-    $('account-state').textContent = accountAccess.admin ? 'Administrador' :
+    const keyState = accountAccess.model_access?.status === 'admin_vertex' ? 'IA pelo projeto (exceção)' :
       (accountAccess.byok_ready ?
-        (accountAccess.model_access?.status === 'verified' ? 'Conexão verificada' : 'Verifique sua chave') :
+        (accountAccess.model_access?.status === 'verified' ? 'Chave Gemini verificada' : 'Verifique sua chave') :
         'Conecte sua chave Gemini');
+    $('account-state').textContent = (accountAccess.admin ? 'Administrador · ' : '') + keyState;
     $('admin-invitations').classList.toggle('hidden', !accountAccess.admin);
-    $('guest-credential').classList.toggle('hidden', !!accountAccess.admin);
-    const guestReady = !accountAccess.admin && !!accountAccess.byok_ready;
+    // Todos conectam a própria chave: os tokens de geração são de quem pesquisa.
+    $('guest-credential').classList.toggle('hidden', accountAccess.model_access?.status === 'admin_vertex');
+    const guestReady = !!accountAccess.byok_ready;
     const guestVerified = guestReady && accountAccess.model_access?.status === 'verified';
     const hasModels = !!accountAccess.research_generation_enabled;
     $('workspace').classList.toggle('access-setup', !hasModels);
@@ -907,7 +913,7 @@ async function loadAccountAccess() {
     $('gemini-key-ready').classList.toggle('hidden', !guestVerified);
     $('remove-personal-key').classList.toggle('hidden', !guestReady);
     $('submit').disabled = !hasModels;
-    $('account-message').textContent = accountAccess.admin ? '' :
+    $('account-message').textContent = accountAccess.model_access?.status === 'admin_vertex' ? '' :
       (guestVerified ? '' : (guestReady
         ? 'Sua chave foi cadastrada, mas ainda não há um modelo confirmado. Confira a chave abaixo.'
         : 'Para começar, conecte sua chave Gemini seguindo as instruções.'));
