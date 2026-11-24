@@ -26,7 +26,9 @@ async function request(path, options = {}) {
   if (!r.ok) {
     let msg = `Erro HTTP ${r.status}`;
     try { const data = await r.json(); msg = typeof data.detail === 'string' ? data.detail : msg; } catch (_e) {}
-    throw new Error(msg);
+    const error = new Error(msg);
+    error.status = r.status;
+    throw error;
   }
   return r;
 }
@@ -460,6 +462,25 @@ async function loadAccountAccess() {
       'Para iniciar uma pesquisa, configure sua própria chave Gemini.';
   } catch (error) {
     accountAccess = null;
+    // Compatibilidade com o backend legado: /account/access não existe nele.
+    // /capabilities exige token Firebase autorizado e, na API antiga,
+    // somente a lista de administradores consegue chamar essa rota.
+    if (error?.status === 404) {
+      try {
+        await request('/capabilities', { signal: controller.signal });
+        accountAccess = {
+          admin: true, byok_ready: false, multiuser_enabled: false,
+          research_generation_enabled: true, legacy_backend: true
+        };
+        $('account-state').textContent = 'Administrador';
+        $('account-message').textContent =
+          'Sua conta está autorizada. A API ainda utiliza a versão anterior; convites e chaves individuais continuam indisponíveis.';
+        $('submit').disabled = false;
+        return;
+      } catch (legacyError) {
+        error = legacyError;
+      }
+    }
     const timedOut = error?.name === 'AbortError' || error?.name === 'TimeoutError';
     $('account-state').textContent = timedOut ? 'Conexão indisponível' : 'Verificação falhou';
     $('account-message').textContent = timedOut
