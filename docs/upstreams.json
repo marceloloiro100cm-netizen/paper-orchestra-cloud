@@ -84,7 +84,8 @@
       "review_frequency": "mensal",
       "risk": "Uso alto de CPU e RAM; baixa pesos de modelos durante o build ou a execução.",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "migration_note": "Onda 1 usa PyMuPDF (R37) como parser estrutural. Docling entra só depois do corpus de avaliação de 30 PDFs, comparando ordem de leitura, títulos e tabelas."
     },
     {
       "id": "R04",
@@ -106,7 +107,8 @@
       "update_policy": "Mesma matriz de versões do Docling.",
       "review_frequency": "mensal",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "migration_note": "Onda 1 usa PyMuPDF (R37) como parser estrutural. Docling entra só depois do corpus de avaliação de 30 PDFs, comparando ordem de leitura, títulos e tabelas."
     },
     {
       "id": "R05",
@@ -138,7 +140,7 @@
       "changelog_url": "https://www.sqlite.org/changes.html",
       "license_spdx": "blessing",
       "license_status": "domínio público (SQLite); validar a distribuição usada no contêiner",
-      "adopted": false,
+      "adopted": true,
       "modules": [
         "M03",
         "M04"
@@ -146,7 +148,11 @@
       "update_policy": "Acompanhar o release log do SQLite e a versão empacotada no Python da imagem.",
       "review_frequency": "mensal",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "used_in": [
+        "worker/lexical_index.py"
+      ],
+      "installed_version": "SQLite embutido no Python da imagem python:3.11-slim (módulo sqlite3)"
     },
     {
       "id": "R07",
@@ -784,19 +790,22 @@
       ],
       "license_spdx": "AGPL-3.0",
       "license_status": "a conferir: licença dupla (AGPL-3.0 ou comercial da Artifex)",
-      "pinned": "sem fixação (vem do requirements.txt do PaperOrchestra)",
+      "pinned": ">=2.1,<3",
       "adopted": true,
       "modules": [
         "V1",
         "M01",
+        "M02",
         "M23"
       ],
       "used_in": [
+        "worker/requirements.txt",
+        "worker/structured_extract.py",
         "worker/source_materials.py",
         "worker/scientific_audit.py",
         "worker/neon_review.py"
       ],
-      "update_policy": "Fixar versão no worker/requirements.txt antes da V2; revisar obrigações da AGPL para serviço em rede.",
+      "update_policy": "Faixa fixada em worker/requirements.txt (antes vinha sem versão do PaperOrchestra); Dependabot semanal; testes de extração de PDF no CI.",
       "review_frequency": "mensal",
       "risk": "AGPL: o serviço é acessível pela rede. O código do projeto é público, o que ajuda, mas a conformidade precisa ser conferida.",
       "owner": "marceloloiro100cm-netizen",
@@ -884,7 +893,7 @@
       "canonical_url": "https://github.com/google-github-actions/auth",
       "license_spdx": "Apache-2.0",
       "license_status": "a conferir",
-      "pinned": "checkout@v4, setup-python@v5, setup-node@v4, auth@v3, setup-gcloud@v3",
+      "pinned": "checkout@v7, setup-python@v7, setup-node@v7, auth@v3, setup-gcloud@v3",
       "adopted": true,
       "modules": [
         "V1",
@@ -896,7 +905,8 @@
       "update_policy": "Dependabot (github-actions) semanal.",
       "review_frequency": "mensal",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "migration_note": "Atualizado de checkout@v4, setup-python@v5 e setup-node@v4 pelos PRs #25, #26 e #28 do Dependabot (24/11/2026)."
     },
     {
       "id": "R42",
@@ -935,8 +945,11 @@
         "R01"
       ],
       "depends_on": [],
-      "status": "nao_iniciado",
-      "next_step": "Escolher 30 PDFs de referência (corpus dourado) e prototipar docling_adapter.py num Job separado."
+      "status": "parcial",
+      "next_step": "Extração estruturada por blocos com PyMuPDF (títulos por tamanho de fonte e estilo DOCX). Falta comparar com Docling (R03) no corpus de 30 PDFs e extrair tabelas.",
+      "files": [
+        "worker/structured_extract.py"
+      ]
     },
     {
       "id": "M02",
@@ -952,8 +965,12 @@
       "depends_on": [
         "M01"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Depende do M01."
+      "status": "parcial",
+      "next_step": "Cada bloco e trecho guarda página e bbox normalizada; DOCX/TXT ficam sem coordenadas. Falta o visualizador que abre o PDF na área do trecho.",
+      "files": [
+        "worker/structured_extract.py",
+        "worker/chunking.py"
+      ]
     },
     {
       "id": "M03",
@@ -969,8 +986,13 @@
       "depends_on": [
         "M01"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Depende do M01; definir política de retenção dos índices derivados."
+      "status": "parcial",
+      "next_step": "Trechos com cache privado por SHA-256 + versões no GCS; índice FTS5 montado por execução. Falta índice vetorial (FAISS, R05) e índice persistente por conta.",
+      "files": [
+        "worker/chunking.py",
+        "worker/lexical_index.py",
+        "worker/source_materials.py"
+      ]
     },
     {
       "id": "M04",
@@ -986,8 +1008,12 @@
       "depends_on": [
         "M03"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Definir política de privacidade para embeddings externos."
+      "status": "parcial",
+      "next_step": "Parte lexical (BM25, FTS5) com rodízio entre fontes, atrás da flag SCRIPTORIUM_V2_RETRIEVAL. Falta parte vetorial e fusão RRF, que dependem da política de embeddings.",
+      "files": [
+        "worker/lexical_index.py",
+        "worker/retrieval_context.py"
+      ]
     },
     {
       "id": "M05",
@@ -1084,8 +1110,11 @@
         "M03",
         "M04"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Depende da recuperação (M04)."
+      "status": "parcial",
+      "next_step": "retrieval_coverage.json registra, por fonte, trechos totais, encontrados e selecionados. Falta painel na interface.",
+      "files": [
+        "worker/retrieval_context.py"
+      ]
     },
     {
       "id": "M10",
@@ -1271,8 +1300,11 @@
         "M01",
         "M03"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Depende do M01."
+      "status": "parcial",
+      "next_step": "Política section-paragraph-1 (seção/parágrafo, ~1200 caracteres, heading_path). Falta benchmark em pt-BR contra janelas móveis.",
+      "files": [
+        "worker/chunking.py"
+      ]
     },
     {
       "id": "M20",
@@ -1305,8 +1337,12 @@
         "M03",
         "M14"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Pode usar os hashes do manifesto (M14) como chave."
+      "status": "parcial",
+      "next_step": "Primeira camada (parsing e trechos por SHA-256 + versões) implementada. Falta cache de fichamentos por modelo e política.",
+      "files": [
+        "worker/source_materials.py",
+        "worker/runner.py"
+      ]
     },
     {
       "id": "M22",
@@ -1343,8 +1379,11 @@
         "M02",
         "M13"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Depende do M01; conferir pesos e local de download."
+      "status": "parcial",
+      "next_step": "Detecção de páginas digitalizadas, vazias ou com texto quebrado, registrada no manifesto. Falta executar OCR (olmOCR R18 ou alternativa) só nessas páginas.",
+      "files": [
+        "worker/ocr_router.py"
+      ]
     },
     {
       "id": "M24",

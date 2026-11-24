@@ -5,3 +5,6 @@ google-genai>=2.34.0,<3
 google-cloud-secret-manager>=2.20,<3
 # Usado por reference_verification.py; antes vinha só como dependência indireta.
 requests>=2.31,<3
+# Faixa fixada (antes vinha sem versão do requirements.txt do PaperOrchestra).
+# Origem: R37 em docs/upstreams.json. Licença AGPL-3.0 ou comercial: ver registro.
+PyMuPDF>=2.1,<3

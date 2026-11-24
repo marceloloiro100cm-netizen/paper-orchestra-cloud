@@ -63,7 +63,7 @@ def normalize_report(text: str) -> dict:
 
 
 def generate_review(pdf_path: Path, idea_path: Path, log_path: Path) -> dict:
-    import fitz
+    from pdf_backend import fitz  # PyMuPDF (R37)
     from google import genai
     from google.genai import types
 

@@ -24,7 +24,7 @@ def extract_text(blob: bytes, fmt: str) -> str:
     if fmt not in SUPPORTED:
         raise ValueError("Formato de arquivo não suportado.")
     if fmt == "pdf":
-        import fitz
+        from pdf_backend import fitz  # PyMuPDF (R37)
         with fitz.open(stream=blob, filetype="pdf") as doc:
             return "\n\n".join(page.get_text("text") for page in list(doc)[:60])
     if fmt == "docx":
@@ -90,3 +90,102 @@ def compose_library_context(sources: list[dict], fetch_bytes) -> tuple[str, list
         "sistema; marcas parecidas dentro dos textos foram removidas.\n"
     )
     return header + "".join(blocks), manifest
+
+
+# ----------------------------------------------------------------- V2 (Onda 1)
+# Ativado por SCRIPTORIUM_V2_RETRIEVAL=true no worker. Plano V2: M01/M02
+# (structured_extract.py), M19/M03 (chunking.py, lexical_index.py), M23
+# (ocr_router.py) e M04/M09 (retrieval_context.py). Origem: R37 e R06.
+DERIVED_SCHEMA = "scriptorium.derived/1"
+
+
+def derived_key(entry: dict) -> str:
+    """Chave do cache derivado: muda se o arquivo, o parser ou a política mudarem."""
+    from chunking import CHUNK_POLICY
+    from structured_extract import parser_version_for
+    return f"{parser_version_for(entry.get('format', ''))}/{CHUNK_POLICY}/{entry.get('sha256', '')}"
+
+
+def _valid_cached(payload: dict, entry: dict, key: str) -> bool:
+    return (isinstance(payload, dict) and payload.get("schema") == DERIVED_SCHEMA
+            and payload.get("key") == key and payload.get("sha256") == entry.get("sha256")
+            and isinstance(payload.get("chunks"), list))
+
+
+def derive_source(entry: dict, fetch_bytes, cache=None) -> tuple[dict, str]:
+    """Documento estruturado + trechos de uma fonte, usando o cache quando válido.
+
+    `cache` (opcional) expõe get(key) -> bytes | None e put(key, bytes). Os dados
+    derivados são descartáveis: o original no Cloud Storage nunca é alterado.
+    """
+    import json
+    from chunking import chunk_document
+    from structured_extract import extract_document
+
+    key = derived_key(entry)
+    if cache is not None and entry.get("sha256"):
+        try:
+            raw = cache.get(key)
+            if raw:
+                payload = json.loads(raw.decode("utf-8"))
+                if _valid_cached(payload, entry, key):
+                    return payload, "hit"
+        except Exception:
+            pass  # Cache corrompido ou indisponível: recalcular.
+    document = extract_document(fetch_bytes(entry["object_path"]), entry.get("format", ""))
+    chunks = chunk_document(document, entry["id"])
+    payload = {
+        "schema": DERIVED_SCHEMA, "key": key, "sha256": entry.get("sha256"),
+        "document": {k: v for k, v in document.items() if k != "blocks"},
+        "chunks": chunks,
+    }
+    status = "disabled"
+    if cache is not None and entry.get("sha256"):
+        try:
+            cache.put(key, json.dumps(payload, ensure_ascii=False).encode("utf-8"))
+            status = "miss"
+        except Exception:
+            status = "write_failed"
+    return payload, status
+
+
+def compose_library_context_v2(sources: list[dict], fetch_bytes, query_text: str,
+                               cache=None) -> tuple[str, list[dict], dict]:
+    """Contexto por trechos recuperados, com ponteiros de página (V2)."""
+    from retrieval_context import render_context, select_passages
+
+    manifest, all_chunks, meta = [], [], {}
+    for entry in sources[:8]:
+        fmt = entry.get("format", "")
+        record = {"id": entry["id"], "name": entry.get("name", "material"), "format": fmt,
+                  "sha256": entry.get("sha256", ""), "status": "included"}
+        try:
+            payload, cache_status = derive_source(entry, fetch_bytes, cache)
+            document = payload["document"]
+            record.update({
+                "parser_version": document.get("parser_version"),
+                "chunk_policy": (payload["chunks"][0]["chunk_policy"] if payload["chunks"] else None),
+                "pages_total": document.get("pages_total"),
+                "pages_processed": document.get("pages_processed"),
+                "ocr_pages_flagged": [p["page"] for p in document.get("ocr", {}).get("pages_flagged", [])],
+                "warnings": document.get("warnings", []),
+                "chunks_total": len(payload["chunks"]),
+                "cache": cache_status,
+                **document.get("guard", {}),
+            })
+            if not payload["chunks"]:
+                record["status"] = "no_extractable_text"
+            all_chunks += payload["chunks"]
+            meta[entry["id"]] = {"name": record["name"], "format": fmt}
+        except Exception as error:
+            record["status"] = "unreadable"
+            record["note"] = type(error).__name__
+        manifest.append(record)
+    selected, coverage = select_passages(all_chunks, query_text)
+    for record in manifest:
+        info = coverage["sources"].get(record["id"], {})
+        record["chunks_selected"] = info.get("chunks_selected", 0)
+        record["extracted_characters"] = sum(c["char_count"] for c in selected if c["source_id"] == record["id"])
+        if record["status"] == "included" and not record["chunks_selected"]:
+            record["status"] = "not_selected"
+    return render_context(selected, meta), manifest, coverage

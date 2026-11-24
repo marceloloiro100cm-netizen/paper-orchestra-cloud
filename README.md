@@ -161,3 +161,16 @@ Primeiros módulos do plano V2 aplicados (todos parciais; detalhes em `docs/V2-M
 - **M11:** cada execução concluída gera `declaracao_uso_ia.md`, um **rascunho** para a IN IFRS nº 16/2026. O texto do Anexo da IN ainda não foi conferido item a item; o rascunho não afirma conformidade e tem campos a preencher pelo autor.
 - **M07:** a conferência de referências consulta retratações, retiradas, expressões de preocupação e correções na Crossref (inclui Retraction Watch). Ausência de aviso não prova que a obra nunca foi retratada.
 - **M15:** Dependabot, OSV-Scanner e o vigia semanal de upstreams.
+
+### Onda 1 do plano V2: leitura por trechos (desligada por padrão)
+
+Com `SCRIPTORIUM_V2_RETRIEVAL=true` no Cloud Run Job, as fontes da biblioteca deixam de entrar como "primeiros 20 mil caracteres de cada arquivo" e passam a entrar como **trechos selecionados por relevância para a ideia**, cada um com fonte, página e seção (`[trecho id | p. 12-13 | seção: ...]`). O orçamento total continua 75 mil caracteres, então o custo não aumenta. Componentes: `structured_extract.py` (M01/M02, PyMuPDF com bbox por bloco), `chunking.py` (M19), `lexical_index.py` (M03/M04, SQLite FTS5 com BM25), `ocr_router.py` (M23, sinaliza páginas digitalizadas) e `retrieval_context.py` (seleção com rodízio entre fontes e relatório `retrieval_coverage.json`, M09). Os trechos ficam em cache privado em `library/{uid}/derived/`, por hash do arquivo e versão do parser; são dados derivados e descartáveis.
+
+Para ativar, depois que o deploy do worker estiver funcionando (Cloud Shell):
+
+```bash
+gcloud run jobs update paper-orchestra-worker --region=southamerica-east1 \
+  --project=paperorchestra-mestrado --update-env-vars=SCRIPTORIUM_V2_RETRIEVAL=true
+```
+
+Para voltar ao comportamento anterior, use `SCRIPTORIUM_V2_RETRIEVAL=false`. O manifesto de cada execução registra qual estratégia foi usada.

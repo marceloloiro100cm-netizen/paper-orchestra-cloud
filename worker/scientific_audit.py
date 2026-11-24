@@ -117,7 +117,7 @@ def audit_text(pdf_text: str, latex_text: str, bib_text: str, experimental_log: 
 
 
 def audit_pdf(pdf_path: Path, latex_path: Path, bib_path: Path, experimental_log_path: Path) -> dict:
-    import fitz  # PyMuPDF faz parte das dependências originais do PaperOrchestra.
+    from pdf_backend import fitz  # PyMuPDF (R37)
 
     with fitz.open(str(pdf_path)) as doc:
         # Leitura limitada: relatórios extensos também são auditados com custo previsível.
