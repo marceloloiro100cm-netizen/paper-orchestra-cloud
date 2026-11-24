@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Cria e publica APENAS o site Firebase Hosting "scriptorium" no projeto existente.
+# Cria e publica APENAS o site Firebase Hosting "scriptoriummpie" no projeto existente.
 # Nunca renomeia, desativa ou publica no site padrão paperorchestra-mestrado.
 set -euo pipefail
 
 PROJECT="paperorchestra-mestrado"
-SITE_ID="scriptorium"
-TARGET="scriptorium-alias"
+SITE_ID="scriptoriummpie"
+TARGET="scriptoriummpie-alias"
 
 if [[ "${GOOGLE_CLOUD_PROJECT:-$PROJECT}" != "$PROJECT" ]]; then
   echo "Projeto Google Cloud inesperado; operação cancelada." >&2
@@ -42,14 +42,14 @@ found = any(isinstance(item, dict) and (
 raise SystemExit(0 if found else 1)
 PY
 then
-  echo "O site scriptorium já está registrado neste projeto. Reutilizando."
+  echo "O site scriptoriummpie já está registrado neste projeto. Reutilizando."
 else
   status=$?
   if [[ "$status" != "1" ]]; then
     echo "Listagem Hosting não confiável: abortando sem criar sites." >&2
     exit "$status"
   fi
-  echo "Tentando registrar o nome global scriptorium.web.app..."
+  echo "Tentando registrar o nome global scriptoriummpie.web.app..."
   # Se já pertencer a outra pessoa ou faltar IAM, o comando falha.
   # NÃO escolher nome alternativo automaticamente.
   firebase hosting:sites:create "$SITE_ID" --project "$PROJECT" --non-interactive
@@ -68,26 +68,26 @@ if not isinstance(original, dict):
 if original.get("rewrites", [{}])[0].get("run", {}).get("serviceId") != "paper-orchestra-api":
     raise SystemExit("Rewrite da API não corresponde ao Scriptorium; abortando")
 copy = dict(original)
-copy["target"] = "scriptorium-alias"
+copy["target"] = "scriptoriummpie-alias"
 # Configuração temporária do site secundário: preserva headers e /api/**.
 with open(sys.argv[1], "w", encoding="utf-8") as f:
     json.dump({"hosting": copy}, f, ensure_ascii=False, indent=2)
 PY
 
-echo "Publicando somente no site scriptorium; endereço antigo preservado."
+echo "Publicando somente no site scriptoriummpie; endereço antigo preservado."
 firebase deploy --only "hosting:$TARGET" --config "$TEMP_CONFIG" --project "$PROJECT" --non-interactive
 
 echo "Verificando arquivos públicos do novo domínio..."
 for attempt in 1 2 3 4 5 6 7 8; do
   curl --fail --silent --show-error --max-time 15 \
     -o /tmp/scriptorium-live-index.html \
-    "https://scriptorium.web.app/index.html?revision=${GITHUB_SHA:-manual}" || true
+    "https://scriptoriummpie.web.app/index.html?revision=${GITHUB_SHA:-manual}" || true
   curl --fail --silent --show-error --max-time 15 \
     -o /tmp/scriptorium-live-app.js \
-    "https://scriptorium.web.app/app.js?revision=${GITHUB_SHA:-manual}" || true
+    "https://scriptoriummpie.web.app/app.js?revision=${GITHUB_SHA:-manual}" || true
   curl --fail --silent --show-error --max-time 15 \
     -o /tmp/scriptorium-live-config.js \
-    "https://scriptorium.web.app/config.js?revision=${GITHUB_SHA:-manual}" || true
+    "https://scriptoriummpie.web.app/config.js?revision=${GITHUB_SHA:-manual}" || true
   if cmp -s public/index.html /tmp/scriptorium-live-index.html \
     && cmp -s public/app.js /tmp/scriptorium-live-app.js \
     && cmp -s public/config.js /tmp/scriptorium-live-config.js; then
