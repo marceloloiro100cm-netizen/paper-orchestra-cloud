@@ -12,6 +12,9 @@ on:
       - "tests/test_multiuser_cross_access.py"
       - "scripts/check-public-onboarding.py"
       - "scripts/check-github-deploys.py"
+      - "scripts/deploy-scriptorium-alias.sh"
+      - "scripts/authorize-scriptorium-domain.py"
+      - ".github/workflows/deploy-scriptorium-alias.yml"
       - "scripts/setup-byok-iam.sh"
       - "scripts/audit-byok-iam.sh"
       - "scripts/bootstrap-cloudshell-unico.sh"
@@ -41,7 +44,8 @@ jobs:
           python -m compileall -q api/access.py api/access_requests.py api/model_access.py api/credentials.py api/main.py worker/byok.py worker/runner.py
           python -m py_compile scripts/check-public-onboarding.py tests/test_multiuser_cross_access.py
           node --check public/app.js
-          bash -n scripts/setup-byok-iam.sh scripts/audit-byok-iam.sh scripts/bootstrap-cloudshell-unico.sh
+          bash -n scripts/setup-byok-iam.sh scripts/audit-byok-iam.sh scripts/bootstrap-cloudshell-unico.sh scripts/deploy-scriptorium-alias.sh
+          python -m py_compile scripts/authorize-scriptorium-domain.py
       - name: Instalar dependências mínimas
         run: python -m pip install -q "fastapi>=0.115,<1" "pydantic>=2.5,<3" google-api-core
       - name: Testes de convites e segregação das chaves
