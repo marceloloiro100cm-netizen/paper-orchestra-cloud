@@ -66,8 +66,16 @@ jobs:
             curl --fail --silent --show-error --max-time 15 \
               -o /tmp/live-paper-config.js \
               "https://paperorchestra-mestrado.web.app/config.js?revision=${GITHUB_SHA}" || true
-            if cmp -s public/config.js /tmp/live-paper-config.js; then
-              echo "Firebase Hosting atualizado; versão confirmada."
+            curl --fail --silent --show-error --max-time 15 \
+              -o /tmp/live-paper-app.js \
+              "https://paperorchestra-mestrado.web.app/app.js?revision=${GITHUB_SHA}" || true
+            curl --fail --silent --show-error --max-time 15 \
+              -o /tmp/live-paper-index.html \
+              "https://paperorchestra-mestrado.web.app/index.html?revision=${GITHUB_SHA}" || true
+            if cmp -s public/config.js /tmp/live-paper-config.js \
+              && cmp -s public/app.js /tmp/live-paper-app.js \
+              && cmp -s public/index.html /tmp/live-paper-index.html; then
+              echo "Firebase Hosting atualizado; HTML, app.js e config.js confirmados."
               exit 0
             fi
             sleep 5
