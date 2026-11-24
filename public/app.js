@@ -163,6 +163,60 @@ async function download(id, kind) {
   } catch (e) { alert(e.message); }
 }
 
+function el(tag, text, cls) { const e = document.createElement(tag); e.textContent = text; if (cls) e.className = cls; return e; }
+
+async function toggleReport(id, target, cls, kind, render) {
+  const old = target.querySelector('.' + cls);
+  if (old) { old.remove(); return; }
+  const box = document.createElement('section');
+  box.className = 'scientific-audit-report ' + cls;
+  box.textContent = 'Carregando...';
+  target.append(box);
+  try {
+    const data = await (await request(`/jobs/${id}/download/${kind}`)).json();
+    box.replaceChildren();
+    render(box, data);
+  } catch (err) { box.textContent = 'Não foi possível abrir o relatório: ' + err.message; }
+}
+
+function showShield(id, target) {
+  return toggleReport(id, target, 'shield-report', 'shield', (box, shield) => {
+    box.append(el('strong', 'Escudo de auditoria: o que pede atenção'));
+    box.append(el('p', 'Organiza os alertas de todas as verificações. Não há nota geral nem selo de "verificado": ausência de alertas não comprova validade científica.'));
+    const c = shield.counts || {};
+    box.append(el('p', `Alta: ${c.alta || 0} · média: ${c.media || 0} · baixa: ${c.baixa || 0}`));
+    const stageNames = {'1_ponteiros_citacoes': '1. Ponteiros e citações literais', '2_metadados': '2. Metadados bibliográficos',
+      '3_situacao_editorial': '3. Retratações e correções', '4_suporte_semantico': '4. Suporte nas fontes', 'triagem_heuristica': 'Triagem do texto'};
+    for (const [key, stage] of Object.entries(shield.stages || {})) {
+      box.append(el('small', `${stageNames[key] || key}: ${stage.status}${stage.motivo ? ' (' + stage.motivo + ')' : ''}`));
+    }
+    const levelNames = {alta: 'Alta', media: 'Média', baixa: 'Baixa'};
+    for (const level of ['alta', 'media', 'baixa']) {
+      const items = (shield.items || []).filter(i => i.level === level);
+      if (!items.length) continue;
+      box.append(el('h4', `${levelNames[level]} (${items.length})`));
+      for (const item of items.slice(0, 80)) {
+        const p = el('p', `${item.title}: ${item.detail}`, level === 'alta' ? 'editorial-alert' : '');
+        box.append(p);
+      }
+    }
+  });
+}
+
+function showCoverage(id, target) {
+  return toggleReport(id, target, 'coverage-report', 'coverage', (box, cov) => {
+    box.append(el('strong', 'Cobertura das fontes: o que os agentes leram'));
+    box.append(el('p', 'Trechos não selecionados não foram lidos pelos agentes; isso não significa que sejam irrelevantes.'));
+    const emb = cov.embeddings || {};
+    box.append(el('p', `Estratégia: ${cov.strategy || '?'} · embeddings: ${emb.status || 'desligados'} · caracteres usados: ${cov.used_chars ?? '?'} de ${cov.total_budget_chars ?? '?'}`));
+    if ((cov.query_terms || []).length) box.append(el('small', 'Termos da busca: ' + cov.query_terms.join(', ')));
+    const modes = {bm25: 'por relevância', rrf: 'por relevância (híbrida)', opening_without_match: 'só o início (nenhum trecho correspondeu)', fallback_document_order: 'ordem do documento'};
+    for (const [sourceId, info] of Object.entries(cov.sources || {})) {
+      box.append(el('p', `${sourceId.slice(0, 8)}…: ${info.chunks_selected} de ${info.chunks_total} trechos selecionados (${info.chunks_matched} correspondências), ${modes[info.selection] || info.selection || ''}`));
+    }
+  });
+}
+
 async function showEvidenceReport(id, target) {
   const old = target.querySelector('.evidence-report');
   if (old) { old.remove(); return; }
@@ -290,6 +344,30 @@ async function showReferenceVerification(id, target) {
       const meta = document.createElement('small');
       meta.textContent = `BibTeX: ${ref.key || ''} · ano: ${ref.year || '?'} · DOI: ${ref.doi || 'não informado'}`;
       detail.append(meta);
+      const factors = item.quality_factors || {};
+      if (factors.version) {
+        const reviewNames = {periodico_provavelmente_revisado: 'periódico (provável revisão por pares)', preprint_ou_repositorio: 'preprint ou repositório', outro_tipo: 'outro tipo', desconhecido: 'tipo desconhecido'};
+        const parts = [reviewNames[factors.peer_review_signal] || factors.peer_review_signal];
+        if (factors.venue) parts.push(factors.venue);
+        if (factors.age_years != null) parts.push(`${factors.age_years} anos`);
+        if (factors.citations_openalex != null) parts.push(`${factors.citations_openalex} citações (OpenAlex)`);
+        if (factors.scielo_doi) parts.push('DOI SciELO');
+        detail.append(el('small', 'Contexto (sinais separados, não é nota de qualidade): ' + parts.join(' · ')));
+      }
+      const manual = item.manual_verification;
+      if (manual && (manual.links || []).length) {
+        detail.append(el('small', manual.reason || 'Conferir manualmente:'));
+        for (const link of manual.links) {
+          try {
+            const parsed = new URL(link.url);
+            if (parsed.protocol === 'https:' && ['scholar.google.com', 'search.scielo.org', 'brapci.inf.br'].includes(parsed.hostname)) {
+              const a = document.createElement('a');
+              a.href = link.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = 'Buscar em ' + link.name;
+              detail.append(a);
+            }
+          } catch (_) { /* endereço inválido ignorado */ }
+        }
+      }
       const editorial = item.editorial || {};
       if (editorial.editorial_status) {
         const status = document.createElement('p');
@@ -465,10 +543,11 @@ async function loadJobs() {
         for (const kind of available) {
           if (kind === 'neon' && !accountAccess?.admin) continue;
           const button = document.createElement('button'); button.type='button';
-          const labels={pdf:'Baixar PDF',latex:'Baixar LaTeX',audit:'Ver auditoria',references:'Conferir referências',neon:'Parecer Neon',manifest:'Manifesto de proveniência',declaration:'Rascunho da declaração de IA',evidence:'Citações e evidências',evidence_csv:'Matriz de evidências (CSV)'};
+          const labels={pdf:'Baixar PDF',latex:'Baixar LaTeX',audit:'Ver auditoria',references:'Conferir referências',neon:'Parecer Neon',manifest:'Manifesto de proveniência',declaration:'Rascunho da declaração de IA',evidence:'Citações e evidências',evidence_csv:'Matriz de evidências (CSV)',shield:'Escudo de auditoria',coverage:'Cobertura das fontes'};
           button.textContent=labels[kind]||'Logs';
+          if(kind==='shield'&&entry.shield_counts){const c=entry.shield_counts;button.textContent+=` (${c.alta||0} alta · ${c.media||0} média)`;}
           if(kind==='references'&&entry.editorial_alerts>0){button.textContent+=` (${entry.editorial_alerts} aviso${entry.editorial_alerts>1?'s':''} editorial${entry.editorial_alerts>1?'is':''})`;}
-          button.addEventListener('click', ()=>kind==='evidence' ? showEvidenceReport(entry.id, info) : kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : kind==='neon' ? showNeonReport(entry.id, info) : download(entry.id,kind));
+          button.addEventListener('click', ()=>kind==='shield' ? showShield(entry.id, info) : kind==='coverage' ? showCoverage(entry.id, info) : kind==='evidence' ? showEvidenceReport(entry.id, info) : kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : kind==='neon' ? showNeonReport(entry.id, info) : download(entry.id,kind));
           files.append(button);
         }
         info.append(files);

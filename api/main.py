@@ -119,6 +119,7 @@ def serializable(record: dict) -> dict:
         "editorial_alerts": record.get("editorial_alerts"),
         "evidence_status": record.get("evidence_status", "not_available"),
         "evidence_summary": record.get("evidence_summary"),
+        "shield_counts": record.get("shield_counts"),
         "audit_findings": record.get("audit_findings"),
         "error": record.get("error", ""),
         "created_at": record.get("created_at", ""),
@@ -357,7 +358,8 @@ def get_status(job_id: str, user: User):
 
 @app.get("/api/jobs/{job_id}/download/{file_kind}")
 def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "references", "neon",
-                                             "manifest", "declaration", "evidence", "evidence_csv"],
+                                             "manifest", "declaration", "evidence", "evidence_csv",
+                                             "shield", "coverage"],
              user: User):
     if file_kind == "neon" and not (NEON_REVIEW_ENABLED and is_admin(user, ALLOWED_EMAILS)):
         raise HTTPException(status_code=403, detail="Parecer Neon não está disponível nesta conta.")
@@ -376,7 +378,10 @@ def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "re
                "declaration": ("declaracao_uso_ia.md", "text/markdown; charset=utf-8"),
                # M05 + M08/M10: citações literais e matriz de evidências.
                "evidence": ("evidence_report.json", "application/json"),
-               "evidence_csv": ("evidence_matrix.csv", "text/csv; charset=utf-8")}
+               "evidence_csv": ("evidence_matrix.csv", "text/csv; charset=utf-8"),
+               # M06: escudo de auditoria; M09: cobertura da seleção de trechos.
+               "shield": ("audit_shield.json", "application/json"),
+               "coverage": ("retrieval_coverage.json", "application/json")}
     filename, content_type = filemap[file_kind]
     blob_path = f"research/{user['uid']}/{job_id}/output/{filename}"
     blob = bucket.blob(blob_path)

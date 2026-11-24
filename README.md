@@ -184,3 +184,9 @@ Com a Onda 1 ligada (`SCRIPTORIUM_V2_RETRIEVAL=true`), o worker também:
 - **matriz de evidências (M08/M10):** cada afirmação com citação ou número recebe até 3 trechos candidatos das fontes, com página; afirmações sem nada parecido nas fontes anexadas são sinalizadas. O sistema não decide se o trecho apoia ou contradiz: isso é revisão humana.
 
 Na interface: **Histórico → Citações e evidências** e **Matriz de evidências (CSV)**. A declaração de uso de IA passa a listar o modelo de embeddings quando ele for usado. Para medir a qualidade da busca no seu corpus, veja `docs/AVALIACAO-RECUPERACAO.md`.
+
+### Onda 3 do plano V2: escudo de auditoria (24/11/2026)
+
+Toda pesquisa nova passa a ter **Histórico → Escudo de auditoria** (M06). Ele junta todas as verificações em uma lista de alertas por gravidade (alta, média, baixa) e mostra o estado dos quatro estágios do plano: ponteiros e citações literais, metadados bibliográficos, retratações e correções, e suporte nas fontes. Não existe nota geral nem selo de "verificado".
+
+Na conferência de referências, cada obra mostra **sinais de contexto separados** (M18): periódico ou preprint, idade, citações no OpenAlex, acesso aberto e sinais de retratação. Nada disso vira nota, porque prestígio não é veracidade. Referências não confirmadas nas bases globais recebem **links de busca no Google Acadêmico, na SciELO e na BRAPCI** (M24), para conferência manual de obras nacionais sem DOI. Com a leitura por trechos ligada, **Histórico → Cobertura das fontes** (M09) mostra quantos trechos de cada fonte os agentes realmente leram.
