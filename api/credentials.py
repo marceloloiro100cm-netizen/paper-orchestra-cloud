@@ -9,8 +9,6 @@ import re
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
-from google.api_core.exceptions import AlreadyExists, NotFound
-from google.cloud import secretmanager
 from pydantic import BaseModel, Field
 
 
@@ -46,7 +44,12 @@ class GeminiCredential(BaseModel):
 def store_credential(db, project: str, uid: str, key: str, *, client=None) -> dict:
     """Armazena nova versão antes de ativar o perfil, sem imprimir o segredo."""
     secret = secret_path(project, uid)
-    manager = client or secretmanager.SecretManagerServiceClient()
+    if client is None:
+        from google.cloud import secretmanager
+        manager = secretmanager.SecretManagerServiceClient()
+    else:
+        manager = client
+    from google.api_core.exceptions import AlreadyExists
     try:
         manager.create_secret(request={
             "parent": f"projects/{project}",
@@ -74,7 +77,12 @@ def delete_credential(db, project: str, uid: str, *, client=None) -> dict:
         "provider": "gemini_api", "status": "revoked",
         "updated_at": datetime.now(timezone.utc).isoformat(),
     })
-    manager = client or secretmanager.SecretManagerServiceClient()
+    if client is None:
+        from google.cloud import secretmanager
+        manager = secretmanager.SecretManagerServiceClient()
+    else:
+        manager = client
+    from google.api_core.exceptions import NotFound
     try:
         manager.delete_secret(request={"name": secret})
     except NotFound:
@@ -86,7 +94,11 @@ def get_worker_credential(db, project: str, uid: str, *, client=None) -> str:
     """Worker lê apenas a credencial própria de um owner_uid já validado."""
     if not credential_state(db, uid):
         raise RuntimeError("Credencial do pesquisador indisponível")
-    manager = client or secretmanager.SecretManagerServiceClient()
+    if client is None:
+        from google.cloud import secretmanager
+        manager = secretmanager.SecretManagerServiceClient()
+    else:
+        manager = client
     response = manager.access_secret_version(request={
         "name": secret_path(project, uid) + "/versions/latest",
     })
