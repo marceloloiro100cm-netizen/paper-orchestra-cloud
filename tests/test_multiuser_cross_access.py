@@ -146,6 +146,32 @@ class TwoUserIsolationTests(unittest.TestCase):
         self.assertEqual(bucket.reads, [])
         self.assertEqual(download(item_id=item_id, user=self.a).body, b"%PDF-synthetic")
 
+    def test_guest_cannot_list_others_documents(self):
+        item_a, item_b = "a" * 32, "b" * 32
+        for item, uid in ((item_a, self.a["uid"]), (item_b, self.b["uid"])):
+            self.db.collection("library_items").document(item).set({
+                "id": item, "owner_uid": uid, "status": "active",
+                "name": "Fonte privada.pdf", "format": "pdf",
+            })
+        router = make_library_router(self.db, Bucket(), lambda: None)
+        list_items = next(r.endpoint for r in router.routes
+                          if r.path.endswith("/items"))
+        files_a = list_items(user=self.a)["items"]
+        files_b = list_items(user=self.b)["items"]
+        self.assertEqual([file["id"] for file in files_a], [item_a])
+        self.assertEqual([file["id"] for file in files_b], [item_b])
+
+    def test_revoked_credential_rejects_worker_before_secret_lookup(self):
+        self.db.collection("research_credentials").document(self.a["uid"]).set({
+            "status": "revoked",
+            "secret_resource": "projects/test/secrets/scriptorium-byok-a_uid",
+        })
+        manager = Manager()
+        with self.assertRaises(RuntimeError):
+            personal_agent_environment({"GEMINI_API_KEY": "OWNER_SECRET"},
+                                       self.db, "test", self.a["uid"], manager=manager)
+        self.assertEqual(manager.requests, [])
+
     def test_model_access_and_secrets_are_per_uid_and_no_admin_fallback(self):
         for user in (self.a, self.b):
             self.db.collection("research_credentials").document(user["uid"]).set({
