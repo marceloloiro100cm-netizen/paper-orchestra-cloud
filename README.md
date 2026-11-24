@@ -143,3 +143,21 @@ No celular, **Histórico de pesquisas → Ver auditoria** aparece apenas para tr
 **Atenção:** o relatório NÃO valida DOI, títulos, autores, existência real de fontes, percentuais, desenho experimental ou verdade das afirmações. Alertas heurísticos têm falsos positivos e não substituem leitura crítica e busca nas fontes originais. `audit_status=unavailable` explicita qualquer falha na geração do relatório, sem bloquear a entrega do PDF.
 
 O original PaperOrchestra usa Semantic Scholar para busca bibliográfica. Uma chave de acesso dedicada é opcional e ainda não foi cadastrada nesta instalação. Nunca publique chaves no repositório; configurar somente por Secret Manager, após obter uma chave legítima.
+
+## Rastreabilidade de origens e plano V2 (24/11/2026)
+
+Toda origem externa do projeto (bibliotecas, APIs, normas, artigos e ferramentas) está registrada em **`docs/upstreams.json`**, com ID estável (R01 a R29 do plano técnico V2; R30 em diante para dependências que já eram usadas), URL canônica, licença, versão fixada, frequência de revisão e onde é usada. Os arquivos legíveis `docs/UPSTREAMS.md` e `docs/V2-MODULOS.md` (situação dos 27 módulos) são gerados a partir dele:
+
+```bash
+python scripts/upstreams.py render   # regenera os .md depois de editar o JSON
+python scripts/upstreams.py check    # valida o registro, os pins no código e os .md
+```
+
+O CI falha se o commit do PaperOrchestra no `worker/Dockerfile`, a versão do Firebase JS em `public/app.js` ou a versão do OSV-Scanner divergirem do registro, ou se algum código citar `Origem: Rnn` inexistente. Toda segunda-feira o workflow **Vigiar upstreams** consulta GitHub, PyPI e npm e atualiza a issue "Rastreio de upstreams (vigia semanal)" com versões novas, licenças divergentes, repositórios movidos ou arquivados e revisões manuais vencidas. Dependabot (pip e GitHub Actions) e OSV-Scanner rodam em paralelo.
+
+Primeiros módulos do plano V2 aplicados (todos parciais; detalhes em `docs/V2-MODULOS.md`):
+- **M13:** o texto de anexos passa por `worker/document_guard.py`, que remove caracteres invisíveis, impede que o documento feche o bloco `<fonte_usuario>` e sinaliza frases típicas de instrução embutida.
+- **M14:** cada execução gera `run_manifest.json` (versões, modelos, hashes das entradas, fontes e saídas, eventos), disponível em **Histórico → Manifesto de proveniência**, inclusive em falhas.
+- **M11:** cada execução concluída gera `declaracao_uso_ia.md`, um **rascunho** para a IN IFRS nº 16/2026. O texto do Anexo da IN ainda não foi conferido item a item; o rascunho não afirma conformidade e tem campos a preencher pelo autor.
+- **M07:** a conferência de referências consulta retratações, retiradas, expressões de preocupação e correções na Crossref (inclui Retraction Watch). Ausência de aviso não prova que a obra nunca foi retratada.
+- **M15:** Dependabot, OSV-Scanner e o vigia semanal de upstreams.

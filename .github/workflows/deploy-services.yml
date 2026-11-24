@@ -82,7 +82,8 @@ jobs:
           API_IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/paper-orchestra/api:agents-${GITHUB_SHA}"
           WORKER_IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/paper-orchestra/worker:agents-${GITHUB_SHA}"
           # Update de imagem somente: preservar variáveis de ambiente, serviços, IAM e Storage.
-          gcloud run jobs update paper-orchestra-worker --image="$WORKER_IMAGE" --region="$REGION" --project="$PROJECT" --quiet
+          # SHA do release também no worker: vai para o manifesto de proveniência (M14).
+          gcloud run jobs update paper-orchestra-worker --image="$WORKER_IMAGE" --update-env-vars="SCRIPTORIUM_RELEASE_SHA=${GITHUB_SHA}" --region="$REGION" --project="$PROJECT" --quiet
           gcloud run services update paper-orchestra-api --image="$API_IMAGE" --update-env-vars="NEON_REVIEW_ENABLED=true,BYOK_ENABLED=true,SCRIPTORIUM_RELEASE_SHA=${GITHUB_SHA}" --region="$REGION" --project="$PROJECT" --quiet
 
       - name: Verificar publicação, revisão e proteção das rotas de contas

@@ -3,6 +3,9 @@
 Consulta Crossref, OpenAlex e Semantic Scholar (sem LLM). Não afirma
 que uma referência é verdadeira ou que a obra sustenta o argumento citado.
 Todos os endpoints são fixos; nunca executa URLs fornecidas pelo manuscrito.
+
+Origens: R08 (Crossref), R09 (OpenAlex), R10 (Semantic Scholar); retratações e
+correções em editorial_status.py (M07; Origem: R11).
 """
 from __future__ import annotations
 
@@ -15,6 +18,8 @@ from difflib import SequenceMatcher
 from urllib.parse import quote
 
 import requests
+
+from editorial_status import editorial_status, summarize as summarize_editorial
 
 DOI_PATTERN = re.compile(r"10\.\d{4,9}/[^\s<>\"{}]+", re.I)
 ENTRY_START = re.compile(r"@([A-Za-z]+)\s*[{(]\s*([^,\s{}()]+)\s*,", re.I)
@@ -159,7 +164,9 @@ def _crossref(entry, session):
         result = data.get("message", {})
         if not doi:
             result = result["items"][0]
+        own_updates = {"DOI": result.get("DOI", ""), "update-to": result.get("update-to") or []}
         return {"status": "ok", "title": (result.get("title") or [""])[0],
+                "_editorial_record": own_updates if doi else None,
                 "year": str((result.get("issued") or {}).get("date-parts", [[""]])[0][0]),
                 "doi": canonical_doi(result.get("DOI", "")),
                 "url": "https://doi.org/" + canonical_doi(result.get("DOI", ""))
@@ -270,8 +277,12 @@ def verify_bibliography(bib_text: str, max_references: int = MAX_REFERENCES,
         if pause and results:
             time.sleep(1.1)
         sources["semantic_scholar"] = _semantic_scholar(entry, session)
-        results.append({"reference": entry, "sources": sources,
-                        **classify(entry, sources)})
+        own_record = sources["crossref"].pop("_editorial_record", None)
+        item = {"reference": entry, "sources": sources, **classify(entry, sources)}
+        # M07: só consulta avisos editoriais quando há DOI (identificador estável).
+        item["editorial"] = editorial_status(entry["doi"], session, _request,
+                                             own_record=own_record, user_agent=USER_AGENT)
+        results.append(item)
     return {
         "status": "completed_with_limitations",
         "checked_at": datetime.now(timezone.utc).isoformat(),
@@ -280,9 +291,11 @@ def verify_bibliography(bib_text: str, max_references: int = MAX_REFERENCES,
         "skipped_by_limit": max(0, len(entries) - limit),
         "total_bibtex_entries": len(entries),
         "items": results,
+        "editorial_summary": summarize_editorial(results),
         "limitations": [
             "Metadados encontrados não comprovam que as fontes sustentam as afirmações do artigo.",
-            "Correspondência de DOI/título não verifica texto integral, autores, retratações ou rigor científico.",
+            "Correspondência de DOI/título não verifica texto integral, autores ou rigor científico.",
+            "Retratações e correções vêm da Crossref (inclui Retraction Watch) e só são consultadas para referências com DOI; ausência de aviso não prova que a obra nunca foi retratada.",
             "APIs podem impor limites; indisponibilidade não significa referência inventada.",
             "Classificação heurística: casos conflitantes ou prováveis exigem conferência humana.",
             "A consulta foi limitada para controlar uso de rede e processamento.",

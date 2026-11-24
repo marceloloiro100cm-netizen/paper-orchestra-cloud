@@ -15,6 +15,8 @@ jobs:
           # Compila todos os módulos; a lista manual deixava arquivos novos de fora.
           python -m compileall -q api worker
           python -m unittest discover -s tests -v
+      - name: Validar registro de upstreams e documentos gerados
+        run: python scripts/upstreams.py check
       - name: Validate JSON and JS
         run: |
           python -m json.tool firebase.json >/dev/null

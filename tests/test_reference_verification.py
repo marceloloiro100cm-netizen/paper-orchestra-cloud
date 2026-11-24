@@ -78,7 +78,11 @@ class ReferenceVerifierTests(unittest.TestCase):
         self.assertEqual(item["classification"], "metadata_match")
         self.assertEqual(len(item["confirmed_by"]), 3)
         self.assertTrue(any("não comprovam" in x.lower() for x in report["limitations"]))
-        self.assertEqual(len(session.calls), 3)
+        # Crossref, OpenAlex, Semantic Scholar + consulta de avisos editoriais (M07).
+        self.assertEqual(len(session.calls), 4)
+        self.assertEqual(session.calls[-1][1], {"filter": "updates:10.1000/example", "rows": 20})
+        self.assertEqual(item["editorial"]["editorial_status"], "no_notice_found")
+        self.assertNotIn("_editorial_record", item["sources"]["crossref"])
         for url, params, headers in session.calls:
             self.assertNotIn("GEMINI", str(url) + str(params))
 
