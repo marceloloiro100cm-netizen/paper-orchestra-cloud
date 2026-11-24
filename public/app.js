@@ -310,6 +310,41 @@ async function showNeonReport(id, target) {
   } catch(e) {box.textContent='Não foi possível abrir o parecer Neon: '+e.message;}
 }
 
+const PREFERRED_MODELS = ['gemini-3.1-pro-preview', 'gemini-3-flash-preview'];
+
+function updateEligibleModels() {
+  const admin = accountAccess?.admin === true;
+  const eligible = admin ? PREFERRED_MODELS : (
+    Array.isArray(accountAccess?.allowed_models) ? accountAccess.allowed_models : []
+  );
+  for (const id of ['model', 'reflection-model']) {
+    const select = $(id);
+    for (const option of select.options) {
+      if (!option.value) continue; // "Mesmo modelo da redação"
+      const canUse = eligible.includes(option.value);
+      option.disabled = !canUse;
+      option.hidden = !canUse;
+    }
+  }
+  if (!admin) {
+    const strongest = PREFERRED_MODELS.find(name => eligible.includes(name));
+    if (strongest) $('model').value = strongest;
+    else $('model').selectedIndex = -1;
+    $('reflection-model').value = '';
+  }
+  $('plotting-panel').classList.toggle('hidden', !admin);
+  if (!admin) $('plotting').checked = false;
+  const modelNote = $('model-access-status');
+  if (admin) modelNote.textContent = 'Modelos da configuração administrativa.';
+  else if (eligible.includes('gemini-3.1-pro-preview')) {
+    modelNote.textContent = 'Gemini Pro disponível e recomendado para esta chave. O uso da API pode ser cobrado.';
+  } else if (eligible.includes('gemini-3-flash-preview')) {
+    modelNote.textContent = 'Gemini Flash disponível. O modelo Pro ficará oculto até ser verificado.';
+  } else {
+    modelNote.textContent = 'Conecte e verifique sua chave para liberar os modelos disponíveis.';
+  }
+}
+
 async function loadCapabilities() {
   $('neon-panel').classList.add('hidden');
   $('neon-explanation').classList.add('hidden');
@@ -317,11 +352,12 @@ async function loadCapabilities() {
   try {
     const r=await request('/capabilities');
     const caps=await r.json();
-    if(caps.neon_review === true) {
+    // Neon possui integração própria. Não basta ter assinatura Pro ou chave Gemini paga.
+    if(caps.neon_review === true && accountAccess?.admin === true) {
       $('neon-panel').classList.remove('hidden');
       $('neon-explanation').classList.remove('hidden');
     }
-  } catch(_) { /* opção permanece oculta caso a API seja anterior */ }
+  } catch(_) { /* Falha fechada: Neon fica oculto. */ }
 }
 
 function statusLabel(value) {
@@ -421,6 +457,13 @@ $('new-paper').addEventListener('submit', async (event) => {
   event.preventDefault();
   const button=$('submit'); button.disabled=true; $('submit-status').textContent='Salvando e iniciando...';
   try {
+    if (accountAccess && !accountAccess.admin && !accountAccess.allowed_models?.includes($('model').value)) {
+      $('submit-status').textContent = 'Verifique sua chave para liberar um modelo compatível.';
+      return;
+    }
+    if (accountAccess && !accountAccess.admin && $('model').value === 'gemini-3.1-pro-preview') {
+      if (!window.confirm('Esta pesquisa utilizará Gemini Pro pela sua chave API. O Google pode cobrar o uso no projeto da sua chave. Deseja continuar?')) return;
+    }
     const payload = {
       title:$('title').value, idea:$('idea').value,
       experimental_log:$('log').value, template:$('template').value,
@@ -442,6 +485,7 @@ let accountAccess = null;
 
 async function loadAccountAccess() {
   $('account-panel').classList.remove('hidden');
+  $('workspace').classList.remove('setup-required');
   $('workspace').classList.add('access-pending');
   $('access-pending').classList.add('hidden');
   $('guest-credential').classList.add('hidden');
@@ -456,21 +500,29 @@ async function loadAccountAccess() {
   try {
     const response = await request('/account/access', { signal: controller.signal });
     accountAccess = await response.json();
+    const guestReady = !accountAccess.admin && accountAccess.research_generation_enabled === true
+      && Array.isArray(accountAccess.allowed_models) && accountAccess.allowed_models.length > 0;
     $('workspace').classList.remove('access-pending');
+    $('workspace').classList.toggle('setup-required', !accountAccess.admin && !guestReady);
     $('account-state').textContent = accountAccess.admin ? 'Administrador' :
-      (accountAccess.byok_ready ? 'Chave cadastrada (não testada)' : 'Conecte sua chave Gemini');
+      (guestReady ? 'Pronto para pesquisar' :
+       (accountAccess.key_connected ? 'Chave precisa de verificação' : 'Conectar minha IA'));
     $('admin-invitations').classList.toggle('hidden', !accountAccess.admin);
     $('guest-credential').classList.toggle('hidden', !!accountAccess.admin);
-    const guestReady = !accountAccess.admin && !!accountAccess.byok_ready;
     $('gemini-setup-details').open = !guestReady;
     $('gemini-setup-title').textContent = guestReady
-      ? 'Gerenciar ou trocar minha chave Gemini'
+      ? 'Trocar ou remover minha chave Gemini'
       : 'Conectar minha chave Gemini — primeiro acesso';
     $('gemini-key-ready').classList.toggle('hidden', !guestReady);
-    $('remove-personal-key').classList.toggle('hidden', !guestReady);
+    $('remove-personal-key').classList.toggle('hidden', !accountAccess.key_connected);
     $('submit').disabled = !accountAccess.research_generation_enabled;
     $('account-message').textContent = accountAccess.admin ? '' :
-      (guestReady ? '' : 'Conclua os três passos abaixo para iniciar sua primeira pesquisa.');
+      (guestReady ? 'Seu espaço de pesquisa está liberado.' :
+        (accountAccess.key_connected
+          ? 'Sua chave foi salva, mas não foi possível confirmar um modelo. Cole-a novamente para refazer o teste.'
+          : 'Vamos conectar sua conta Google ao serviço Gemini. É rápido e você não precisa de assinatura Pro.'));
+    updateEligibleModels();
+    if (accountAccess.admin) loadPendingRequests();
   } catch (error) {
     accountAccess = null;
     // Compatibilidade exclusiva da conta administradora já autorizada na API antiga.
@@ -479,10 +531,12 @@ async function loadAccountAccess() {
         await request('/capabilities', { signal: controller.signal });
         accountAccess = {
           admin: true, byok_ready: false, multiuser_enabled: false,
-          research_generation_enabled: true, legacy_backend: true
+          research_generation_enabled: true, legacy_backend: true,
+          allowed_models: PREFERRED_MODELS
         };
         $('workspace').classList.remove('access-pending');
         $('account-state').textContent = 'Administrador';
+        updateEligibleModels();
         $('account-message').textContent = '';
         $('submit').disabled = false;
         return;
@@ -500,6 +554,7 @@ async function loadAccountAccess() {
         ? 'A API não respondeu em 12 segundos. Tente verificar novamente.'
         : 'Não foi possível confirmar sua conta: ' + (error?.message || 'erro inesperado'));
     $('access-pending').classList.remove('hidden');
+    $('workspace').classList.add('access-pending');
     $('submit').disabled = true;
   } finally {
     clearTimeout(timeout);
@@ -536,6 +591,55 @@ $('toggle-personal-key').addEventListener('click', () => {
   $('toggle-personal-key').textContent = visible ? 'Ocultar' : 'Mostrar';
   $('toggle-personal-key').setAttribute('aria-pressed', String(visible));
 });
+$('send-access-request').addEventListener('click', async () => {
+  const button = $('send-access-request');
+  button.disabled = true;
+  $('pending-help').textContent = 'Enviando solicitação...';
+  try {
+    await request('/account/request-access', {method:'POST'});
+    $('pending-help').textContent = 'Solicitação enviada! O administrador poderá liberar sua conta. Depois, clique em Verificar meu acesso.';
+  } catch (err) {
+    $('pending-help').textContent = 'Ainda não foi possível enviar pelo Scriptorium. Use Copiar pedido e envie ao administrador.';
+  } finally { button.disabled = false; }
+});
+
+async function loadPendingRequests() {
+  if (!accountAccess?.admin) return;
+  const box = $('pending-requests-list');
+  box.textContent = 'Buscando solicitações...';
+  try {
+    const response = await request('/admin/access-requests');
+    const result = await response.json();
+    box.replaceChildren();
+    const items = Array.isArray(result.items) ? result.items : [];
+    if (!items.length) { box.textContent = 'Nenhum pedido de acesso aguardando aprovação.';return; }
+    for (const item of items) {
+      const row = document.createElement('div');
+      row.className = 'access-request-row';
+      const email = document.createElement('strong');
+      email.textContent = item.email;
+      const approve = document.createElement('button');
+      approve.type = 'button'; approve.className='btn';
+      approve.textContent = 'Autorizar este pesquisador';
+      approve.addEventListener('click', async () => {
+        approve.disabled = true; approve.textContent = 'Autorizando...';
+        try {
+          await request('/admin/invitations', {method:'POST',body:JSON.stringify({email:item.email})});
+          $('account-message').textContent = 'Acesso autorizado para ' + item.email + '.';
+          await loadPendingRequests();
+        } catch (err) {
+          $('account-message').textContent = 'Não foi possível autorizar: ' + err.message;
+          approve.disabled = false; approve.textContent = 'Tentar novamente';
+        }
+      });
+      row.append(email, approve); box.append(row);
+    }
+  } catch (_) {
+    box.textContent = 'Solicitações indisponíveis. Você ainda pode convidar um pesquisador pelo e-mail.';
+  }
+}
+$('refresh-access-requests').addEventListener('click', loadPendingRequests);
+
 $('copy-access-request').addEventListener('click', async () => {
   const message = 'Olá! Solicito um convite para usar o Scriptorium MPIE. Minha conta Google é: '
     + (user?.email || '(e-mail da conta)') + '.';
@@ -568,15 +672,26 @@ $('save-personal-key').addEventListener('click', async () => {
   button.disabled = true;
   $('key-setup-result').textContent = 'Salvando chave no cofre seguro...';
   try {
-    await request('/account/credential', {
+    const checkResponse = await request('/account/credential', {
       method:'PUT', body: JSON.stringify({key})
     });
+    const checkResult = await checkResponse.json();
     $('personal-gemini-key').value = '';
     $('personal-gemini-key').type = 'password';
     $('toggle-personal-key').textContent = 'Mostrar';
     $('toggle-personal-key').setAttribute('aria-pressed','false');
     await loadAccountAccess();
-    $('key-setup-result').textContent = 'Chave cadastrada. A disponibilidade do modelo será conferida na execução.';
+    if (accountAccess?.research_generation_enabled) {
+      $('key-setup-result').textContent = 'Conexão confirmada. Seu Scriptorium está pronto.';
+      await Promise.all([loadJobs(), loadLibrary(), loadCapabilities()]);
+      if (refreshInterval) clearInterval(refreshInterval);
+      refreshInterval = setInterval(loadJobs, 12000);
+    } else {
+      const limited = Object.values(checkResult.model_status || {}).some(v => v === 'quota_limited');
+      $('key-setup-result').textContent = limited
+        ? 'Sua chave foi salva, mas o Google informou limite temporário. Tente novamente mais tarde.'
+        : 'A chave foi salva, mas nenhum modelo foi confirmado. Confira a chave ou tente novamente.';
+    }
   } catch(error) {
     $('key-setup-result').textContent = 'Não foi possível salvar a chave: ' + error.message;
   } finally { button.disabled = false; }
@@ -609,6 +724,7 @@ onAuthStateChanged(auth, async (current) => {
   window.dispatchEvent(new CustomEvent('scriptorium:library-user-changed', {
     detail: { uid: current?.uid || null }
   }));
+  if (user) $('workspace').classList.add('access-pending');
   $('login-panel').classList.toggle('hidden', !!user);
   $('workspace').classList.toggle('hidden', !user);
   $('logout').classList.toggle('hidden', !user);
@@ -622,7 +738,7 @@ onAuthStateChanged(auth, async (current) => {
     }
   } else {
     accountAccess = null;
-    $('workspace').classList.remove('access-pending');
+    $('workspace').classList.remove('access-pending', 'setup-required');
     $('account-panel').classList.add('hidden');
     $('access-pending').classList.add('hidden');
     $('guest-credential').classList.add('hidden');
