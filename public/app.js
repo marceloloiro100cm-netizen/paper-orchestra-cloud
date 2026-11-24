@@ -447,6 +447,70 @@ $('new-paper').addEventListener('submit', async (event) => {
   finally {button.disabled=false;}
 });
 
+let accountAccess = null;
+
+async function loadAccountAccess() {
+  $('account-panel').classList.remove('hidden');
+  $('guest-credential').classList.add('hidden');
+  $('admin-invitations').classList.add('hidden');
+  $('submit').disabled = true;
+  $('account-state').textContent = 'Verificando...';
+  try {
+    const response = await request('/account/access');
+    accountAccess = await response.json();
+    $('account-state').textContent = accountAccess.admin ? 'Administrador' :
+      (accountAccess.byok_ready ? 'Gemini configurado' : 'Chave Gemini necessária');
+    $('admin-invitations').classList.toggle('hidden', !accountAccess.admin);
+    $('guest-credential').classList.toggle('hidden', !!accountAccess.admin);
+    $('submit').disabled = !accountAccess.research_generation_enabled;
+    $('account-message').textContent = accountAccess.research_generation_enabled ?
+      'Sua conta está autorizada a iniciar pesquisas.' :
+      'Para iniciar uma pesquisa, configure sua própria chave Gemini.';
+  } catch (error) {
+    accountAccess = null;
+    $('account-state').textContent = 'Sem autorização';
+    $('account-message').textContent = error.message;
+    $('submit').disabled = true;
+  }
+}
+
+$('save-personal-key').addEventListener('click', async () => {
+  const button = $('save-personal-key');
+  const key = $('personal-gemini-key').value.trim();
+  if (!key) { $('account-message').textContent='Informe sua chave Gemini.';return; }
+  button.disabled = true;
+  try {
+    await request('/account/credential', {
+      method:'PUT', body: JSON.stringify({key})
+    });
+    $('personal-gemini-key').value = '';
+    await loadAccountAccess();
+  } catch(error) { $('account-message').textContent = error.message; }
+  finally { button.disabled = false; }
+});
+$('remove-personal-key').addEventListener('click', async () => {
+  if (!window.confirm('Revogar sua chave de IA? Novas pesquisas serão bloqueadas.')) return;
+  try {
+    await request('/account/credential',{method:'DELETE'});
+    $('personal-gemini-key').value = '';
+    await loadAccountAccess();
+  } catch(error) { $('account-message').textContent = error.message; }
+});
+async function changeInvite(revoke) {
+  const email = $('invitation-email').value.trim();
+  if (!email) { $('account-message').textContent='Informe um e-mail.';return; }
+  try {
+    await request(revoke ? '/admin/invitations/'+encodeURIComponent(email) : '/admin/invitations', {
+      method: revoke ? 'DELETE' : 'POST',
+      ...(revoke ? {} : {body:JSON.stringify({email})})
+    });
+    $('account-message').textContent = revoke ? 'Acesso revogado.' : 'Convite registrado. A pessoa já pode acessar com o Google.';
+    $('invitation-email').value = '';
+  } catch(error) { $('account-message').textContent = error.message; }
+}
+$('invite-researcher').addEventListener('click', () => changeInvite(false));
+$('revoke-researcher').addEventListener('click', () => changeInvite(true));
+
 onAuthStateChanged(auth, async (current) => {
   user=current;
   $('login-panel').classList.toggle('hidden', !!user);
@@ -454,6 +518,6 @@ onAuthStateChanged(auth, async (current) => {
   $('logout').classList.toggle('hidden', !user);
   $('identity').textContent=user?.email || '';
   if (refreshInterval) clearInterval(refreshInterval);
-  if (user) { await Promise.all([loadJobs(),loadLibrary(),loadCapabilities()]); refreshInterval=setInterval(loadJobs, 12000); }
-  else { libraryItems=[];selectedSourceIds.clear();updateSelectedCount(); }
+  if (user) { await loadAccountAccess(); if (accountAccess) await Promise.all([loadJobs(),loadLibrary(),loadCapabilities()]); refreshInterval=setInterval(loadJobs, 12000); }
+  else { accountAccess=null; $('account-panel').classList.add('hidden'); $('personal-gemini-key').value=''; libraryItems=[];selectedSourceIds.clear();updateSelectedCount(); }
 });
