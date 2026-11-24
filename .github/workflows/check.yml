@@ -20,7 +20,7 @@ jobs:
           node --check public/app.js
           node --check public/config.js
       - name: Check script syntax
-        run: bash -n scripts/deploy-cloud-shell.sh scripts/configure-guardrails.sh scripts/configure-budget.sh scripts/reduce-deployer-iam.sh scripts/setup-byok-iam.sh
+        run: bash -n scripts/deploy-cloud-shell.sh scripts/configure-guardrails.sh scripts/configure-budget.sh scripts/reduce-deployer-iam.sh scripts/setup-byok-iam.sh scripts/audit-byok-iam.sh
       - name: Validate public Firebase config and no private credentials
         run: |
           test -f public/config.js
