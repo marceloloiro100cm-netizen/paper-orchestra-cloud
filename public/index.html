@@ -1178,7 +1178,19 @@
     /* Campos nativos mantidos para app.js, controlados pelos cartões visuais */
     .sr-select { display: none !important; }
     /* Primeiro acesso dos pesquisadores convidados: sem alterar os formulários de pesquisa. */
-    .access-pending .stepper, .access-pending [data-step-panel] { display: none !important; }
+    /* Só a conta aparece antes da autorização ou da conexão da IA.
+       Não basta ocultar a navegação: a biblioteca também contém controles próprios. */
+    #workspace.access-pending > :not(#account-panel),
+    #workspace.access-setup > :not(#account-panel) { display: none !important; }
+    #account-panel .panel-header { flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+    #account-state { max-width: 100%; white-space: normal; text-align: left; overflow-wrap: anywhere; flex: 0 1 auto; }
+    #pending-access-list .access-request-entry { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-main); }
+    #pending-access-list .access-request-entry button { min-height: 42px; }
+    .upload-drawer > summary { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .upload-drawer > summary > span:first-child { min-width: 0; overflow-wrap: break-word; }
+    .upload-drawer > summary > span:last-child { font-size: 1.2rem; flex-shrink: 0; }
+    @media(max-width:520px) { #account-panel h2 { font-size: 1.35rem; } }
+
     .gemini-setup { margin-top: 12px; border: 1px solid var(--border-main); border-radius: 14px; background: var(--bg-subtle); overflow: hidden; }
     .gemini-setup > summary { cursor: pointer; padding: 12px 15px; font-weight: 700; color: var(--mpie-blue-text); }
     .gemini-setup > summary:focus-visible { outline: 3px solid var(--mpie-blue); outline-offset: -3px; }
@@ -1251,8 +1263,8 @@
     <div id="workspace" class="hidden">
       <section class="panel" id="account-panel">
         <div class="panel-header"><div>
-          <h2>Minha conta e inteligência artificial</h2>
-          <p class="subtle" style="margin:0">Cada pesquisador utiliza sua própria chave Gemini. Nenhuma chave é exibida após o cadastro.</p>
+          <h2>Minha conta</h2>
+          <p class="subtle" style="margin:0">Conecte sua inteligência artificial com segurança. O Scriptorium mostrará só os recursos disponíveis para você.</p>
         </div><span class="pill" id="account-state">Iniciando verificação...</span></div>
         <div id="account-message" class="subtle" role="status"></div>
         <div id="access-pending" class="hidden" aria-live="polite">
@@ -1260,9 +1272,12 @@
           <p class="subtle">O Scriptorium ainda não autorizou esta conta. Peça um convite ao administrador; se já recebeu um, ele deve conferir se o acesso multiusuário está ativado. Entrar com Google não libera pesquisas nem documentos automaticamente.</p>
           <p class="subtle">E-mail da conta: <strong id="pending-email"></strong></p>
           <div class="actions">
-            <button class="btn" type="button" id="copy-access-request">Copiar pedido de convite</button>
-            <button class="btn alt" type="button" id="retry-access">Verificar meu acesso</button>
+            <button class="btn" type="button" id="request-invitation">Solicitar acesso ao administrador</button>
+            <button class="btn alt" type="button" id="retry-access">Já fui autorizado</button>
           </div>
+          <details><summary>Prefere enviar uma mensagem?</summary>
+            <button class="btn alt" type="button" id="copy-access-request">Copiar mensagem para o administrador</button>
+          </details>
           <p class="subtle" id="pending-help" role="status"></p>
         </div>
         <div id="guest-credential" class="hidden">
@@ -1270,7 +1285,8 @@
           <details class="gemini-setup" id="gemini-setup-details">
             <summary id="gemini-setup-title">Conectar minha chave Gemini — primeiro acesso</summary>
             <div class="gemini-setup-body">
-              <p class="subtle">São três passos. A chave pertence à sua conta/projeto Google, não à conta do administrador.</p>
+              <p class="subtle">Não é preciso ter assinatura Google AI Pro ou Ultra. A chave pode funcionar com recursos gratuitos, conforme a disponibilidade do seu projeto.</p>
+              <p class="subtle">Ao salvar, o Scriptorium fará testes curtos com os modelos para descobrir quais funcionam. Eles podem gerar um pequeno consumo da API Gemini associado ao projeto da sua chave.</p>
               <ol class="gemini-steps">
                 <li><strong>Abra o Google AI Studio com sua conta Google.</strong>
                   <div class="actions">
@@ -1292,7 +1308,7 @@
                 <button class="btn alt" type="button" id="remove-personal-key">Revogar minha chave</button>
               </div>
               <p class="subtle" id="key-setup-result" role="status"></p>
-              <p class="subtle">A chave é armazenada pelo servidor no Google Secret Manager. O cadastro verifica o formato; a autorização efetiva dos modelos será testada quando uma pesquisa for executada. Nunca envie a chave por mensagem.</p>
+              <p class="subtle">A chave fica protegida no Google Secret Manager. Os testes mostram o acesso no momento da verificação; cotas podem mudar. Nunca compartilhe sua chave por mensagem.</p>
               <p class="subtle">As cotas e eventuais custos da API Gemini pertencem ao projeto Google da chave. O plano pessoal Gemini/Google AI Pro não substitui o faturamento da API.</p>
             </div>
           </details>
@@ -1304,7 +1320,11 @@
             <button class="btn" type="button" id="invite-researcher">Autorizar acesso</button>
             <button class="btn alt" type="button" id="revoke-researcher">Revogar acesso</button>
           </div>
-          <p class="subtle">Convidados precisam cadastrar sua própria chave Gemini antes de iniciar uma pesquisa.</p>
+          <p class="subtle">Convidados precisam conectar a própria chave Gemini. A aprovação não utiliza os tokens do administrador.</p>
+          <div class="actions">
+            <button class="btn alt" type="button" id="refresh-access-requests">Atualizar solicitações</button>
+          </div>
+          <div id="pending-access-list" class="subtle" role="status"></div>
         </div>
       </section>
       <!-- Navegação em 3 etapas (Estúdio Editorial) -->
@@ -1351,7 +1371,7 @@
 
         <!-- Gaveta retrátil de Upload (mantém o topo limpo e preserva 100% os IDs de app.js) -->
         <details class="upload-drawer">
-          <summary><span>+ Guardar novo arquivo na biblioteca (.pdf, .docx, .bib, .ris, .txt)</span><span class="subtle" style="font-size:.78rem">Abrir / Fechar</span></summary>
+          <summary><span>+ Adicionar arquivo</span><span class="subtle" aria-hidden="true">⌄</span></summary>
           <div class="library-grid">
             <div><label for="library-file">Arquivo</label><input id="library-file" type="file" accept=".pdf,.docx,.bib,.ris,.txt" /></div>
             <div>
@@ -1511,6 +1531,7 @@
             <!-- Modelos de IA & Revisão -->
             <div class="config-section">
               <span class="config-label">Motor de IA e Recursos</span>
+              <p class="subtle" id="model-access-summary" role="status" style="margin:5px 0 10px">Verificando modelos disponíveis...</p>
               <label for="model" style="margin-top:0">Modelo principal de redação</label>
               <select id="model">
                 <option value="gemini-3-flash-preview">Gemini 3 Flash (econômico e rápido)</option>
