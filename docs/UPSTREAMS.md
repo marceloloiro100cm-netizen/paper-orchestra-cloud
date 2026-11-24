@@ -53,7 +53,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R38 | [abnTeX2](https://github.com/abntex/abntex2) | biblioteca | sim | LPPL-1.3c | versão do pacote Debian texlive-publishers da imagem python:3.11-slim | V1, M27 |
 | R39 | [Firebase JavaScript SDK](https://github.com/firebase/firebase-js-sdk) | biblioteca | sim | Apache-2.0 | 11.10.0 | V1 |
 | R40 | [OSV-Scanner GitHub Action (workflows reutilizáveis)](https://github.com/google/osv-scanner-action) | ferramenta | sim | Apache-2.0 | v2.7.1 | M15 |
-| R41 | [GitHub Actions usadas nos workflows (actions/checkout, setup-python, setup-node; google-github-actions/auth, setup-gcloud)](https://github.com/google-github-actions/auth) | ferramenta | sim | Apache-2.0 | checkout@v4, setup-python@v5, setup-node@v4, auth@v3, setup-gcloud@v3 | V1, M15 |
+| R41 | [GitHub Actions usadas nos workflows (actions/checkout, setup-python, setup-node; google-github-actions/auth, setup-gcloud)](https://github.com/google-github-actions/auth) | ferramenta | sim | Apache-2.0 | checkout@v7, setup-python@v7, setup-node@v7, auth@v3, setup-gcloud@v3 | V1, M15 |
 | R42 | [Imagem base python:3.11-slim (Docker Official Images)](https://hub.docker.com/_/python) | ferramenta | sim | PSF-2.0 | python:3.11-slim (tag móvel, sem digest) | V1 |
 
 ## Fichas
@@ -988,14 +988,14 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Licença (SPDX):** Apache-2.0
 - **Situação da licença:** a conferir
 - **Licença dos pesos:** -
-- **Versão fixada:** checkout@v4, setup-python@v5, setup-node@v4, auth@v3, setup-gcloud@v3
+- **Versão fixada:** checkout@v7, setup-python@v7, setup-node@v7, auth@v3, setup-gcloud@v3
 - **Versão instalada:** -
 - **Última versão revisada:** -
 - **Onde é usado:** .github/workflows/
 - **Política de atualização:** Dependabot (github-actions) semanal.
 - **Frequência de revisão:** mensal
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** Atualizado de checkout@v4, setup-python@v5 e setup-node@v4 pelos PRs #25, #26 e #28 do Dependabot (24/11/2026).
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen

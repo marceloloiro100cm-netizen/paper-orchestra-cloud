@@ -893,7 +893,7 @@
       "canonical_url": "https://github.com/google-github-actions/auth",
       "license_spdx": "Apache-2.0",
       "license_status": "a conferir",
-      "pinned": "checkout@v4, setup-python@v5, setup-node@v4, auth@v3, setup-gcloud@v3",
+      "pinned": "checkout@v7, setup-python@v7, setup-node@v7, auth@v3, setup-gcloud@v3",
       "adopted": true,
       "modules": [
         "V1",
@@ -905,7 +905,8 @@
       "update_policy": "Dependabot (github-actions) semanal.",
       "review_frequency": "mensal",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "migration_note": "Atualizado de checkout@v4, setup-python@v5 e setup-node@v4 pelos PRs #25, #26 e #28 do Dependabot (24/11/2026)."
     },
     {
       "id": "R42",
