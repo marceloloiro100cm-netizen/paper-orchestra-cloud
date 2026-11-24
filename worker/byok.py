@@ -20,7 +20,7 @@ def personal_agent_environment(current: dict, db, project: str, owner_uid: str, 
         client = manager
     response = client.access_secret_version(request={"name": path + "/versions/latest"})
     key = response.payload.data.decode("utf-8")
-    if not re.fullmatch(r"[A-Za-z0-9_-]{20,512}", key):
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{20,512}", key):
         raise RuntimeError("Chave pessoal inválida")
     # Limpa TODAS as fontes herdadas que poderiam direcionar ao projeto do mantenedor.
     env = dict(current)
