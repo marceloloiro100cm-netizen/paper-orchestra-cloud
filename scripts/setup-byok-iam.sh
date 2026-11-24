@@ -65,7 +65,7 @@ fi
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${DEPLOYER_SA}" \
   --role="projects/${PROJECT_ID}/roles/${AUDIT_ROLE_ID}" \
-  --quiet >/dev/null
+  --condition=None --quiet >/dev/null
 
 echo "Concessões BYOK condicionais e leitura IAM configuradas para projeto ${PROJECT_ID}."
 echo "Este é um bootstrap privilegiado único, NÃO deve ser executado no pipeline de deploy."
