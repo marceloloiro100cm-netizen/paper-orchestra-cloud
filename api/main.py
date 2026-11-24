@@ -344,6 +344,8 @@ def get_status(job_id: str, user: User):
 
 @app.get("/api/jobs/{job_id}/download/{file_kind}")
 def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "references", "neon"], user: User):
+    if file_kind == "neon" and not (NEON_REVIEW_ENABLED and is_admin(user, ALLOWED_EMAILS)):
+        raise HTTPException(status_code=403, detail="Parecer Neon não está disponível nesta conta.")
     item = get_research(job_id, user)
     if item["status"] != "completed" and not (file_kind == "log" and item["status"] == "failed"):
         raise HTTPException(status_code=409, detail="Pesquisa ainda não concluída")
