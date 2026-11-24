@@ -24,6 +24,8 @@ BUCKET = os.environ["RESEARCH_BUCKET"]
 ALLOWED_EMAILS = {x.strip().lower() for x in os.getenv("ALLOWED_EMAILS", "").split(",") if x.strip()}
 JOB_NAME = f"projects/{PROJECT}/locations/{REGION}/jobs/paper-orchestra-worker"
 NEON_REVIEW_ENABLED = os.getenv("NEON_REVIEW_ENABLED", "false").lower() == "true"
+# Fails closed until IAM has been provisioned and audited in deployment.
+BYOK_ENABLED = os.getenv("BYOK_ENABLED", "false").lower() == "true"
 
 if not ALLOWED_EMAILS:
     raise RuntimeError("ALLOWED_EMAILS vazio: por segurança, a API não inicia.")
@@ -66,7 +68,7 @@ def current_user(authorization: Annotated[str | None, Header()] = None):
     except Exception:
         raise HTTPException(status_code=401, detail="Sessão inválida ou expirada") from None
     email = (token.get("email") or "").lower()
-    if not get_access(db, token, ALLOWED_EMAILS)["allowed"]:
+    if not (is_admin(token, ALLOWED_EMAILS) or (BYOK_ENABLED and get_access(db, token, ALLOWED_EMAILS)["allowed"])):
         raise HTTPException(status_code=403, detail="Conta não autorizada")
     return token
 
@@ -125,12 +127,15 @@ def capabilities(user: User):
 @app.get("/api/account/access")
 def account_access(user: User):
     access = get_access(db, user, ALLOWED_EMAILS)
-    return {"admin": access["admin"], "byok_ready": access["byok_ready"],
-            "research_generation_enabled": access["admin"] or access["byok_ready"]}
+    return {"admin": access["admin"], "byok_ready": BYOK_ENABLED and access["byok_ready"],
+            "multiuser_enabled": BYOK_ENABLED,
+            "research_generation_enabled": access["admin"] or (BYOK_ENABLED and access["byok_ready"])}
 
 
 @app.put("/api/account/credential")
 def save_personal_credential(payload: GeminiCredential, user: User):
+    if not BYOK_ENABLED:
+        raise HTTPException(status_code=503, detail="Credenciais individuais indisponíveis até aprovação da infraestrutura.")
     if is_admin(user, ALLOWED_EMAILS):
         raise HTTPException(status_code=409, detail="A conta administradora usa a configuração existente.")
     # Chave enviada somente pela sessão autenticada. Nunca retorna o valor.
@@ -146,6 +151,8 @@ def save_personal_credential(payload: GeminiCredential, user: User):
 
 @app.delete("/api/account/credential")
 def remove_personal_credential(user: User):
+    if not BYOK_ENABLED:
+        raise HTTPException(status_code=503, detail="Credenciais individuais indisponíveis até aprovação da infraestrutura.")
     if is_admin(user, ALLOWED_EMAILS):
         raise HTTPException(status_code=409, detail="A credencial do administrador não é gerenciada aqui.")
     try:
@@ -156,6 +163,8 @@ def remove_personal_credential(user: User):
 
 @app.post("/api/admin/invitations", status_code=201)
 def invite_researcher(payload: Invitation, user: User):
+    if not BYOK_ENABLED:
+        raise HTTPException(status_code=503, detail="Convites indisponíveis até aprovação da infraestrutura.")
     if not is_admin(user, ALLOWED_EMAILS):
         raise HTTPException(status_code=403, detail="Apenas administradores podem convidar.")
     return set_invitation(db, payload.email, True, user["uid"], ALLOWED_EMAILS)
@@ -163,6 +172,8 @@ def invite_researcher(payload: Invitation, user: User):
 
 @app.delete("/api/admin/invitations/{email}")
 def revoke_researcher(email: str, user: User):
+    if not BYOK_ENABLED:
+        raise HTTPException(status_code=503, detail="Convites indisponíveis até aprovação da infraestrutura.")
     if not is_admin(user, ALLOWED_EMAILS):
         raise HTTPException(status_code=403, detail="Apenas administradores podem revogar.")
     try:
@@ -184,7 +195,7 @@ def list_researches(user: User):
 def create_research(payload: NewResearch, user: User):
     owner_uid = user["uid"]
     access = get_access(db, user, ALLOWED_EMAILS)
-    if not (access["admin"] or access["byok_ready"]):
+    if not (access["admin"] or (BYOK_ENABLED and access["byok_ready"])):
         # Bloqueia antes de armazenar materiais ou iniciar Cloud Run.
         raise HTTPException(status_code=409, detail="Configure sua chave Gemini antes de iniciar uma pesquisa.")
     if payload.neon_review and not access["admin"]:
