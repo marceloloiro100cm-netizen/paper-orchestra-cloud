@@ -1177,6 +1177,26 @@
     }
     /* Campos nativos mantidos para app.js, controlados pelos cartões visuais */
     .sr-select { display: none !important; }
+    /* Primeiro acesso dos pesquisadores convidados: sem alterar os formulários de pesquisa. */
+    .access-pending .stepper, .access-pending [data-step-panel] { display: none !important; }
+    .gemini-setup { margin-top: 12px; border: 1px solid var(--border-main); border-radius: 14px; background: var(--bg-subtle); overflow: hidden; }
+    .gemini-setup > summary { cursor: pointer; padding: 12px 15px; font-weight: 700; color: var(--mpie-blue-text); }
+    .gemini-setup > summary:focus-visible { outline: 3px solid var(--mpie-blue); outline-offset: -3px; }
+    .gemini-setup-body { padding: 5px 15px 16px; }
+    .gemini-steps { margin: 6px 0 13px; padding-left: 21px; }
+    .gemini-steps > li { padding: 5px 0 8px; overflow-wrap: anywhere; }
+    .gemini-steps .actions { margin: 7px 0 0; }
+    .gemini-steps .btn { display: inline-flex; align-items: center; text-decoration: none; min-height: 41px; }
+    .gemini-key-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .gemini-key-row input { flex: 1 1 240px; min-width: 0; }
+    .gemini-key-row button { min-height: 41px; }
+    #gemini-key-ready { margin: 9px 0; }
+    #access-pending .actions { margin-bottom: 10px; }
+    @media (max-width: 520px) {
+      .gemini-key-row input { flex-basis: 100%; }
+      .gemini-key-row button { flex: 1; }
+      .gemini-steps .actions .btn { flex: 1 1 100%; justify-content: center; text-align: center; }
+    }
   </style>
 </head>
 <body>
@@ -1235,15 +1255,47 @@
           <p class="subtle" style="margin:0">Cada pesquisador utiliza sua própria chave Gemini. Nenhuma chave é exibida após o cadastro.</p>
         </div><span class="pill" id="account-state">Iniciando verificação...</span></div>
         <div id="account-message" class="subtle" role="status"></div>
-        <div id="guest-credential" class="hidden">
-          <p class="warning">O processamento Gemini será associado ao projeto da sua chave. O servidor e o armazenamento continuam compartilhados.</p>
-          <label for="personal-gemini-key">Chave individual da API Gemini (Google AI Studio)</label>
-          <input id="personal-gemini-key" type="password" autocomplete="new-password" placeholder="Cole sua chave privada" />
+        <div id="access-pending" class="hidden" aria-live="polite">
+          <h3 style="margin:0 0 7px">Seu login Google foi reconhecido</h3>
+          <p class="subtle">Falta o convite do administrador para utilizar o Scriptorium. Entrar com Google não libera automaticamente pesquisas nem acesso a documentos.</p>
+          <p class="subtle">E-mail da conta: <strong id="pending-email"></strong></p>
           <div class="actions">
-            <button class="btn" type="button" id="save-personal-key">Salvar chave de IA</button>
-            <button class="btn alt" type="button" id="remove-personal-key">Revogar minha chave</button>
+            <button class="btn" type="button" id="copy-access-request">Copiar pedido de convite</button>
+            <button class="btn alt" type="button" id="retry-access">Verificar meu acesso</button>
           </div>
-          <p class="subtle">Nunca compartilhe esta chave por e-mail ou mensagem. A chave é enviada somente à API autenticada e guardada no Secret Manager.</p>
+          <p class="subtle" id="pending-help" role="status"></p>
+        </div>
+        <div id="guest-credential" class="hidden">
+          <p id="gemini-key-ready" class="subtle hidden" role="status">Chave cadastrada. Você já pode iniciar pesquisas; o acesso real aos modelos será confirmado durante a execução.</p>
+          <details class="gemini-setup" id="gemini-setup-details">
+            <summary id="gemini-setup-title">Conectar minha chave Gemini — primeiro acesso</summary>
+            <div class="gemini-setup-body">
+              <p class="subtle">São três passos. A chave pertence à sua conta/projeto Google, não à conta do administrador.</p>
+              <ol class="gemini-steps">
+                <li><strong>Abra o Google AI Studio com sua conta Google.</strong>
+                  <div class="actions">
+                    <a class="btn" href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener noreferrer">Abrir página oficial de chaves</a>
+                    <a class="btn alt" href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" rel="noopener noreferrer">Ajuda oficial do Google</a>
+                  </div>
+                </li>
+                <li><strong>Copie uma chave da API Gemini.</strong> Caso não exista, use a opção de criação de chave no AI Studio e selecione um projeto Google seu. Confira a conta Google e as condições de faturamento antes de continuar.</li>
+                <li><strong>Volte ao Scriptorium, cole a chave e salve.</strong> O valor não será exibido depois do cadastro.</li>
+              </ol>
+              <label for="personal-gemini-key">Sua chave Gemini (privada)</label>
+              <div class="gemini-key-row">
+                <input id="personal-gemini-key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Cole a chave copiada do Google AI Studio" />
+                <button class="btn alt" type="button" id="paste-personal-key">Colar</button>
+                <button class="btn alt" type="button" id="toggle-personal-key" aria-pressed="false">Mostrar</button>
+              </div>
+              <div class="actions">
+                <button class="btn" type="button" id="save-personal-key">Salvar chave e continuar</button>
+                <button class="btn alt" type="button" id="remove-personal-key">Revogar minha chave</button>
+              </div>
+              <p class="subtle" id="key-setup-result" role="status"></p>
+              <p class="subtle">A chave é armazenada pelo servidor no Google Secret Manager. O cadastro verifica o formato; a autorização efetiva dos modelos será testada quando uma pesquisa for executada. Nunca envie a chave por mensagem.</p>
+              <p class="subtle">As cotas e eventuais custos da API Gemini pertencem ao projeto Google da chave. O plano pessoal Gemini/Google AI Pro não substitui o faturamento da API.</p>
+            </div>
+          </details>
         </div>
         <div id="admin-invitations" class="hidden">
           <label for="invitation-email">Convidar pesquisador pelo e-mail Google</label>
