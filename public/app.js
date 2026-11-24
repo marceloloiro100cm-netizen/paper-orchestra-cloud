@@ -61,7 +61,7 @@ function displayLibrary() {
   );
   if (!items.length) {target.textContent='Nenhum documento encontrado. Adicione PDFs, DOCX ou bibliografias para começar.';return;}
   for (const item of items) {
-    const line = document.createElement('div'); line.className = 'library-item';
+    const line = document.createElement('div'); line.className = 'library-item'; line.dataset.libraryId = item.id;
     const body = document.createElement('div');
     const label = document.createElement('label');
     const check = document.createElement('input'); check.type='checkbox';
