@@ -40,8 +40,7 @@ class FakeDb:
         self.documents = {}
 
     def collection(self, name):
-        assert name == "research_members"
-        return FakeCollection(self.documents)
+        return FakeCollection(self.documents.setdefault(name, {}))
 
 
 class InvitationTests(unittest.TestCase):
@@ -84,6 +83,20 @@ class InvitationTests(unittest.TestCase):
     def test_cannot_override_admin(self):
         with self.assertRaises(Exception):
             set_invitation(self.db, "admin@example.org", False, "admin-uid", self.admins)
+
+    def test_individual_credential_status(self):
+        from credentials import credential_state
+        guest = {"uid": "researcher-123", "email": "guest@example.org",
+                 "email_verified": True}
+        set_invitation(self.db, guest["email"], True, "admin-uid", self.admins)
+        self.assertFalse(get_access(self.db, guest, self.admins)["byok_ready"])
+        self.db.collection("research_credentials").document(guest["uid"]).set({
+            "status": "active", "secret_resource": "projects/p/secrets/scriptorium-byok-researcher-123"
+        })
+        self.assertTrue(credential_state(self.db, guest["uid"]))
+        self.assertTrue(get_access(self.db, guest, self.admins)["byok_ready"])
+        self.db.collection("research_credentials").document(guest["uid"]).set({"status": "revoked"})
+        self.assertFalse(get_access(self.db, guest, self.admins)["byok_ready"])
 
     def test_invalid_email(self):
         with self.assertRaises(ValueError):
