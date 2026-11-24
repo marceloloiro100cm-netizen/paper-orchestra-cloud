@@ -24,7 +24,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R09 | [OpenAlex API](https://docs.openalex.org/) | api | sim | termos do serviço | - | V1, M06, M18 |
 | R10 | [Semantic Scholar API](https://www.semanticscholar.org/product/api) | api | sim | termos do serviço | - | V1, M06 |
 | R11 | [Retraction Watch via Crossref](https://www.crossref.org/documentation/retrieve-metadata/retraction-watch/) | api | sim | termos do serviço | - | M07 |
-| R12 | [Estudo MIT: citações por ponteiros](https://dspace.mit.edu/entities/publication/2994e161-6c34-4f88-973e-c13d1e8cd2ef) | artigo | não | não se aplica | - | M05, M10 |
+| R12 | [Estudo MIT: citações por ponteiros](https://dspace.mit.edu/entities/publication/2994e161-6c34-4f88-973e-c13d1e8cd2ef) | artigo | sim | não se aplica | - | M05, M10 |
 | R13 | [GapView (UC Irvine)](https://escholarship.org/uc/item/2zs4w991) | artigo | não | não se aplica | - | M09, M16 |
 | R14 | [FIRE (MBZUAI)](https://github.com/mbzuai-nlp/fire) | prototipo | não | a conferir | - | M22 |
 | R15 | [RA-RAG (POSTECH)](https://github.com/ml-postech/RA-RAG) | prototipo | não | MIT | - | M18 |
@@ -47,7 +47,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R32 | [Pydantic](https://github.com/pydantic/pydantic) | biblioteca | sim | MIT | >=2.5,<3 | V1 |
 | R33 | [Firebase Admin SDK para Python](https://github.com/firebase/firebase-admin-python) | biblioteca | sim | Apache-2.0 | >=6.5,<8 | V1 |
 | R34 | [Google Cloud Client Libraries para Python (Firestore, Storage, Run, Secret Manager)](https://github.com/googleapis/google-cloud-python) | biblioteca | sim | Apache-2.0 | faixas em api/requirements.txt e worker/requirements.txt | V1 |
-| R35 | [Google Gen AI SDK para Python (google-genai)](https://github.com/googleapis/python-genai) | biblioteca | sim | Apache-2.0 | >=2.34.0,<3 | V1, M25 |
+| R35 | [Google Gen AI SDK para Python (google-genai)](https://github.com/googleapis/python-genai) | biblioteca | sim | Apache-2.0 | >=2.34.0,<3 | V1, M04, M25 |
 | R36 | [Requests](https://github.com/psf/requests) | biblioteca | sim | Apache-2.0 | >=2.31,<3 | V1, M07 |
 | R37 | [PyMuPDF](https://github.com/pymupdf/PyMuPDF) | biblioteca | sim | AGPL-3.0 | >=2.1,<3 | V1, M01, M02, M23 |
 | R38 | [abnTeX2](https://github.com/abntex/abntex2) | biblioteca | sim | LPPL-1.3c | versão do pacote Debian texlive-publishers da imagem python:3.11-slim | V1, M27 |
@@ -55,6 +55,8 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R40 | [OSV-Scanner GitHub Action (workflows reutilizáveis)](https://github.com/google/osv-scanner-action) | ferramenta | sim | Apache-2.0 | v2.7.1 | M15 |
 | R41 | [GitHub Actions usadas nos workflows (actions/checkout, setup-python, setup-node; google-github-actions/auth, setup-gcloud)](https://github.com/google-github-actions/auth) | ferramenta | sim | Apache-2.0 | checkout@v7, setup-python@v7, setup-node@v7, auth@v3, setup-gcloud@v3 | V1, M15 |
 | R42 | [Imagem base python:3.11-slim (Docker Official Images)](https://hub.docker.com/_/python) | ferramenta | sim | PSF-2.0 | python:3.11-slim (tag móvel, sem digest) | V1 |
+| R43 | [NumPy](https://github.com/numpy/numpy) | biblioteca | sim | BSD-3-Clause | >=1.26,<3 | M03, M04, M08 |
+| R44 | [Gemini Embedding (gemini-embedding-001)](https://ai.google.dev/api/embeddings) | api | sim | termos do serviço | gemini-embedding-001, 768 dimensões (SCRIPTORIUM_EMBEDDING_MODEL / _DIMENSIONS) | M04, M08 |
 
 ## Fichas
 
@@ -167,7 +169,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Política de atualização:** Ciclo mensal; mudar a versão dos embeddings força reindexação controlada.
 - **Frequência de revisão:** mensal
 - **Risco:** Índice serializado no GCS não é banco distribuído; reavaliar para muitos usuários.
-- **Nota de migração:** -
+- **Nota de migração:** Por enquanto a busca vetorial usa NumPy (R43), exata e equivalente ao IndexFlatIP. FAISS entra quando o índice persistente por conta passar de dezenas de milhares de vetores.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -319,12 +321,12 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Avisos de segurança:** -
 - **Histórico de mudanças:** -
 - **Licença (SPDX):** não se aplica
-- **Situação da licença:** artigo científico; implementar o princípio com código próprio
+- **Situação da licença:** artigo científico; princípio implementado com código próprio
 - **Licença dos pesos:** -
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** -
+- **Onde é usado:** worker/quote_verification.py
 - **Política de atualização:** Acompanhar revisões e trabalhos relacionados.
 - **Frequência de revisão:** trimestral
 - **Risco:** -
@@ -1018,6 +1020,52 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Política de atualização:** Semestral; planejar a troca de Python antes do fim do suporte do 3.11 (outubro de 2027).
 - **Frequência de revisão:** semestral
 - **Risco:** Tag móvel: cada build pode receber outra versão do Debian e do TeX Live.
+- **Nota de migração:** -
+- **Resultado de benchmark:** -
+- **Rollback:** -
+- **Responsável:** marceloloiro100cm-netizen
+- **Última checagem:** 2026-11-24
+
+### R43 · NumPy
+
+- **Fonte canônica:** https://github.com/numpy/numpy
+- **Versões:** https://github.com/numpy/numpy/releases
+- **Erros e correções:** https://github.com/numpy/numpy/issues
+- **Avisos de segurança:** https://github.com/numpy/numpy/security/advisories
+- **Histórico de mudanças:** -
+- **Licença (SPDX):** BSD-3-Clause
+- **Situação da licença:** a conferir pelo vigia semanal
+- **Licença dos pesos:** -
+- **Versão fixada:** >=1.26,<3
+- **Versão instalada:** -
+- **Última versão revisada:** -
+- **Onde é usado:** worker/requirements.txt, worker/vector_index.py, worker/embeddings.py
+- **Política de atualização:** Dependabot semanal; também vem do requirements.txt do PaperOrchestra.
+- **Frequência de revisão:** mensal
+- **Risco:** -
+- **Nota de migração:** Busca vetorial exata (equivalente ao IndexFlatIP do FAISS, R05) para até alguns milhares de trechos.
+- **Resultado de benchmark:** -
+- **Rollback:** -
+- **Responsável:** marceloloiro100cm-netizen
+- **Última checagem:** 2026-11-24
+
+### R44 · Gemini Embedding (gemini-embedding-001)
+
+- **Fonte canônica:** https://ai.google.dev/api/embeddings
+- **Versões:** -
+- **Erros e correções:** -
+- **Avisos de segurança:** -
+- **Histórico de mudanças:** https://docs.cloud.google.com/vertex-ai/generative-ai/docs/embeddings/get-text-embeddings
+- **Licença (SPDX):** termos do serviço
+- **Situação da licença:** serviço Google (Gemini API e Vertex AI); termos e preços próprios
+- **Licença dos pesos:** -
+- **Versão fixada:** gemini-embedding-001, 768 dimensões (SCRIPTORIUM_EMBEDDING_MODEL / _DIMENSIONS)
+- **Versão instalada:** gemini-embedding-001
+- **Última versão revisada:** -
+- **Onde é usado:** worker/embeddings.py, worker/evidence_matrix.py, scripts/eval_retrieval.py
+- **Política de atualização:** Mensal: nome do modelo, dimensões, limites (250 textos e 20 mil tokens por requisição no Vertex) e preço. Trocar de modelo invalida o cache de vetores (a chave inclui modelo e dimensão).
+- **Frequência de revisão:** mensal
+- **Risco:** Envia trechos das fontes ao Google (autorizado pelo responsável em 24/11/2026). Convidados usam a própria chave; nunca o projeto do administrador.
 - **Nota de migração:** -
 - **Resultado de benchmark:** -
 - **Rollback:** -

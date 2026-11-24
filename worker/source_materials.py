@@ -149,12 +149,58 @@ def derive_source(entry: dict, fetch_bytes, cache=None) -> tuple[dict, str]:
     return payload, status
 
 
+MAX_EMBEDDED_CHUNKS = 4000
+
+
+def embed_sources(chunks_by_source: dict[str, tuple[str, list[dict]]], embedder,
+                  cache=None) -> tuple[dict, dict]:
+    """Vetores por chunk_id (M04), com cache por fonte; limite de trechos por execução."""
+    vectors, stats = {}, {"cache_hits": 0, "embedded_sources": 0, "skipped_by_limit": 0}
+    budget = MAX_EMBEDDED_CHUNKS
+    # Chave: id da fonte -> (sha256 do arquivo, trechos). O cache usa o sha256.
+    for source_sha, chunks in chunks_by_source.values():
+        if not chunks:
+            continue
+        if len(chunks) > budget:
+            stats["skipped_by_limit"] += len(chunks)
+            continue
+        budget -= len(chunks)
+        key = f"{embedder.cache_namespace()}/{chunks[0]['parser_version']}-{chunks[0]['chunk_policy']}/{source_sha}"
+        matrix = None
+        if cache is not None:
+            try:
+                from embeddings import unpack_vectors
+                raw = cache.get(key)
+                matrix = unpack_vectors(raw, chunks, embedder) if raw else None
+            except Exception:
+                matrix = None
+        if matrix is not None:
+            stats["cache_hits"] += 1
+        else:
+            matrix = embedder.embed([c["text"] for c in chunks], "RETRIEVAL_DOCUMENT")
+            stats["embedded_sources"] += 1
+            if cache is not None:
+                try:
+                    from embeddings import pack_vectors
+                    cache.put(key, pack_vectors(chunks, matrix, embedder))
+                except Exception:
+                    pass
+        vectors.update({c["chunk_id"]: matrix[i] for i, c in enumerate(chunks)})
+    return vectors, stats
+
+
 def compose_library_context_v2(sources: list[dict], fetch_bytes, query_text: str,
-                               cache=None) -> tuple[str, list[dict], dict]:
-    """Contexto por trechos recuperados, com ponteiros de página (V2)."""
+                               cache=None, embedder=None,
+                               collect: dict | None = None) -> tuple[str, list[dict], dict]:
+    """Contexto por trechos recuperados, com ponteiros de página (V2).
+
+    Com `embedder`, a busca é híbrida (BM25 + embeddings, RRF); qualquer falha de
+    embeddings volta para a busca lexical e fica registrada na cobertura.
+    `collect` (opcional) recebe trechos e vetores para a auditoria de evidências.
+    """
     from retrieval_context import render_context, select_passages
 
-    manifest, all_chunks, meta = [], [], {}
+    manifest, all_chunks, meta, by_source = [], [], {}, {}
     for entry in sources[:8]:
         fmt = entry.get("format", "")
         record = {"id": entry["id"], "name": entry.get("name", "material"), "format": fmt,
@@ -176,12 +222,27 @@ def compose_library_context_v2(sources: list[dict], fetch_bytes, query_text: str
             if not payload["chunks"]:
                 record["status"] = "no_extractable_text"
             all_chunks += payload["chunks"]
+            by_source[entry["id"]] = (entry.get("sha256") or entry["id"], payload["chunks"])
             meta[entry["id"]] = {"name": record["name"], "format": fmt}
         except Exception as error:
             record["status"] = "unreadable"
             record["note"] = type(error).__name__
         manifest.append(record)
-    selected, coverage = select_passages(all_chunks, query_text)
+    vectors, query_vector, embedding_info = None, None, {"status": "disabled"}
+    if embedder is not None and all_chunks:
+        try:
+            vectors, stats = embed_sources(by_source, embedder, cache)
+            query_vector = embedder.embed([query_text], "RETRIEVAL_QUERY")[0]
+            embedding_info = {"status": "completed", **stats, **embedder.info()}
+        except Exception as error:
+            vectors, query_vector = None, None
+            embedding_info = {"status": "failed_fallback_lexical", "error": type(error).__name__,
+                              **embedder.info()}
+    selected, coverage = select_passages(all_chunks, query_text, vectors=vectors,
+                                         query_vector=query_vector)
+    coverage["embeddings"] = embedding_info
+    if collect is not None:
+        collect.update({"chunks": all_chunks, "vectors": vectors or {}, "sources": meta})
     for record in manifest:
         info = coverage["sources"].get(record["id"], {})
         record["chunks_selected"] = info.get("chunks_selected", 0)

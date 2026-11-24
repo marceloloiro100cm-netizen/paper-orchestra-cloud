@@ -117,6 +117,8 @@ def serializable(record: dict) -> dict:
         "references_checked": record.get("references_checked"),
         "references_skipped": record.get("references_skipped"),
         "editorial_alerts": record.get("editorial_alerts"),
+        "evidence_status": record.get("evidence_status", "not_available"),
+        "evidence_summary": record.get("evidence_summary"),
         "audit_findings": record.get("audit_findings"),
         "error": record.get("error", ""),
         "created_at": record.get("created_at", ""),
@@ -355,7 +357,8 @@ def get_status(job_id: str, user: User):
 
 @app.get("/api/jobs/{job_id}/download/{file_kind}")
 def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "references", "neon",
-                                             "manifest", "declaration"], user: User):
+                                             "manifest", "declaration", "evidence", "evidence_csv"],
+             user: User):
     if file_kind == "neon" and not (NEON_REVIEW_ENABLED and is_admin(user, ALLOWED_EMAILS)):
         raise HTTPException(status_code=403, detail="Parecer Neon não está disponível nesta conta.")
     item = get_research(job_id, user)
@@ -370,7 +373,10 @@ def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "re
                "neon": ("neon_critical_review.json", "application/json"),
                # M14: proveniência; M11: rascunho de declaração de uso de IA.
                "manifest": ("run_manifest.json", "application/json"),
-               "declaration": ("declaracao_uso_ia.md", "text/markdown; charset=utf-8")}
+               "declaration": ("declaracao_uso_ia.md", "text/markdown; charset=utf-8"),
+               # M05 + M08/M10: citações literais e matriz de evidências.
+               "evidence": ("evidence_report.json", "application/json"),
+               "evidence_csv": ("evidence_matrix.csv", "text/csv; charset=utf-8")}
     filename, content_type = filemap[file_kind]
     blob_path = f"research/{user['uid']}/{job_id}/output/{filename}"
     blob = bucket.blob(blob_path)
