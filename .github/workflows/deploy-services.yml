@@ -47,14 +47,18 @@ jobs:
         with:
           project_id: paperorchestra-mestrado
 
-      - name: Provisionar e auditar IAM BYOK antes de publicar
+      - name: Auditar IAM BYOK sem alterar permissões
         shell: bash
         env:
           PROJECT_ID: paperorchestra-mestrado
         run: |
           set -euo pipefail
-          bash scripts/setup-byok-iam.sh
-          bash scripts/audit-byok-iam.sh
+          # Configuração de IAM exige administrador de projeto e deve ser feita
+          # uma única vez, fora do GitHub Actions. O publicador só audita.
+          if ! bash scripts/audit-byok-iam.sh; then
+            echo "::error::A liberação BYOK ainda não foi aprovada no IAM. Execute UMA VEZ, como administrador no Cloud Shell, scripts/setup-byok-iam.sh e scripts/audit-byok-iam.sh. Nunca conceda papel Role Admin ao deployer automático."
+            exit 1
+          fi
 
       - name: Construir API e worker sem alterar produção
         shell: bash

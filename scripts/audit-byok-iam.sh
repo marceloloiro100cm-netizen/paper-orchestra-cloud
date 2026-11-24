@@ -11,14 +11,15 @@ PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --project="$PROJECT_ID"
 if [[ ! "$PROJECT_NUMBER" =~ ^[0-9]+$ ]]; then echo "Número de projeto inválido" >&2; exit 2; fi
 API_SA="serviceAccount:paper-orchestra-api@${PROJECT_ID}.iam.gserviceaccount.com"
 WORKER_SA="serviceAccount:paper-orchestra-worker@${PROJECT_ID}.iam.gserviceaccount.com"
+DEPLOYER_SA="serviceAccount:paper-orchestra-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
 POLICY="$(mktemp)"
 trap 'rm -f "$POLICY"' EXIT
 gcloud projects get-iam-policy "$PROJECT_ID" --format=json > "$POLICY"
-python3 - "$POLICY" "$PROJECT_ID" "$PROJECT_NUMBER" "$API_SA" "$WORKER_SA" <<'PY'
+python3 - "$POLICY" "$PROJECT_ID" "$PROJECT_NUMBER" "$API_SA" "$WORKER_SA" "$DEPLOYER_SA" <<'PY'
 import json
 import sys
 
-path, project, number, api, worker = sys.argv[1:]
+path, project, number, api, worker, deployer = sys.argv[1:]
 with open(path, encoding="utf-8") as handle:
     policy = json.load(handle)
 bindings = policy.get("bindings", [])
@@ -38,6 +39,14 @@ for member, (role, title) in expected.items():
                 for binding in matches)
     if not valid:
         problems.append("Ausência de IAM condicionado para " + title)
+
+# Pipeline automático só pode ler a política IAM, não modificar papéis nem
+# conceder acesso a segredos. Exigir o papel personalizado criado no bootstrap.
+auditor_role = "projects/" + project + "/roles/scriptoriumByokAuditor"
+if not any(binding.get("role") == auditor_role
+           and deployer in binding.get("members", [])
+           for binding in bindings):
+    problems.append("Deployer sem auditoria IAM de leitura. Execute o bootstrap único.")
 
 # Examinar bindings sem condição, ou com condição diferente da configuração BYOK.
 high_risk_roles = {
