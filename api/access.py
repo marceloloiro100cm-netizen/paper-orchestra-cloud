@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
+from credentials import credential_state
 
 
 def normalize_email(email: str) -> str:
@@ -40,9 +41,9 @@ def get_access(db, user: dict, admin_emails: set[str]) -> dict:
     snap = db.collection("research_members").document(key).get()
     invitation = snap.to_dict() if snap.exists else {}
     allowed = invitation.get("status") == "active" and invitation.get("email") == email
-    # Convidados permanecem impedidos de usar a IA do projeto compartilhado.
-    # A habilitação real de BYOK exige cofre, worker e testes de isolamento.
-    return {"allowed": allowed, "admin": False, "byok_ready": False}
+    # Nunca permite a credencial padrão do servidor a um convidado.
+    ready = bool(allowed and credential_state(db, user.get("uid", "")))
+    return {"allowed": allowed, "admin": False, "byok_ready": ready}
 
 
 class Invitation(BaseModel):
