@@ -444,8 +444,11 @@ async function loadAccountAccess() {
   $('admin-invitations').classList.add('hidden');
   $('submit').disabled = true;
   $('account-state').textContent = 'Verificando...';
+  // Uma rota lenta ou deploy incompleto não pode deixar a tela carregando para sempre.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    const response = await request('/account/access');
+    const response = await request('/account/access', { signal: controller.signal });
     accountAccess = await response.json();
     $('account-state').textContent = accountAccess.admin ? 'Administrador' :
       (accountAccess.byok_ready ? 'Chave cadastrada (não testada)' : 'Chave Gemini necessária');
@@ -457,9 +460,14 @@ async function loadAccountAccess() {
       'Para iniciar uma pesquisa, configure sua própria chave Gemini.';
   } catch (error) {
     accountAccess = null;
-    $('account-state').textContent = 'Sem autorização';
-    $('account-message').textContent = error.message;
+    const timedOut = error?.name === 'AbortError' || error?.name === 'TimeoutError';
+    $('account-state').textContent = timedOut ? 'Conexão indisponível' : 'Verificação falhou';
+    $('account-message').textContent = timedOut
+      ? 'A API não respondeu em 12 segundos. Atualize a página ou tente novamente.'
+      : 'Não foi possível confirmar sua conta: ' + (error?.message || 'erro inesperado');
     $('submit').disabled = true;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
