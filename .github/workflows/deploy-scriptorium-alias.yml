@@ -8,7 +8,10 @@ on:
     paths:
       - .github/workflows/deploy-scriptorium-alias.yml
       - scripts/deploy-scriptorium-alias.sh
-      - scripts/authorize-scriptorium-domain.py
+      - public/config.js
+      - public/app.js
+      - public/index.html
+      - firebase.json
   workflow_dispatch:
 
 permissions:
@@ -35,7 +38,8 @@ jobs:
           test -f public/config.js
           grep -q 'projectId: "paperorchestra-mestrado"' public/config.js
           bash -n scripts/deploy-scriptorium-alias.sh
-          python3 -m py_compile scripts/authorize-scriptorium-domain.py
+          # O login usa domínio autorizado previamente pelo administrador.
+          # Não modifica configuração Firebase Authentication.
           node --check public/app.js
           node --check public/config.js
           python3 - <<'PY'
@@ -74,8 +78,9 @@ jobs:
           GOOGLE_CLOUD_PROJECT: paperorchestra-mestrado
         run: bash scripts/deploy-scriptorium-alias.sh
 
-      - name: Autorizar novo domínio no Firebase Authentication
-        run: python3 scripts/authorize-scriptorium-domain.py
+      # A autorização foi realizada pelo administrador no Firebase Console,
+      # confirmado visualmente em 24/11/2026. Não repetir chamada de escrita
+      # à configuração Firebase Auth via deployer sem permissão de consulta.
 
       - name: Confirmar backend compartilhado e acesso negado sem login
         run: |
