@@ -67,6 +67,23 @@ e concede ao worker acesso de leitura **condicionado ao prefixo**
 `scriptorium-byok-`. A API não recebe permissão para ler os valores dos
 segredos; o worker não recebe permissão irrestrita de leitura de segredos.
 
+Foi incluída uma auditoria read-only de política IAM, que deve ser executada
+após o provisionamento e antes de qualquer deploy público:
+
+```bash
+PROJECT_ID=paperorchestra-mestrado bash scripts/setup-byok-iam.sh
+PROJECT_ID=paperorchestra-mestrado bash scripts/audit-byok-iam.sh
+```
+
+A segunda linha somente **lê a política IAM** do projeto, não lê segredos e
+falha quando faltam condições por prefixo ou aparecem concessões amplas
+conhecidas. Ela não substitui a revisão de permissões herdadas nem uma
+verificação de Cloud Run com duas contas reais.
+
+Chaves Gemini antigas `AIza...` e novas `AQ....` são aceitas pelo formulário
+e pelo worker. Esse teste é de formato; a autenticação, os limites e a
+disponibilidade dos modelos dependem do projeto de cada pesquisador.
+
 Esse script **não é executado automaticamente** pelo deploy de serviços.
 Deve ser revisado, executado explicitamente no projeto
 `paperorchestra-mestrado` e verificado com IAM efetivo antes de promover o PR.
