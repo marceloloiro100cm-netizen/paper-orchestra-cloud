@@ -21,7 +21,7 @@ def api(path):
         return json.load(resp)
 
 
-for workflow in ("deploy-services.yml", "deploy-hosting.yml"):
+for workflow in ("deploy-services.yml", "deploy-hosting.yml", "deploy-scriptorium-alias.yml"):
     q = parse.urlencode({"branch": "main", "per_page": "3"})
     data = api("/actions/workflows/" + workflow + "/runs?" + q)
     print("WORKFLOW: " + workflow)
