@@ -79,14 +79,13 @@ jobs:
           WORKER_IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/paper-orchestra/worker:agents-${GITHUB_SHA}"
           # Update de imagem somente: preservar variáveis de ambiente, serviços, IAM e Storage.
           gcloud run jobs update paper-orchestra-worker --image="$WORKER_IMAGE" --region="$REGION" --project="$PROJECT" --quiet
-          gcloud run services update paper-orchestra-api --image="$API_IMAGE" --update-env-vars="NEON_REVIEW_ENABLED=true,BYOK_ENABLED=true" --region="$REGION" --project="$PROJECT" --quiet
+          gcloud run services update paper-orchestra-api --image="$API_IMAGE" --update-env-vars="NEON_REVIEW_ENABLED=true,BYOK_ENABLED=true,SCRIPTORIUM_RELEASE_SHA=${GITHUB_SHA}" --region="$REGION" --project="$PROJECT" --quiet
 
-      - name: Verificar que a API continua respondendo
+      - name: Verificar publicação, revisão e proteção das rotas de contas
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsS --retry 6 --retry-delay 5 \
-            https://paperorchestra-mestrado.web.app/api/health \
-            -o /tmp/paper-health.json
-          python -c "import json; data=json.load(open('/tmp/paper-health.json')); assert data.get('ok') is True, data"
-          echo "Nova versão do serviço implantada. A geração multiagente ainda precisa de novo teste pelo usuário."
+          # O health sozinho aceitava uma API antiga. Agora exigimos o SHA e
+          # respostas 401 de cinco rotas de pesquisa/acesso sem token.
+          python3 scripts/check-public-onboarding.py --expected-release "${GITHUB_SHA}" --attempts 12
+          echo "API publicada e rotas protegidas. Validação autenticada ainda precisa de contas reais."
