@@ -24,7 +24,7 @@ jobs:
     environment: production
     steps:
       - name: Obter o código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verificar o projeto e o branch de origem
         env:

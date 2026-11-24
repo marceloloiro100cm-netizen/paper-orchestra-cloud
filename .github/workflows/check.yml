@@ -8,7 +8,7 @@ jobs:
   static-checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate Python files
         run: |
           python -m pip install -q requests fastapi google-api-core

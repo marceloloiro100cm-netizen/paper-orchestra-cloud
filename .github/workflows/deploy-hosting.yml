@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Obter código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Conferir configuração e projeto
         shell: bash
