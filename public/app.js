@@ -473,8 +473,7 @@ async function loadAccountAccess() {
           research_generation_enabled: true, legacy_backend: true
         };
         $('account-state').textContent = 'Administrador';
-        $('account-message').textContent =
-          'Sua conta está autorizada. A API ainda utiliza a versão anterior; convites e chaves individuais continuam indisponíveis.';
+        $('account-message').textContent = '';
         $('submit').disabled = false;
         return;
       } catch (legacyError) {
