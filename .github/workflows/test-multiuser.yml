@@ -8,6 +8,7 @@ on:
       - "public/**"
       - "tests/test_access.py"
       - "tests/test_byok.py"
+      - "tests/test_credentials.py"
       - "scripts/setup-byok-iam.sh"
       - ".github/workflows/test-multiuser.yml"
   push:
@@ -40,3 +41,4 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_access.py' -v
           python -m unittest discover -s tests -p 'test_byok.py' -v
+          python -m unittest discover -s tests -p 'test_credentials.py' -v
