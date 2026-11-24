@@ -10,6 +10,11 @@
 # (request.time), usa só para criar os dois papéis do BYOK e remove a
 # concessão no fim, mesmo em caso de falha. A expiração é uma segunda barreira:
 # se a remoção falhar, a concessão deixa de valer sozinha.
+#
+# Modo "permissoes-deploy": dá ao deployer só o que o gcloud builds submit
+# precisa (Service Usage Consumer e Storage Admin restrito ao bucket de fontes
+# do Cloud Build). Exige Project IAM Admin temporário concedido no Console e
+# remove esse papel ao final.
 name: Bootstrap BYOK (sem Cloud Shell)
 
 on:
@@ -20,9 +25,9 @@ on:
         required: true
         default: diagnosticar
         type: choice
-        options: [diagnosticar, aplicar]
+        options: [diagnosticar, aplicar, permissoes-deploy]
       confirmacao:
-        description: "Para aplicar, digite CONFIRMO-BYOK"
+        description: "Para aplicar ou permissoes-deploy, digite CONFIRMO-BYOK"
         required: false
         default: ""
 
@@ -117,7 +122,7 @@ jobs:
           done
 
       - name: Conferir confirmação
-        if: inputs.modo == 'aplicar'
+        if: inputs.modo != 'diagnosticar'
         shell: bash
         env:
           CONFIRMACAO: ${{ inputs.confirmacao }}
@@ -174,8 +179,43 @@ jobs:
           echo "::error::O bootstrap não pôde ser aplicado. Veja as mensagens acima."
           exit 1
 
+      - name: Permissões de build do deployer (Service Usage Consumer e bucket do Cloud Build)
+        if: inputs.modo == 'permissoes-deploy'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUCKET="${PROJECT_ID}_cloudbuild"
+          gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+            --member="serviceAccount:${DEPLOYER}" --role="roles/serviceusage.serviceUsageConsumer" \
+            --condition=None --quiet >/dev/null
+          echo "Concedido: roles/serviceusage.serviceUsageConsumer"
+          # Storage Admin só vale no bucket de fontes do Cloud Build (e no nível de
+          # projeto, onde o gcloud lista buckets para conferir o dono). Os buckets
+          # de dados dos pesquisadores ficam de fora da condição.
+          EXPR="resource.type == \"cloudresourcemanager.googleapis.com/Project\" || resource.name.startsWith(\"projects/_/buckets/${BUCKET}\")"
+          gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+            --member="serviceAccount:${DEPLOYER}" --role="roles/storage.admin" \
+            --condition="title=DeployerFontesCloudBuild,description=Somente o bucket ${BUCKET},expression=${EXPR}" \
+            --quiet >/dev/null
+          echo "Concedido: roles/storage.admin restrito a ${BUCKET}"
+          for attempt in 1 2 3 4 5 6 7 8; do
+            TOKEN="$(gcloud auth print-access-token)"
+            p="$(curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+              "https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT_ID}:testIamPermissions" \
+              -d '{"permissions":["serviceusage.services.use"]}')"
+            b="$(curl -sS -H "Authorization: Bearer $TOKEN" \
+              "https://storage.googleapis.com/storage/v1/b/${BUCKET}/iam/testPermissions?permissions=storage.objects.create&permissions=storage.buckets.get")"
+            echo "Tentativa ${attempt}: projeto=${p//[$'\n ']/} bucket=${b//[$'\n ']/}"
+            if echo "$p" | grep -q services.use && echo "$b" | grep -q objects.create && echo "$b" | grep -q buckets.get; then
+              echo "Permissões de build propagadas."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::warning::As concessões foram feitas, mas ainda não propagaram. Rode o deploy em alguns minutos."
+
       - name: Remover papéis temporários (sempre)
-        if: always() && inputs.modo == 'aplicar'
+        if: always() && inputs.modo != 'diagnosticar'
         shell: bash
         run: |
           set -euo pipefail
