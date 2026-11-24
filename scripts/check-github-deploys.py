@@ -22,7 +22,7 @@ def api(path):
 
 
 for workflow in ("deploy-services.yml", "deploy-hosting.yml", "deploy-scriptorium-alias.yml"):
-    q = parse.urlencode({"branch": "main", "per_page": "3"})
+    q = parse.urlencode({"branch": "main", "per_page": "5"})
     data = api("/actions/workflows/" + workflow + "/runs?" + q)
     print("WORKFLOW: " + workflow)
     for run in data.get("workflow_runs", [])[:3]:
