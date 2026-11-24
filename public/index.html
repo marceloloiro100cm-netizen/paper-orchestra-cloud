@@ -1144,20 +1144,35 @@
       let editingColId = null;
       let draggedKey = null;
 
-      try {
-        const sc = JSON.parse(localStorage.getItem('scriptorium_kanban_cols') || 'null');
-        if (Array.isArray(sc) && sc.length >= 2) columns = sc;
-        const sm = JSON.parse(localStorage.getItem('scriptorium_item_cols') || '{}');
-        if (sm && typeof sm === 'object') itemColMap = sm;
-        const sv = localStorage.getItem('scriptorium_view_mode');
-        if (sv === 'kanban' || sv === 'list') viewMode = sv;
-      } catch (_) {}
-
-      function savePrefs() {
+      // Preferências pertencem à conta Google ativa, nunca ao navegador inteiro.
+      // O servidor continua sendo a fonte de verdade para os documentos.
+      let libraryUid = null;
+      const prefKey = (name) => 'scriptorium_library_' + libraryUid + '_' + name;
+      function loadPrefs() {
+        columns = JSON.parse(JSON.stringify(DEFAULT_COLS));
+        itemColMap = {};
+        viewMode = 'kanban';
+        activeColFilter = 'todas';
+        activeFormat = 'todos';
+        editingColId = null;
+        if (!libraryUid) return;
         try {
-          localStorage.setItem('scriptorium_kanban_cols', JSON.stringify(columns));
-          localStorage.setItem('scriptorium_item_cols', JSON.stringify(itemColMap));
-          localStorage.setItem('scriptorium_view_mode', viewMode);
+          const sc = JSON.parse(localStorage.getItem(prefKey('cols')) || 'null');
+          if (Array.isArray(sc) && sc.length >= 2 &&
+              sc.every(c => typeof c.id === 'string' && typeof c.name === 'string'))
+            columns = sc;
+          const sm = JSON.parse(localStorage.getItem(prefKey('items')) || '{}');
+          if (sm && typeof sm === 'object' && !Array.isArray(sm)) itemColMap = sm;
+          const sv = localStorage.getItem(prefKey('view'));
+          if (sv === 'kanban' || sv === 'list') viewMode = sv;
+        } catch (_) {}
+      }
+      function savePrefs() {
+        if (!libraryUid) return;
+        try {
+          localStorage.setItem(prefKey('cols'), JSON.stringify(columns));
+          localStorage.setItem(prefKey('items'), JSON.stringify(itemColMap));
+          localStorage.setItem(prefKey('view'), viewMode);
         } catch (_) {}
       }
 
@@ -1544,6 +1559,14 @@
         if (selCount) new MutationObserver(() => updateBudget(readRealLibraryItems())).observe(selCount, { childList: true, characterData: true, subtree: true });
       }
       libList.addEventListener('change', () => setTimeout(renderLibraryViews, 20));
+      window.addEventListener('scriptorium:library-user-changed', (event) => {
+        const uid = event.detail && event.detail.uid;
+        if (libraryUid === uid) return;
+        libraryUid = uid || null;
+        loadPrefs();
+        libList.textContent = 'Carregando biblioteca...';
+        renderLibraryViews();
+      });
       renderLibraryViews();
 
     })();
