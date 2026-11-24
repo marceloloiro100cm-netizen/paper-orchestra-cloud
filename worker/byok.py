@@ -1,6 +1,5 @@
 """Carregamento fail-closed de credenciais BYOK no Cloud Run Job."""
 import re
-from google.cloud import secretmanager
 
 
 def personal_agent_environment(current: dict, db, project: str, owner_uid: str, *,
@@ -14,7 +13,11 @@ def personal_agent_environment(current: dict, db, project: str, owner_uid: str, 
     path = f"projects/{project}/secrets/scriptorium-byok-{owner_uid}"
     if snap.to_dict().get("secret_resource") != path:
         raise RuntimeError("Caminho da credencial inválido")
-    client = manager or secretmanager.SecretManagerServiceClient()
+    if manager is None:
+        from google.cloud import secretmanager
+        client = secretmanager.SecretManagerServiceClient()
+    else:
+        client = manager
     response = client.access_secret_version(request={"name": path + "/versions/latest"})
     key = response.payload.data.decode("utf-8")
     if not re.fullmatch(r"[A-Za-z0-9_-]{20,512}", key):
