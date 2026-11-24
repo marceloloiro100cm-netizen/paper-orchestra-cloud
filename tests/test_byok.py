@@ -84,6 +84,12 @@ class BYOKTests(unittest.TestCase):
             personal_agent_environment({}, DB(), "myproject",
                                        "../other", manager=Manager("A" * 39))
 
+    def test_new_aq_key_format_accepted(self):
+        key = "AQ." + "a" * 44
+        result = personal_agent_environment({}, DB(), "myproject", "guest-1",
+                                            manager=Manager(key))
+        self.assertEqual(result["GEMINI_API_KEY"], key)
+
     def test_invalid_key_blocks(self):
         with self.assertRaises(RuntimeError):
             personal_agent_environment({}, DB(), "myproject",
