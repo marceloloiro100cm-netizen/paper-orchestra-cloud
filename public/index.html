@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1466B8">
+  <meta name="scriptorium-ui-revision" content="responsive-fluid-20261124-2">
   <title>Scriptorium MPIE — Laboratório de Pesquisa</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='115 40 282 432'%3E%3Cpath fill='%232779C9' d='M251.5 48 C234 114,186 196,130 274 C126 280,126 287,131 293 C156 322,174 352,184 386 L256 386 L256 238 L251.5 238 Z'/%3E%3Cpath fill='%23145DA6' d='M260.5 48 C278 114,326 196,382 274 C386 280,386 287,381 293 C356 322,338 352,328 386 L256 386 L256 238 L260.5 238 Z'/%3E%3Crect x='249.5' y='246' width='13' height='140' fill='%23F4B93B'/%3E%3Ccircle cx='256' cy='236' r='24' fill='%23F4B93B'/%3E%3Cpath fill='none' stroke='%23F4B93B' stroke-width='13' stroke-linecap='round' stroke-linejoin='round' d='M196 276 L196 306 L224 334 L224 386 M316 276 L316 306 L288 334 L288 386'/%3E%3Ccircle cx='196' cy='272' r='16' fill='%23F4B93B'/%3E%3Ccircle cx='316' cy='272' r='16' fill='%23F4B93B'/%3E%3Cpath fill='%231466B8' d='M184 402 L328 402 L338 456 C339 461,335 466,330 466 L182 466 C177 466,173 461,174 456 Z'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -89,7 +90,7 @@
       z-index: 40;
       background: var(--bg-surface);
       border-bottom: 1px solid var(--border-main);
-      padding: 12px max(20px, calc((100vw - 1024px) / 2));
+      padding: 12px clamp(12px, 2.25vw, 48px);
       transition: background-color 180ms ease, border-color 180ms ease;
     }
     .head {
@@ -182,7 +183,8 @@
     /* Container principal */
     main {
       flex: 1;
-      width: min(1024px, 100%);
+      width: 100%;
+      max-width: none;
       padding: 26px 20px 32px;
       margin: 0 auto;
     }
@@ -387,7 +389,7 @@
        ========================================================================= */
     .research-studio {
       display: grid;
-      grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr);
+      grid-template-columns: minmax(0, 1.65fr) minmax(310px, 0.85fr);
       gap: 22px;
       align-items: start;
     }
@@ -2093,6 +2095,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=20261124-legacy-admin-recovery-3"></script>
+  <script type="module" src="/app.js?v=responsive-fluid-20261124-2"></script>
 </body>
 </html>
