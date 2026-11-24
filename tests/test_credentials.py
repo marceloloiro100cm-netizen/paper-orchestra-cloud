@@ -76,6 +76,21 @@ class CredentialTests(unittest.TestCase):
         self.assertIn("/scriptorium-byok-user_a", manager.versions[0]["parent"])
         self.assertIn("/scriptorium-byok-user_b", manager.versions[1]["parent"])
 
+    def test_verified_models_saved_with_credential_without_secret_value(self):
+        db, manager = DB(), Manager()
+        key = "K" * 39
+        access = {
+            "status": "verified",
+            "models": {"gemini-3-flash-preview": "supported",
+                       "gemini-3.1-pro-preview": "unavailable"},
+        }
+        store_credential(db, "safeproject", "visitor", key,
+                         client=manager, model_access=access)
+        stored = db.collections["research_credentials"]["visitor"]
+        self.assertEqual(stored["model_access"], access)
+        self.assertTrue(stored["status"] == "active")
+        self.assertNotIn(key, str(stored))
+
     def test_revocation_disables_credential_and_deletes_secret(self):
         db, manager = DB(), Manager()
         store_credential(db, "safeproject", "guest", "A" * 39, client=manager)
