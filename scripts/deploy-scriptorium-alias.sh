@@ -16,7 +16,7 @@ command -v python3 >/dev/null || { echo "Python 3 indisponível." >&2; exit 2; }
 
 echo "Consultando sites Firebase Hosting do projeto $PROJECT (sem tocar no site padrão)..."
 SITES_JSON="$(mktemp)"
-TEMP_CONFIG="$(mktemp "./firebase-scriptorium.XXXXXX.json")"
+TEMP_CONFIG="$(mktemp --suffix=.json "./firebase-scriptorium.XXXXXX")"
 trap 'rm -f "$SITES_JSON" "$TEMP_CONFIG"' EXIT
 
 firebase hosting:sites:list --project "$PROJECT" --json > "$SITES_JSON"
@@ -24,12 +24,14 @@ if python3 - "$SITES_JSON" "$SITE_ID" <<'PY'
 import json, sys
 data = json.load(open(sys.argv[1], encoding="utf-8"))
 if data.get("status") != "success":
-    raise SystemExit("Não foi possível confirmar a listagem do Firebase Hosting")
+    print("Não foi possível confirmar a listagem do Firebase Hosting", file=sys.stderr)
+    raise SystemExit(2)
 result = data.get("result", [])
 if isinstance(result, dict):
     result = result.get("sites", [])
 if not isinstance(result, list):
-    raise SystemExit("Formato inesperado da listagem Hosting")
+    print("Formato inesperado da listagem Hosting", file=sys.stderr)
+    raise SystemExit(2)
 site = sys.argv[2]
 found = any(isinstance(item, dict) and (
     item.get("name", "").endswith("/sites/" + site)
@@ -42,6 +44,11 @@ PY
 then
   echo "O site scriptorium já está registrado neste projeto. Reutilizando."
 else
+  status=$?
+  if [[ "$status" != "1" ]]; then
+    echo "Listagem Hosting não confiável: abortando sem criar sites." >&2
+    exit "$status"
+  fi
   echo "Tentando registrar o nome global scriptorium.web.app..."
   # Se já pertencer a outra pessoa ou faltar IAM, o comando falha.
   # NÃO escolher nome alternativo automaticamente.
