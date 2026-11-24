@@ -1,9 +1,14 @@
-name: Scriptorium — publicar endereço scriptorium.web.app
+name: Scriptorium — publicar endereço scriptoriummpie.web.app
 
-# ATENÇÃO: o Firebase rejeitou SITE_ID=scriptorium (nome global já reservado).
-# Não repetir tentativas em todos os deploys de frontend. Ao escolher outro
-# nome de site, atualizar o script e a documentação antes de iniciar manualmente.
+# O nome exato scriptorium.web.app foi rejeitado (globalmente reservado).
+# A tentativa agora usa o novo nome indicado pelo usuário: scriptoriummpie.web.app.
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-scriptorium-alias.yml
+      - scripts/deploy-scriptorium-alias.sh
+      - scripts/authorize-scriptorium-domain.py
   workflow_dispatch:
 
 permissions:
@@ -64,7 +69,7 @@ jobs:
       - name: Instalar Firebase CLI
         run: npm install --global firebase-tools@latest
 
-      - name: Registrar scriptorium.web.app e publicar a mesma aplicação
+      - name: Registrar scriptoriummpie.web.app e publicar a mesma aplicação
         env:
           GOOGLE_CLOUD_PROJECT: paperorchestra-mestrado
         run: bash scripts/deploy-scriptorium-alias.sh
@@ -76,7 +81,7 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --max-time 20 \
-            https://scriptorium.web.app/api/health \
+            https://scriptoriummpie.web.app/api/health \
             -o /tmp/scriptorium-health.json
           python3 - <<'PY'
           import json
@@ -85,7 +90,7 @@ jobs:
           print("API alcançável no novo domínio.")
           PY
           STATUS="$(curl --silent --show-error --max-time 20 -o /dev/null \
-            -w "%{http_code}" https://scriptorium.web.app/api/jobs)"
+            -w "%{http_code}" https://scriptoriummpie.web.app/api/jobs)"
           if [[ "$STATUS" != "401" ]]; then
             echo "::error::/api/jobs no novo domínio precisa exigir autenticação HTTP 401, retornou $STATUS."
             exit 1
