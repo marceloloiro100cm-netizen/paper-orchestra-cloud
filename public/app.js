@@ -548,6 +548,7 @@ async function loadAccountAccess() {
   $('access-pending').classList.add('hidden');
   $('guest-credential').classList.add('hidden');
   $('admin-invitations').classList.add('hidden');
+  $('legacy-api-notice').classList.add('hidden');
   $('submit').disabled = true;
   $('account-state').textContent = 'Verificando...';
   $('pending-email').textContent = user?.email || '';
@@ -595,8 +596,10 @@ async function loadAccountAccess() {
         };
         $('workspace').classList.remove('access-pending');
         applyModelAccess();
-        $('account-state').textContent = 'Administrador';
-        $('account-message').textContent = '';
+        $('account-state').textContent = 'Administrador · API anterior';
+        $('account-message').textContent = 'As pesquisas existentes continuam acessíveis.';
+        $('legacy-api-notice').classList.remove('hidden');
+        $('admin-invitations').classList.add('hidden');
         $('submit').disabled = false;
         return;
       } catch (legacyError) {
@@ -729,6 +732,22 @@ async function changeInvite(revoke) {
 }
 $('invite-researcher').addEventListener('click', () => changeInvite(false));
 $('revoke-researcher').addEventListener('click', () => changeInvite(true));
+
+$('retry-api-version').addEventListener('click', async () => {
+  if (!user) return;
+  const button = $('retry-api-version');
+  button.disabled = true;
+  try {
+    await loadAccountAccess();
+    if (accountAccess?.research_generation_enabled && !accountAccess.legacy_backend) {
+      await Promise.all([loadJobs(), loadLibrary(), loadCapabilities()]);
+      if (refreshInterval) clearInterval(refreshInterval);
+      refreshInterval = setInterval(loadJobs, 12000);
+    }
+  } finally {
+    button.disabled = false;
+  }
+});
 
 onAuthStateChanged(auth, async (current) => {
   user=current;
