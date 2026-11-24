@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 from library import make_library_router, MAX_SELECTED_SOURCES
+from access import Invitation, get_access, is_admin, set_invitation
 
 import firebase_admin
 from firebase_admin import auth
@@ -64,7 +65,7 @@ def current_user(authorization: Annotated[str | None, Header()] = None):
     except Exception:
         raise HTTPException(status_code=401, detail="Sessão inválida ou expirada") from None
     email = (token.get("email") or "").lower()
-    if not token.get("email_verified") or email not in ALLOWED_EMAILS:
+    if not get_access(db, token, ALLOWED_EMAILS)["allowed"]:
         raise HTTPException(status_code=403, detail="Conta não autorizada")
     return token
 
@@ -119,6 +120,30 @@ def capabilities(user: User):
 
 
 
+@app.get("/api/account/access")
+def account_access(user: User):
+    access = get_access(db, user, ALLOWED_EMAILS)
+    return {"admin": access["admin"], "byok_ready": access["byok_ready"],
+            "research_generation_enabled": access["admin"]}
+
+
+@app.post("/api/admin/invitations", status_code=201)
+def invite_researcher(payload: Invitation, user: User):
+    if not is_admin(user, ALLOWED_EMAILS):
+        raise HTTPException(status_code=403, detail="Apenas administradores podem convidar.")
+    return set_invitation(db, payload.email, True, user["uid"], ALLOWED_EMAILS)
+
+
+@app.delete("/api/admin/invitations/{email}")
+def revoke_researcher(email: str, user: User):
+    if not is_admin(user, ALLOWED_EMAILS):
+        raise HTTPException(status_code=403, detail="Apenas administradores podem revogar.")
+    try:
+        return set_invitation(db, email, False, user["uid"], ALLOWED_EMAILS)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="E-mail inválido.") from None
+
+
 @app.get("/api/jobs")
 def list_researches(user: User):
     # Consulta simples, sem índices compostos. Ordenação em memória para acervo pessoal.
@@ -131,6 +156,10 @@ def list_researches(user: User):
 @app.post("/api/jobs", status_code=202)
 def create_research(payload: NewResearch, user: User):
     owner_uid = user["uid"]
+    if not is_admin(user, ALLOWED_EMAILS):
+        # Bloqueia antes de gravar dados ou disparar Cloud Run; convidados
+        # nunca podem consumir o Vertex AI ou a chave Gemini do administrador.
+        raise HTTPException(status_code=409, detail="Sua conta aguarda a configuração de IA própria (BYOK). Nenhuma pesquisa foi iniciada.")
     if payload.neon_review and not NEON_REVIEW_ENABLED:
         raise HTTPException(status_code=409, detail="Revisão Neon indisponível até validar o acesso do worker.")
     # Proteção de custos: uma geração por vez por conta.
