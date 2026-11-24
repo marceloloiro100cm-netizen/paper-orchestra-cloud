@@ -11,6 +11,7 @@ on:
       - "tests/test_credentials.py"
       - "tests/test_multiuser_cross_access.py"
       - "scripts/check-public-onboarding.py"
+      - "scripts/check-github-deploys.py"
       - "scripts/setup-byok-iam.sh"
       - "scripts/audit-byok-iam.sh"
       - ".github/workflows/test-multiuser.yml"
@@ -20,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   validate:
@@ -52,3 +54,8 @@ jobs:
 
       - name: Diagnóstico público da API atual (sem token ou dados reais)
         run: python3 scripts/check-public-onboarding.py --diagnostic
+
+      - name: Verificar estado do deploy Firebase e Cloud Run (somente leitura)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/check-github-deploys.py
