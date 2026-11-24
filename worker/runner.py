@@ -18,6 +18,7 @@ from scientific_audit import audit_pdf
 from reference_verification import verify_bibliography
 from source_materials import compose_library_context
 from neon_review import generate_review
+from byok import personal_agent_environment
 
 PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
 BUCKET = os.environ["RESEARCH_BUCKET"]
@@ -49,6 +50,14 @@ def main():
     if not doc.exists or doc.to_dict().get("owner_uid") != OWNER_UID:
         raise ValueError("Pesquisa ou responsável inválidos")
     data = doc.to_dict()
+    auth_mode = data.get("ai_auth_mode", "admin_vertex")
+    if auth_mode not in ("admin_vertex", "user_gemini"):
+        raise RuntimeError("Modo de autenticação de IA inválido")
+    # Registros anteriores permanecem na modalidade administrativa legada.
+    agent_env = (personal_agent_environment(os.environ, client, PROJECT, OWNER_UID)
+                 if auth_mode == "user_gemini" else dict(os.environ))
+    if auth_mode == "user_gemini" and data.get("neon_review_requested"):
+        raise RuntimeError("Revisão Neon central bloqueada para pesquisadores BYOK")
     update(status="running", stage="Preparando arquivos de entrada", started_at=now())
     with tempfile.TemporaryDirectory(prefix="orchestra_") as tmp:
         root = Path(tmp)
@@ -117,7 +126,8 @@ def main():
                 with ThreadPoolExecutor(max_workers=1) as executor:
                     future = executor.submit(
                         subprocess.run, command, cwd=str(BASE), stdout=log,
-                        stderr=subprocess.STDOUT, timeout=10400, check=False
+                        stderr=subprocess.STDOUT, timeout=10400, check=False,
+                        env=agent_env
                     )
                     last_agents = None
                     while True:
@@ -136,6 +146,12 @@ def main():
         finally:
             # Preserva o registro mesmo que o motor falhe ou exceda o timeout.
             if logpath.exists():
+                # Logs do pipeline não podem revelar a chave em caso de erro externo.
+                if auth_mode == "user_gemini":
+                    contents = logpath.read_text(encoding="utf-8", errors="replace")
+                    secret = agent_env["GEMINI_API_KEY"]
+                    if secret in contents:
+                        logpath.write_text(contents.replace(secret, "[REDACTED]"), encoding="utf-8")
                 put(logpath, "execution.log", "text/plain; charset=utf-8")
         if process.returncode != 0:
             raise RuntimeError(f"O pipeline terminou com código {process.returncode}; consulte os logs do trabalho no Cloud Run.")
@@ -190,7 +206,7 @@ def main():
             update(reference_status="unavailable")
         # Parecer Neon totalmente opcional, isolado do pipeline original.
         # Falhas não invalidam PDF já gerado nem disparam múltiplas cobranças.
-        if data.get("neon_review_requested"):
+        if data.get("neon_review_requested") and auth_mode == "admin_vertex":
             update(stage="Revisão crítica opcional com Gemini Neon", neon_review_status="running")
             try:
                 review = generate_review(
