@@ -89,6 +89,16 @@ class CredentialTests(unittest.TestCase):
         key = "AQ." + "z" * 44
         self.assertEqual(GeminiCredential(key=key).normalized, key)
 
+    def test_secret_is_masked_in_validation_repr(self):
+        from credentials import GeminiCredential
+        raw = "AQ." + "k" * 44
+        payload = GeminiCredential(key=raw)
+        self.assertNotIn(raw, repr(payload))
+        self.assertEqual(payload.normalized, raw)
+        with self.assertRaises(ValueError) as error:
+            GeminiCredential(key="invalid").normalized
+        self.assertNotIn("AQ.", str(error.exception))
+
     def test_bad_uid_rejected(self):
         with self.assertRaises(ValueError):
             secret_id("../unsafe")
