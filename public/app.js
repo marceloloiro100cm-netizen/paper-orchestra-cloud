@@ -403,6 +403,7 @@ async function loadJobs() {
         const files = document.createElement('div'); files.className='downloads';
         const available = entry.status === 'failed' ? ['log'] : entry.files;
         for (const kind of available) {
+          if (kind === 'neon' && !accountAccess?.admin) continue;
           const button = document.createElement('button'); button.type='button';
           button.textContent=kind==='pdf'?'Baixar PDF':kind==='latex'?'Baixar LaTeX':kind==='audit'?'Ver auditoria':kind==='references'?'Conferir referências':kind==='neon'?'Parecer Neon':'Logs';
           button.addEventListener('click', ()=>kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : kind==='neon' ? showNeonReport(entry.id, info) : download(entry.id,kind));
