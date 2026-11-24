@@ -31,4 +31,8 @@ def personal_agent_environment(current: dict, db, project: str, owner_uid: str, 
     env["GEMINI_API_KEY"] = key
     env["GOOGLE_API_KEY"] = key
     env["GOOGLE_GENAI_USE_VERTEXAI"] = "false"
+    # O PaperOrchestra chama dotenv.load_dotenv(...). Campos vazios já
+    # existentes impedem que um .env legada injete configuração Vertex.
+    env["VERTEX_AI_PROJECT"] = ""
+    env["VERTEX_AI_LOCATION"] = ""
     return env
