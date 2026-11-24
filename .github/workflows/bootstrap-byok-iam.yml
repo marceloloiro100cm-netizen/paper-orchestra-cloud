@@ -13,7 +13,7 @@
 #
 # Modo "permissoes-deploy": dá ao deployer só o que o gcloud builds submit
 # precisa (Service Usage Consumer e Storage Admin restrito ao bucket de fontes
-# do Cloud Build). Exige Project IAM Admin temporário concedido no Console e
+# do Cloud Build) e Artifact Registry Reader. Exige Project IAM Admin temporário concedido no Console e
 # remove esse papel ao final.
 name: Bootstrap BYOK (sem Cloud Shell)
 
@@ -204,6 +204,11 @@ jobs:
             --member="serviceAccount:${DEPLOYER}" --role="roles/serviceusage.serviceUsageConsumer" \
             --condition=None --quiet >/dev/null
           echo "Concedido: roles/serviceusage.serviceUsageConsumer"
+          # Cloud Run confere se quem publica pode ler a imagem no Artifact Registry.
+          gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+            --member="serviceAccount:${DEPLOYER}" --role="roles/artifactregistry.reader" \
+            --condition=None --quiet >/dev/null
+          echo "Concedido: roles/artifactregistry.reader"
           # Storage Admin só vale no bucket de fontes do Cloud Build (e no nível de
           # projeto, onde o gcloud lista buckets para conferir o dono). Os buckets
           # de dados dos pesquisadores ficam de fora da condição.
