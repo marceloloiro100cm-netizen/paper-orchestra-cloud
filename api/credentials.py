@@ -9,7 +9,7 @@ import re
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, SecretStr
 
 
 def secret_id(uid: str) -> str:
@@ -31,11 +31,12 @@ def credential_state(db, uid: str) -> bool:
 
 
 class GeminiCredential(BaseModel):
-    key: str = Field(min_length=20, max_length=512)
+    # SecretStr mascara o valor em representações e em erros de validação.
+    key: SecretStr
 
     @property
     def normalized(self) -> str:
-        key = self.key.strip()
+        key = self.key.get_secret_value().strip()
         if not re.fullmatch(r"[A-Za-z0-9_.-]{20,512}", key):
             raise ValueError("Formato de chave inválido")
         return key
