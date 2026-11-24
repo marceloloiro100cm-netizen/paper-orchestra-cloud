@@ -1065,6 +1065,91 @@
 
 
 
+    /* Layout fluido: ocupa a viewport em monitores amplos sem cortar telas menores. */
+    :root { --page-gutter: clamp(12px, 2.25vw, 48px); }
+    html { width: 100%; min-width: 0; }
+    body { width: 100%; min-width: 0; overflow-x: clip; }
+    header { padding-inline: var(--page-gutter); }
+    .head, main, #workspace, .panel, .stepper, .research-studio,
+    .studio-main, .studio-sidebar, .studio-card, .config-section,
+    .lib-toolbar, .lib-search-row, .kanban-grid, .kanban-col,
+    #library-list, #research-list { min-width: 0; }
+    main {
+      width: 100%;
+      max-width: none;
+      margin-inline: 0;
+      padding: clamp(16px, 2vw, 32px) var(--page-gutter) 40px;
+    }
+    .research-studio {
+      grid-template-columns: minmax(0, 1.65fr) minmax(310px, 0.85fr);
+      gap: clamp(14px, 1.6vw, 28px);
+    }
+    .studio-sidebar { min-width: 0; }
+    .kanban-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); }
+    .step-btn { min-width: 0; }
+    .step-title, .step-sub { overflow-wrap: anywhere; }
+    .lib-search-row input { min-width: min(100%, 180px); }
+    input, textarea, select { max-width: 100%; }
+    .item, .library-item { min-width: 0; }
+    .item > *, .library-item > * { min-width: 0; }
+    .attached-strip, .attached-head, .studio-card-head { min-width: 0; }
+    .source-chip { max-width: min(100%, 240px); }
+
+    /* Notebooks, tablets em paisagem e janelas reduzidas. */
+    @media (max-width: 1120px) {
+      .research-studio { grid-template-columns: minmax(0, 1.35fr) minmax(290px, 0.9fr); }
+      .studio-sidebar { position: static; }
+      .step-btn { padding: 12px; gap: 9px; }
+    }
+    @media (max-width: 920px) {
+      .research-studio { grid-template-columns: minmax(0, 1fr); }
+      .studio-sidebar { position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .studio-sidebar > * { min-width: 0; }
+      .stepper { gap: 8px; }
+      .step-title { font-size: 0.8rem; }
+      .step-sub { font-size: 0.71rem; }
+    }
+    @media (max-width: 700px) {
+      header { padding: 10px var(--page-gutter); }
+      .head { gap: 9px; }
+      .brand { min-width: 0; gap: 8px; }
+      .brand-logo { height: 38px; max-width: 40px; }
+      .brand-title-row { flex-wrap: wrap; gap: 4px 6px; }
+      .header-controls { gap: 5px; }
+      #identity, header p { display: none; }
+      .theme-btn, #logout { padding: 7px 9px !important; font-size: 0.75rem !important; }
+      main { padding-top: 14px; padding-bottom: 24px; }
+      .stepper { grid-template-columns: 1fr; }
+      .step-btn { padding: 10px 12px; }
+      .panel { padding: 16px; }
+      .panel-header { align-items: stretch; }
+      .studio-sidebar { grid-template-columns: minmax(0, 1fr); }
+      .columns, .library-grid { grid-template-columns: minmax(0, 1fr); }
+      .lib-toolbar { align-items: stretch; }
+      .lib-search-row { flex-basis: 100%; min-width: 0; }
+      .lib-search-row input { flex-basis: 100%; }
+      .lib-search-row select { flex: 1; width: 100%; }
+      .budget-box { max-width: 100%; }
+      .item, .library-item { flex-direction: column; }
+      .modal-box { width: 100%; max-height: calc(100dvh - 32px); }
+      .step-footer { align-items: stretch; }
+    }
+    @media (max-width: 420px) {
+      .brand-logo { height: 32px; max-width: 34px; }
+      header h1 { font-size: 1.05rem; }
+      .mpie-badge { font-size: 0.6rem; padding: 1px 5px; }
+      .theme-btn { padding: 6px 7px !important; }
+      .theme-btn #theme-label { display: none; }
+      .panel, .studio-card, .config-section { padding: 13px; border-radius: 13px; }
+      .template-grid { grid-template-columns: minmax(0, 1fr); }
+      .kanban-grid { grid-template-columns: minmax(0, 1fr); }
+      .source-chip { max-width: 100%; }
+      .step-footer .btn, .step-footer .actions { width: 100%; }
+      .step-footer .actions .btn { width: 100%; }
+      .modal-head, .modal-foot { padding: 11px; }
+      .modal-foot { flex-wrap: wrap; }
+    }
+
     /* Campos nativos mantidos para app.js, controlados pelos cartões visuais */
     .sr-select { display: none !important; }
   </style>
