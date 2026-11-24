@@ -85,10 +85,10 @@ class ModelAccessTests(unittest.TestCase):
             validate_key_and_models("A" * 39,
                 transport=lambda url, key, payload=None: (403, {}))
 
-    def test_legacy_key_keeps_flash_but_cannot_unlock_pro(self):
+    def test_legacy_key_requires_verification_before_any_model(self):
         legacy = account_model_access(DB({"u": {"status": "active"}}), "u")
         self.assertEqual(legacy["status"], "legacy_unverified")
-        self.assertEqual(allowed_models(legacy), [FLASH_MODEL])
+        self.assertEqual(allowed_models(legacy), [])
         self.assertNotIn(PRO_MODEL, allowed_models(legacy))
 
     def test_revoked_key_cannot_unlock_any_model(self):
