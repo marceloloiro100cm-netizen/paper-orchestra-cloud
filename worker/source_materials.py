@@ -190,7 +190,7 @@ def embed_sources(chunks_by_source: dict[str, tuple[str, list[dict]]], embedder,
 
 
 def compose_library_context_v2(sources: list[dict], fetch_bytes, query_text: str,
-                               cache=None, embedder=None,
+                               cache=None, embedder=None, reranker=None,
                                collect: dict | None = None) -> tuple[str, list[dict], dict]:
     """Contexto por trechos recuperados, com ponteiros de página (V2).
 
@@ -239,7 +239,7 @@ def compose_library_context_v2(sources: list[dict], fetch_bytes, query_text: str
             embedding_info = {"status": "failed_fallback_lexical", "error": type(error).__name__,
                               **embedder.info()}
     selected, coverage = select_passages(all_chunks, query_text, vectors=vectors,
-                                         query_vector=query_vector)
+                                         query_vector=query_vector, reranker=reranker)
     coverage["embeddings"] = embedding_info
     if collect is not None:
         collect.update({"chunks": all_chunks, "vectors": vectors or {}, "sources": meta,

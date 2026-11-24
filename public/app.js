@@ -175,7 +175,7 @@ async function toggleReport(id, target, cls, kind, render) {
   try {
     const data = await (await request(`/jobs/${id}/download/${kind}`)).json();
     box.replaceChildren();
-    render(box, data);
+    await render(box, data);
   } catch (err) { box.textContent = 'Não foi possível abrir o relatório: ' + err.message; }
 }
 
@@ -232,6 +232,65 @@ function showGapReport(entry, target, decide) {
     approve.addEventListener('click', () => decideNow('approve'));
     discard.addEventListener('click', () => { if (window.confirm('Descartar esta pesquisa? O diagnóstico continua no histórico.')) decideNow('discard'); });
     bar.append(approve, discard, status); box.append(bar);
+  });
+}
+
+// Revisão humana (M08/M12/M24): somente acréscimo; a mais recente aparece.
+const REVIEW_OPTIONS = {
+  claim: [['apoia', 'O trecho apoia'], ['contradiz', 'O trecho contradiz'], ['apenas_menciona', 'Só menciona'], ['nao_sustenta', 'Não sustenta'], ['pendente', 'Pendente']],
+  fire: [['apoia', 'Concordo: apoiada'], ['contradiz', 'Concordo: contrariada'], ['apenas_menciona', 'Só menciona'], ['nao_sustenta', 'Não sustenta'], ['pendente', 'Pendente']],
+  reference: [['referencia_confirmada', 'Conferi: referência correta'], ['referencia_incorreta', 'Conferi: referência incorreta'], ['pendente', 'Pendente']],
+  quote: [['citacao_correta', 'Citação correta'], ['citacao_incorreta', 'Citação incorreta'], ['pendente', 'Pendente']],
+};
+async function loadReviews(jobId) {
+  try { return (await (await request(`/jobs/${jobId}/reviews`)).json()).latest || {}; } catch (_) { return {}; }
+}
+function reviewControl(jobId, type, targetId, latest) {
+  const wrap = document.createElement('div'); wrap.className = 'review-control';
+  const current = latest[`${type}:${targetId}`];
+  const select = document.createElement('select');
+  select.append(new Option('Minha revisão...', ''));
+  for (const [value, label] of REVIEW_OPTIONS[type]) select.append(new Option(label, value));
+  if (current) select.value = current.decision;
+  const note = document.createElement('input'); note.type = 'text'; note.maxLength = 1000; note.placeholder = 'Nota (opcional)';
+  const save = el('button', 'Registrar'); save.type = 'button';
+  const status = el('small', current ? `Última revisão: ${new Date(current.at).toLocaleString('pt-BR')}` : '');
+  save.addEventListener('click', async () => {
+    if (!select.value) { status.textContent = 'Escolha uma opção.'; return; }
+    save.disabled = true;
+    try {
+      const r = await (await request(`/jobs/${jobId}/reviews`, {method: 'POST', body: JSON.stringify({target_type: type, target_id: targetId, decision: select.value, note: note.value})})).json();
+      status.textContent = `Registrada em ${new Date(r.at).toLocaleString('pt-BR')} (histórico preservado).`;
+      latest[`${type}:${targetId}`] = r; note.value = '';
+    } catch (e) { status.textContent = e.message; }
+    finally { save.disabled = false; }
+  });
+  wrap.append(select, note, save, status);
+  return wrap;
+}
+
+function showFire(id, target) {
+  return toggleReport(id, target, 'fire-report', 'fire', async (box, data) => {
+    const latest = await loadReviews(id);
+    box.append(el('strong', 'Verificação de afirmações nas fontes (experimental)'));
+    box.append(el('p', 'Um modelo verificou cada afirmação só com trechos das fontes anexadas, buscando mais trechos quando incerto. "Evidência insuficiente" não significa afirmação falsa. Registre sua conclusão em cada item.'));
+    const u = data.usage || {};
+    box.append(el('small', `Chamadas ao modelo: ${u.calls || 0} de ${u.max_calls || '?'}`));
+    const names = {apoiada_pelas_fontes: 'Apoiada pelas fontes', contrariada_pelas_fontes: 'Contrariada pelas fontes', evidencia_insuficiente: 'Evidência insuficiente', nao_verificada: 'Não verificada (orçamento)'};
+    for (const r of data.claims || []) {
+      const d = document.createElement('details'); d.className = 'reference-item';
+      d.append(el('summary', `${r.label === 'contrariada_pelas_fontes' ? '⚠ ' : ''}${names[r.label] || r.label}: ${r.text}`));
+      const last = (r.rounds || []).slice(-1)[0];
+      if (last && last.justificativa) d.append(el('p', last.justificativa));
+      d.append(el('small', `Ciclos: ${(r.rounds || []).length} · motivo da parada: ${r.stop_reason}`));
+      for (const ev of r.evidence || []) {
+        const pages = ev.pages ? `p. ${ev.pages[0]}${ev.pages[1] !== ev.pages[0] ? '-' + ev.pages[1] : ''}` : 'sem página';
+        d.append(el('p', `${ev.cited_in_decision ? '★ ' : ''}${ev.source_name} · ${pages}`));
+        d.append(el('small', ev.excerpt || ''));
+      }
+      d.append(reviewControl(id, 'fire', r.claim_id, latest));
+      box.append(d);
+    }
   });
 }
 
@@ -303,6 +362,7 @@ async function showEvidenceReport(id, target) {
   const line = (tag, text, cls) => { const el = document.createElement(tag); el.textContent = text; if (cls) el.className = cls; return el; };
   try {
     const report = await (await request(`/jobs/${id}/download/evidence`)).json();
+    const latest = await loadReviews(id);
     box.replaceChildren();
     box.append(line('strong', 'Citações literais e matriz de evidências: revisão humana necessária'));
     box.append(line('p', 'Os trechos foram localizados automaticamente nas fontes anexadas. O sistema NÃO decide se um trecho apoia ou contradiz a afirmação, e "sem evidência no corpus" vale só para as fontes anexadas.'));
@@ -331,6 +391,7 @@ async function showEvidenceReport(id, target) {
         detail.append(line('small', ev.excerpt || ''));
       }
       if (!(row.evidence || []).length) detail.append(line('p', 'Nenhum trecho candidato nas fontes anexadas.'));
+      detail.append(reviewControl(id, 'claim', row.claim_id, latest));
       box.append(detail);
     }
   } catch (err) { box.textContent = 'Não foi possível abrir o relatório: ' + err.message; }
@@ -392,6 +453,7 @@ async function showReferenceVerification(id, target) {
   try {
     const response = await request(`/jobs/${id}/download/references`);
     const report = await response.json();
+    const latest = await loadReviews(id);
     box.replaceChildren();
     const heading = document.createElement('strong');
     heading.textContent = 'Conferência de metadados bibliográficos';
@@ -444,6 +506,7 @@ async function showReferenceVerification(id, target) {
           } catch (_) { /* endereço inválido ignorado */ }
         }
       }
+      if (ref.key && /^[\w.:\-\/]+$/.test(ref.key)) detail.append(reviewControl(id, 'reference', ref.key, latest));
       const editorial = item.editorial || {};
       if (editorial.editorial_status) {
         const status = document.createElement('p');
@@ -633,11 +696,11 @@ async function loadJobs() {
             gb.addEventListener('click', () => showGapReport(entry, info, false));
             files.append(gb); continue;
           }
-          const labels={pdf:'Baixar PDF',latex:'Baixar LaTeX',audit:'Ver auditoria',references:'Conferir referências',neon:'Parecer Neon',manifest:'Manifesto de proveniência',declaration:'Rascunho da declaração de IA',evidence:'Citações e evidências',evidence_csv:'Matriz de evidências (CSV)',shield:'Escudo de auditoria',coverage:'Cobertura das fontes',contradictions:'Divergências entre fontes (experimental)'};
+          const labels={pdf:'Baixar PDF',latex:'Baixar LaTeX',audit:'Ver auditoria',references:'Conferir referências',neon:'Parecer Neon',manifest:'Manifesto de proveniência',declaration:'Rascunho da declaração de IA',evidence:'Citações e evidências',evidence_csv:'Matriz de evidências (CSV)',shield:'Escudo de auditoria',coverage:'Cobertura das fontes',contradictions:'Divergências entre fontes (experimental)',fire:'Verificação de afirmações (experimental)'};
           button.textContent=labels[kind]||'Logs';
           if(kind==='shield'&&entry.shield_counts){const c=entry.shield_counts;button.textContent+=` (${c.alta||0} alta · ${c.media||0} média)`;}
           if(kind==='references'&&entry.editorial_alerts>0){button.textContent+=` (${entry.editorial_alerts} aviso${entry.editorial_alerts>1?'s':''} editorial${entry.editorial_alerts>1?'is':''})`;}
-          button.addEventListener('click', ()=>kind==='contradictions' ? showContradictions(entry.id, info) : kind==='shield' ? showShield(entry.id, info) : kind==='coverage' ? showCoverage(entry.id, info) : kind==='evidence' ? showEvidenceReport(entry.id, info) : kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : kind==='neon' ? showNeonReport(entry.id, info) : download(entry.id,kind));
+          button.addEventListener('click', ()=>kind==='fire' ? showFire(entry.id, info) : kind==='contradictions' ? showContradictions(entry.id, info) : kind==='shield' ? showShield(entry.id, info) : kind==='coverage' ? showCoverage(entry.id, info) : kind==='evidence' ? showEvidenceReport(entry.id, info) : kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : kind==='neon' ? showNeonReport(entry.id, info) : download(entry.id,kind));
           files.append(button);
         }
         info.append(files);

@@ -198,3 +198,11 @@ Na conferência de referências, cada obra mostra **sinais de contexto separados
 - **Importação do Zotero (M26):** em Biblioteca → Importar do Zotero, cole uma chave **somente leitura**, escolha a coleção e importe os metadados como um .bib. A chave é usada só nessa requisição e não é guardada. Anexos não são importados.
 
 > **Pendência:** a API e o worker em produção ainda estão na versão de 23/11, até o bootstrap de IAM no Cloud Shell (issue #43). O site já tem a interface nova; os recursos acima passam a funcionar depois desse passo.
+
+### Módulos finais do plano V2: reranking, verificação iterativa e revisões (24/11/2026)
+
+Com isso, os 27 módulos do plano têm ao menos uma parte implementada (situação de cada um em `docs/V2-MODULOS.md`).
+
+- **Reranking (M20):** integração com o FlagEmbedding (`BAAI/bge-reranker-v2-m3`) e o InRanker (UNICAMP) pronta, mas desligada (`SCRIPTORIUM_V2_RERANKER=none`). As bibliotecas não estão na imagem do worker: o plano só as adota se a avaliação no corpus de referência mostrar ganho. Para medir: `scripts/eval_retrieval.py --reranker bge` (ver `docs/AVALIACAO-RECUPERACAO.md`).
+- **Verificação iterativa (M22, experimental):** com `SCRIPTORIUM_V2_FIRE=true`, cada afirmação é verificada pelo modelo só com trechos das fontes anexadas. Quando ele não tem certeza, busca mais trechos e tenta de novo, até 3 ciclos e 40 chamadas por pesquisa. Ele só decide com confiança e citando os trechos pelo identificador; atingir o limite nunca conta como "apoiada". Afirmações contrariadas viram alerta alto no escudo.
+- **Revisões humanas (M08, M12, M24):** em "Citações e evidências", "Conferir referências" e "Verificação de afirmações", cada item tem um campo para registrar a sua conclusão (por exemplo, "o trecho apoia" ou "referência correta"). Cada registro é novo e o histórico é preservado.

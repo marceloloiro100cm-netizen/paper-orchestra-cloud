@@ -33,7 +33,7 @@ def _stage(status, **extra):
 
 
 def build_shield(audit: dict | None, references: dict | None, evidence: dict | None,
-                 contradictions: dict | None = None) -> dict:
+                 contradictions: dict | None = None, fire: dict | None = None) -> dict:
     items, stages = [], {}
 
     # Estágio 1: ponteiros e citações literais (M05).
@@ -111,6 +111,16 @@ def build_shield(audit: dict | None, references: dict | None, evidence: dict | N
     else:
         stages["4_suporte_semantico"] = _stage("nao_executado",
                                                motivo="Disponível com a leitura por trechos (V2) ligada.")
+
+    # M22 (experimental): verificação iterativa completa o estágio 4.
+    if fire:
+        stages["4_suporte_semantico"] = _stage("executado_experimental", **fire.get("summary", {}),
+                                               motivo="Afirmações verificadas por modelo nas fontes anexadas (M22).")
+        for result in fire.get("claims", []):
+            if result["label"] == "contrariada_pelas_fontes":
+                items.append(_item("alta", "4_suporte_semantico", "Afirmação contrariada pelas fontes anexadas",
+                                   f"{result['claim_id']}: {result['text'][:300]}. "
+                                   f"{(result['rounds'] or [{}])[-1].get('justificativa', '')}", result["claim_id"]))
 
     # M17 (experimental): possíveis divergências entre fontes.
     if contradictions:

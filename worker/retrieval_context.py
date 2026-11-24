@@ -63,13 +63,23 @@ def rank_chunks(chunks: list[dict], query_text: str, vectors: dict | None = None
 
 
 def select_passages(chunks: list[dict], query_text: str, *,
-                    vectors: dict | None = None, query_vector=None,
+                    vectors: dict | None = None, query_vector=None, reranker=None,
                     total_budget: int = TOTAL_MAX_CHARS,
                     per_source_budget: int = PER_SOURCE_MAX_CHARS) -> tuple[list[dict], dict]:
     """Seleciona trechos (BM25 ou híbrido) com rodízio entre fontes, dentro do orçamento."""
     by_id = {c["chunk_id"]: c for c in chunks}
     sources = list(dict.fromkeys(c["source_id"] for c in chunks))
     hits, terms, strategy = rank_chunks(chunks, query_text, vectors, query_vector)
+    rerank_info = None
+    if reranker is not None and hits:
+        # M20: reordena os primeiros resultados; falha mantém a ordem anterior.
+        from reranker import rerank_hits
+        try:
+            hits = rerank_hits(hits, by_id, query_text, reranker)
+            rerank_info = {"status": "completed", **reranker.info()}
+        except Exception as error:
+            rerank_info = {"status": "failed_kept_previous_order", "error": type(error).__name__,
+                           **reranker.info()}
     ranked = defaultdict(list)
     for rank, hit in enumerate(hits, start=1):
         ranked[hit["source_id"]].append((rank, hit))
@@ -107,6 +117,7 @@ def select_passages(chunks: list[dict], query_text: str, *,
         "strategy": strategy, "index_version": INDEX_VERSION, "selection": reason,
         "vector_backend": "numpy-flat-ip-1" if strategy == HYBRID_STRATEGY else None,
         "rrf_k": RRF_K if strategy == HYBRID_STRATEGY else None,
+        "reranker": rerank_info,
         "query_terms": terms, "total_budget_chars": total_budget,
         "per_source_budget_chars": per_source_budget, "used_chars": used_total,
         "sources": {

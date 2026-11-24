@@ -58,6 +58,10 @@ def build_declaration(manifest: dict, agents: dict | None = None) -> str:
         tools.append(f"| Gemini Embedding | {embeddings.get('provider', provider)} | "
                      f"`{embeddings.get('model', '')}` | Seleção de trechos das fontes anexadas por "
                      "similaridade semântica e busca de evidências (não gera texto) |")
+    fire = (manifest.get("ai_services") or {}).get("fire")
+    if fire and fire.get("calls"):
+        tools.append(f"| Gemini | {fire.get('provider', provider)} | `{fire.get('model', '')}` | "
+                     "Verificação experimental de afirmações nas fontes anexadas (não altera o texto) |")
     compare = (manifest.get("ai_services") or {}).get("contradictions")
     if compare and compare.get("calls"):
         tools.append(f"| Gemini | {compare.get('provider', provider)} | `{compare.get('model', '')}` | "
