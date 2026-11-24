@@ -67,13 +67,16 @@ jobs:
           TOKEN="$(gcloud auth print-access-token)"
           curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
             "https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT_ID}:testIamPermissions" \
-            -d '{"permissions":["resourcemanager.projects.getIamPolicy","resourcemanager.projects.setIamPolicy","iam.roles.create","iam.roles.update","iam.roles.get","serviceusage.services.enable"]}' \
+            -d '{"permissions":["resourcemanager.projects.getIamPolicy","resourcemanager.projects.setIamPolicy","iam.roles.create","iam.roles.update","iam.roles.get","serviceusage.services.enable","serviceusage.services.use","cloudbuild.builds.create","storage.buckets.create","storage.buckets.get","storage.objects.create","artifactregistry.repositories.uploadArtifacts","iam.serviceAccounts.actAs"]}' \
             > /tmp/perms.json
           python3 - <<'PY'
           import json
           held = set(json.load(open('/tmp/perms.json')).get('permissions', []))
           for p in ["resourcemanager.projects.getIamPolicy", "resourcemanager.projects.setIamPolicy",
-                    "iam.roles.create", "iam.roles.update", "iam.roles.get", "serviceusage.services.enable"]:
+                    "iam.roles.create", "iam.roles.update", "iam.roles.get", "serviceusage.services.enable",
+                    "serviceusage.services.use", "cloudbuild.builds.create", "storage.buckets.create",
+                    "storage.buckets.get", "storage.objects.create",
+                    "artifactregistry.repositories.uploadArtifacts", "iam.serviceAccounts.actAs"]:
               print(("SIM " if p in held else "NÃO"), p)
           PY
           for role in scriptoriumByokWriter scriptoriumByokAuditor; do
@@ -95,6 +98,16 @@ jobs:
               print("  -", role, f"(condição: {cond})" if cond else "")
           PY
           bash scripts/audit-byok-iam.sh || echo "Auditoria BYOK ainda incompleta (esperado antes do bootstrap)."
+          # Bucket de fontes do Cloud Build (usado por gcloud builds submit no deploy).
+          BUCKET="${PROJECT_ID}_cloudbuild"
+          code="$(curl -sS -o /tmp/bucket.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN" \
+            "https://storage.googleapis.com/storage/v1/b/${BUCKET}")"
+          echo "Bucket ${BUCKET}: HTTP ${code}"
+          python3 -c "import json; d=json.load(open('/tmp/bucket.json')); print('  projeto:', d.get('projectNumber'), 'local:', d.get('location'), 'erro:', (d.get('error') or {}).get('message'))" || true
+          curl -sS -H "Authorization: Bearer $TOKEN" \
+            "https://storage.googleapis.com/storage/v1/b/${BUCKET}/iam/testPermissions?permissions=storage.objects.create&permissions=storage.objects.get&permissions=storage.objects.list&permissions=storage.buckets.get" \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print('  permissões no bucket:', d.get('permissions'), (d.get('error') or {}).get('message',''))" || true
+          echo "Número do projeto: $(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
 
       - name: Conferir confirmação
         if: inputs.modo == 'aplicar'
