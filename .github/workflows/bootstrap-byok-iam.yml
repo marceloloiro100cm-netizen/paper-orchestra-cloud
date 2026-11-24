@@ -108,6 +108,13 @@ jobs:
             "https://storage.googleapis.com/storage/v1/b/${BUCKET}/iam/testPermissions?permissions=storage.objects.create&permissions=storage.objects.get&permissions=storage.objects.list&permissions=storage.buckets.get" \
             | python3 -c "import json,sys; d=json.load(sys.stdin); print('  permissões no bucket:', d.get('permissions'), (d.get('error') or {}).get('message',''))" || true
           echo "Número do projeto: $(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+          for sa in paper-orchestra-api paper-orchestra-worker; do
+            email="${sa}@${PROJECT_ID}.iam.gserviceaccount.com"
+            curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+              "https://iam.googleapis.com/v1/projects/${PROJECT_ID}/serviceAccounts/${email}:testIamPermissions" \
+              -d '{"permissions":["iam.serviceAccounts.actAs","iam.serviceAccounts.getIamPolicy"]}' \
+              | python3 -c "import json,sys; d=json.load(sys.stdin); print('  ${sa}:', d.get('permissions'), (d.get('error') or {}).get('message',''))" || true
+          done
 
       - name: Conferir confirmação
         if: inputs.modo == 'aplicar'
