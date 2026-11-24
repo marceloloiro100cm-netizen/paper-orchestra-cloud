@@ -242,7 +242,8 @@ def compose_library_context_v2(sources: list[dict], fetch_bytes, query_text: str
                                          query_vector=query_vector)
     coverage["embeddings"] = embedding_info
     if collect is not None:
-        collect.update({"chunks": all_chunks, "vectors": vectors or {}, "sources": meta})
+        collect.update({"chunks": all_chunks, "vectors": vectors or {}, "sources": meta,
+                        "selected_ids": [c["chunk_id"] for c in selected]})
     for record in manifest:
         info = coverage["sources"].get(record["id"], {})
         record["chunks_selected"] = info.get("chunks_selected", 0)

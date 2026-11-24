@@ -44,7 +44,10 @@ def fake_embedder(fail=False):
 # Não substitui o pacote "google" real (google-api-core é usado por outros testes).
 try:
     import google.genai  # noqa: F401  (SDK real, se existir)
+    REAL_GENAI = not getattr(sys.modules["google.genai"], "__scriptorium_fake__", False)
 except ImportError:
+    REAL_GENAI = False
+if not REAL_GENAI:
     try:
         import google  # pacote namespace real, se existir
     except ImportError:
@@ -52,7 +55,11 @@ except ImportError:
         google.__path__ = []
         sys.modules["google"] = google
     genai_types = types.SimpleNamespace(EmbedContentConfig=lambda **kw: types.SimpleNamespace(**kw))
-    fake_genai = types.ModuleType("google.genai")
+    fake_genai = sys.modules.get("google.genai") or types.ModuleType("google.genai")
+    fake_genai.__scriptorium_fake__ = True
+    shared = getattr(fake_genai, "types", None) or types.SimpleNamespace()
+    shared.EmbedContentConfig = genai_types.EmbedContentConfig
+    genai_types = shared
     fake_genai.types = genai_types
     sys.modules["google.genai"] = fake_genai
     sys.modules["google.genai.types"] = genai_types

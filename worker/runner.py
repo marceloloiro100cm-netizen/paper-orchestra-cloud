@@ -38,6 +38,8 @@ V2_RETRIEVAL = os.getenv("SCRIPTORIUM_V2_RETRIEVAL", "false").lower() == "true"
 # Onda 2: embeddings Gemini na busca e na matriz de evidências (envio de trechos
 # autorizado pelo responsável em 24/11/2026). Só vale com V2_RETRIEVAL ligado.
 V2_EMBEDDINGS = os.getenv("SCRIPTORIUM_V2_EMBEDDINGS", "true").lower() == "true"
+# M17 experimental: classifica pares de trechos com o modelo (custo extra). Desligado.
+V2_CONTRADICTIONS = os.getenv("SCRIPTORIUM_V2_CONTRADICTIONS", "false").lower() == "true"
 
 client = firestore.Client(project=PROJECT)
 storage_client = storage.Client(project=PROJECT)
@@ -94,6 +96,28 @@ def publish_manifest(root: Path, status: str, error: str = "") -> dict:
     return manifest
 
 
+def run_preflight(root: Path, raw: Path, data: dict, evidence_inputs: dict,
+                  source_records: list, embedder) -> None:
+    """M16: diagnóstico das fontes; para no checkpoint de aprovação (M12)."""
+    from gap_report import build_gap_report
+    update(stage="Diagnosticando as fontes")
+    idea = (raw / "idea_sparse.md").read_text(encoding="utf-8", errors="replace")
+    # A ideia já tem as fontes anexadas ao final; o diagnóstico usa só o texto do autor.
+    idea = idea.split("\n\n## MATERIAIS PRÓPRIOS ANEXADOS")[0]
+    report = build_gap_report(data.get("title", ""), idea, evidence_inputs["chunks"],
+                              evidence_inputs["sources"], source_records,
+                              vectors=evidence_inputs["vectors"], embedder=embedder)
+    path = root / "gap_report.json"
+    path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    put(path, "gap_report.json", "application/json")
+    if embedder is not None:
+        MANIFEST.add_ai_service("embeddings", embedder.info())
+    publish_manifest(root, "awaiting_source_approval")
+    update(status="awaiting_source_approval", stage="Aguardando sua aprovação das fontes",
+           files=["gap_report", "manifest"], gap_summary=report["summary"],
+           checkpoint={"name": "source_approval", "requested_at": now()})
+
+
 def main():
     doc = ref.get()
     if not doc.exists or doc.to_dict().get("owner_uid") != OWNER_UID:
@@ -111,15 +135,23 @@ def main():
     # Recebe só campos selecionados do ambiente; nenhuma chave entra no manifesto.
     MANIFEST = RunManifest(RESEARCH_ID, OWNER_UID, data, os.environ, Path(__file__).resolve().parent)
     # Mesma identidade de IA da pesquisa: convidado usa a própria chave (BYOK).
+    # M16/M12: "preflight" só diagnostica as fontes e para no checkpoint de
+    # aprovação; "generate" é a pesquisa completa (direta ou já aprovada).
+    mode = data.get("mode") or "generate"
+    if mode not in ("preflight", "generate"):
+        raise RuntimeError("Modo de execução inválido")
+    # O diagnóstico usa a leitura por trechos mesmo com a flag V2 desligada:
+    # foi pedido explicitamente pelo pesquisador e não gera texto.
+    use_v2 = V2_RETRIEVAL or mode == "preflight"
     embedder = None
-    if V2_RETRIEVAL and V2_EMBEDDINGS:
+    if use_v2 and V2_EMBEDDINGS:
         try:
             embedder = make_embedder(auth_mode, agent_env, PROJECT)
         except Exception as exc:  # sem embeddings, a busca segue só com BM25
             print("Embeddings indisponíveis:", type(exc).__name__, flush=True)
-    evidence_inputs = {"chunks": [], "vectors": {}, "sources": {}} if V2_RETRIEVAL else None
+    evidence_inputs = {"chunks": [], "vectors": {}, "sources": {}} if use_v2 else None
     # M06: relatórios reunidos no escudo de auditoria; M09: cobertura publicada.
-    shield_inputs = {"audit": None, "references": None, "evidence": None}
+    shield_inputs = {"audit": None, "references": None, "evidence": None, "contradictions": None}
     coverage_published = False
     update(status="running", stage="Preparando arquivos de entrada", started_at=now())
     with tempfile.TemporaryDirectory(prefix="orchestra_") as tmp:
@@ -143,7 +175,7 @@ def main():
             if len(safe_sources) != len(sources):
                 raise ValueError("Referência inválida na biblioteca desta conta")
             fetch = lambda object_path: bucket.blob(object_path).download_as_bytes()
-            if V2_RETRIEVAL:
+            if use_v2:
                 # Consulta = título + ideia original (antes de anexar fontes e idioma).
                 query = data.get("title", "") + "\n" + (raw / "idea_sparse.md").read_text(
                     encoding="utf-8", errors="replace")
@@ -174,6 +206,9 @@ def main():
                 "included": sum(m["status"] == "included" for m in manifest),
                 "strategy": "v2" if V2_RETRIEVAL else "v1",
             })
+        if mode == "preflight":
+            run_preflight(root, raw, data, evidence_inputs, manifest if data.get("sources") else [], embedder)
+            return
         # Preferência aplicada somente aos dados temporários, não aos originais salvos.
         if data.get("language") == "pt-BR":
             with (raw / "idea_sparse.md").open("a", encoding="utf-8") as text:
@@ -246,7 +281,9 @@ def main():
                 raise FileNotFoundError("O motor concluiu sem gerar final_paper.pdf")
             pdf = matches[0]
         put(pdf, "final_paper.pdf", "application/pdf")
-        files = ["pdf", "log"] + (["coverage"] if coverage_published else [])
+        files = (["pdf", "log"] + (["coverage"] if coverage_published else [])
+                 # O diagnóstico aprovado (M16/M12) continua disponível no histórico.
+                 + (["gap_report"] if "gap_report" in (data.get("files") or []) else []))
         # Auditoria local não gera texto ou evidências novas.
         try:
             refined_tex = output / "content_refinement_workdir" / "final_refined_paper.tex"
@@ -323,13 +360,31 @@ def main():
             except Exception as exc:
                 print("Conferência de evidências indisponível:", repr(exc), flush=True)
                 update(evidence_status="unavailable")
+        # M17 (experimental): possíveis divergências entre fontes.
+        if (V2_CONTRADICTIONS and embedder is not None and evidence_inputs
+                and evidence_inputs.get("vectors")):
+            update(stage="Comparando fontes (experimental)")
+            try:
+                from contradictions import detect
+                selected = set(evidence_inputs.get("selected_ids") or [])
+                result = detect([c for c in evidence_inputs["chunks"] if c["chunk_id"] in selected],
+                                evidence_inputs["vectors"], evidence_inputs["sources"], embedder.client)
+                result_path = root / "contradictions.json"
+                result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+                put(result_path, "contradictions.json", "application/json")
+                files.append("contradictions")
+                shield_inputs["contradictions"] = result
+                MANIFEST.add_ai_service("contradictions", {"model": result["model"],
+                                                           "provider": embedder.provider, **result["usage"]})
+            except Exception as exc:
+                print("Comparação de fontes indisponível:", repr(exc), flush=True)
         if embedder is not None:
             MANIFEST.add_ai_service("embeddings", embedder.info())
         # M06: escudo de auditoria em camadas (sem nota geral nem selo).
         try:
             from audit_shield import build_shield
             shield = build_shield(shield_inputs["audit"], shield_inputs["references"],
-                                  shield_inputs["evidence"])
+                                  shield_inputs["evidence"], shield_inputs["contradictions"])
             shield_path = root / "audit_shield.json"
             shield_path.write_text(json.dumps(shield, ensure_ascii=False, indent=2), encoding="utf-8")
             put(shield_path, "audit_shield.json", "application/json")

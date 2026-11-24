@@ -14,7 +14,9 @@ from model_access import (FLASH_MODEL, PRO_MODEL, account_model_access,
                           allowed_models, validate_key_and_models)
 from access_requests import (request_access, pending_access_requests,
                              approve_access_request)
-from job_state import ACTIVE_STATUSES, claim_active_slot, reconcile
+from job_state import (ACTIVE_STATUSES, StateConflict, claim_active_slot, reconcile,
+                       transition)
+from zotero_import import make_zotero_router
 
 import firebase_admin
 from firebase_admin import auth
@@ -56,6 +58,8 @@ class NewResearch(BaseModel):
     # Idioma do manuscrito solicitado, sem alterar o template LaTeX.
     language: Literal["en", "pt-BR"] = "en"
     source_ids: list[str] = Field(default_factory=list, max_length=MAX_SELECTED_SOURCES)
+    # M16 + M12: diagnosticar as fontes e esperar aprovação antes de gerar.
+    preflight: bool = False
 
     @field_validator("idea", "experimental_log")
     @classmethod
@@ -87,6 +91,29 @@ IdentifiedUser = Annotated[dict, Depends(identified_user)]
 
 # Biblioteca própria privada, separada das pesquisas já concluídas.
 app.include_router(make_library_router(db, bucket, current_user))
+# M26: importação somente leitura do Zotero (a chave nunca é guardada).
+app.include_router(make_zotero_router(db, bucket, current_user))
+
+AWAITING_SOURCES = "awaiting_source_approval"
+
+
+class CheckpointDecision(BaseModel):
+    decision: Literal["approve", "discard"]
+    # Subconjunto das fontes do diagnóstico que seguem para a geração.
+    source_ids: list[str] | None = Field(default=None, max_length=MAX_SELECTED_SOURCES)
+
+
+def start_job(job_id: str, owner_uid: str, mode: str) -> None:
+    run_client.run_job(request=run_v2.RunJobRequest(
+        name=JOB_NAME,
+        overrides=run_v2.RunJobRequest.Overrides(
+            container_overrides=[run_v2.RunJobRequest.Overrides.ContainerOverride(
+                env=[run_v2.EnvVar(name="RESEARCH_ID", value=job_id),
+                     run_v2.EnvVar(name="RESEARCH_OWNER_UID", value=owner_uid),
+                     run_v2.EnvVar(name="RESEARCH_MODE", value=mode)],
+            )],
+        ),
+    ))
 
 
 def get_research(job_id: str, user: dict) -> dict:
@@ -114,6 +141,10 @@ def serializable(record: dict) -> dict:
         "neon_review_requested": record.get("neon_review_requested", False),
         "neon_review_status": record.get("neon_review_status", "not_available"),
         "reference_status": record.get("reference_status", "not_available"),
+        "mode": record.get("mode", "generate"),
+        "checkpoint": record.get("checkpoint"),
+        "approvals": record.get("approvals", []),
+        "gap_summary": record.get("gap_summary"),
         "references_checked": record.get("references_checked"),
         "references_skipped": record.get("references_skipped"),
         "editorial_alerts": record.get("editorial_alerts"),
@@ -283,6 +314,8 @@ def create_research(payload: NewResearch, user: User):
             raise HTTPException(status_code=409, detail=busy_detail)
     # Validar propriedade antes de iniciar tarefas caras ou armazenar a solicitação.
     source_ids = list(dict.fromkeys(payload.source_ids))
+    if payload.preflight and not source_ids:
+        raise HTTPException(status_code=422, detail="Selecione ao menos uma fonte para o diagnóstico.")
     if len(source_ids) > MAX_SELECTED_SOURCES:
         raise HTTPException(status_code=422, detail="Máximo de 8 fontes por pesquisa.")
     sources = []
@@ -306,7 +339,10 @@ def create_research(payload: NewResearch, user: User):
     now = datetime.now(timezone.utc).isoformat()
     record = {
         "id": job_id, "owner_uid": owner_uid,
-        "title": payload.title, "status": "queued", "stage": "Preparando materiais",
+        "title": payload.title, "status": "queued",
+        "stage": "Diagnóstico das fontes na fila" if payload.preflight else "Preparando materiais",
+        "mode": "preflight" if payload.preflight else "generate",
+        "approvals": [],
         "template": payload.template, "model": payload.model,
         "ai_auth_mode": "admin_vertex" if access["admin"] else "user_gemini",
         "reflection_model": payload.reflection_model or payload.model,
@@ -333,15 +369,7 @@ def create_research(payload: NewResearch, user: User):
         for name, content in (("idea_sparse.md", payload.idea), ("experimental_log.md", payload.experimental_log)):
             blob = bucket.blob(f"{prefix}/input/{name}")
             blob.upload_from_string(content, content_type="text/markdown; charset=utf-8")
-        run_client.run_job(request=run_v2.RunJobRequest(
-            name=JOB_NAME,
-            overrides=run_v2.RunJobRequest.Overrides(
-                container_overrides=[run_v2.RunJobRequest.Overrides.ContainerOverride(
-                    env=[run_v2.EnvVar(name="RESEARCH_ID", value=job_id),
-                         run_v2.EnvVar(name="RESEARCH_OWNER_UID", value=owner_uid)],
-                )],
-            ),
-        ))
+        start_job(job_id, owner_uid, record["mode"])
         # A operação é assíncrona: não aguardar o término da redação na requisição HTTP.
         # O worker fará as atualizações de progresso diretamente no Firestore.
         ref.update({"stage": "Execução solicitada"})
@@ -349,6 +377,61 @@ def create_research(payload: NewResearch, user: User):
         ref.update({"status": "failed", "error": "Falha ao iniciar o processo na nuvem", "finished_at": datetime.now(timezone.utc).isoformat()})
         raise HTTPException(status_code=503, detail="Não foi possível iniciar. Verifique as permissões do Cloud Run Job.") from None
     return {"id": job_id, "status": "queued"}
+
+
+@app.post("/api/jobs/{job_id}/checkpoint")
+def decide_checkpoint(job_id: str, payload: CheckpointDecision, user: User):
+    """M12: o pesquisador aprova (ou descarta) as fontes depois do diagnóstico (M16)."""
+    record = get_research(job_id, user)
+    if record.get("status") != AWAITING_SOURCES:
+        raise HTTPException(status_code=409, detail="Esta pesquisa não está aguardando aprovação.")
+    now = datetime.now(timezone.utc).isoformat()
+    event = {"checkpoint": "source_approval", "decision": payload.decision,
+             "by_uid": user["uid"], "at": now}
+    if payload.decision == "discard":
+        try:
+            transition(db, job_id, AWAITING_SOURCES, {
+                "status": "discarded", "stage": "Descartada pelo pesquisador", "finished_at": now,
+                "checkpoint": None, "approvals": [*record.get("approvals", []), event]})
+        except StateConflict:
+            raise HTTPException(status_code=409, detail="A decisão já foi registrada.") from None
+        return {"id": job_id, "status": "discarded"}
+    sources = record.get("sources", [])
+    if payload.source_ids is not None:
+        wanted = set(payload.source_ids)
+        if not wanted or not wanted <= {s.get("id") for s in sources}:
+            raise HTTPException(status_code=422, detail="Escolha ao menos uma das fontes do diagnóstico.")
+        sources = [s for s in sources if s.get("id") in wanted]
+    event["sources_kept"] = [s.get("id") for s in sources]
+    if not access_allows_generation(user, record):
+        raise HTTPException(status_code=403, detail="Sua chave Gemini não está mais disponível para gerar.")
+    updated = {**record, "status": "queued", "mode": "generate", "sources": sources,
+               "stage": "Fontes aprovadas; preparando a geração", "checkpoint": None,
+               "approvals": [*record.get("approvals", []), event], "finished_at": "", "error": ""}
+    try:
+        if not claim_active_slot(db, user["uid"], job_id, updated, expected_status=AWAITING_SOURCES):
+            raise HTTPException(status_code=409, detail="Há uma pesquisa em execução. Finalize-a antes de aprovar esta.")
+    except StateConflict:
+        raise HTTPException(status_code=409, detail="A decisão já foi registrada.") from None
+    try:
+        start_job(job_id, user["uid"], "generate")
+    except Exception:
+        db.collection("research_jobs").document(job_id).update({
+            "status": "failed", "error": "Falha ao iniciar o processo na nuvem",
+            "finished_at": datetime.now(timezone.utc).isoformat()})
+        raise HTTPException(status_code=503, detail="Não foi possível iniciar. Verifique as permissões do Cloud Run Job.") from None
+    return {"id": job_id, "status": "queued", "sources_kept": event["sources_kept"]}
+
+
+def access_allows_generation(user: dict, record: dict) -> bool:
+    """Revalida o acesso no momento da aprovação (a chave pode ter sido removida)."""
+    access = get_access(db, user, ALLOWED_EMAILS)
+    if access["admin"]:
+        return True
+    if not (BYOK_ENABLED and access["byok_ready"]):
+        return False
+    allowed = allowed_models(account_model_access(db, user["uid"]))
+    return record.get("model") in allowed and (record.get("reflection_model") or record.get("model")) in allowed
 
 
 @app.get("/api/jobs/{job_id}")
@@ -359,13 +442,19 @@ def get_status(job_id: str, user: User):
 @app.get("/api/jobs/{job_id}/download/{file_kind}")
 def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "references", "neon",
                                              "manifest", "declaration", "evidence", "evidence_csv",
-                                             "shield", "coverage"],
+                                             "shield", "coverage", "gap_report", "contradictions"],
              user: User):
     if file_kind == "neon" and not (NEON_REVIEW_ENABLED and is_admin(user, ALLOWED_EMAILS)):
         raise HTTPException(status_code=403, detail="Parecer Neon não está disponível nesta conta.")
     item = get_research(job_id, user)
     # Em falhas, log e manifesto mostram até onde a execução chegou.
-    if item["status"] != "completed" and not (file_kind in ("log", "manifest") and item["status"] == "failed"):
+    readable_early = (
+        (file_kind in ("log", "manifest") and item["status"] == "failed")
+        # O diagnóstico (M16) fica legível durante e depois do checkpoint.
+        or (file_kind in ("gap_report", "manifest") and item.get("mode") in ("preflight", "generate")
+            and "gap_report" in item.get("files", []))
+    )
+    if item["status"] != "completed" and not readable_early:
         raise HTTPException(status_code=409, detail="Pesquisa ainda não concluída")
     filemap = {"pdf": ("final_paper.pdf", "application/pdf"),
                "latex": ("latex_source.zip", "application/zip"),
@@ -381,7 +470,11 @@ def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "re
                "evidence_csv": ("evidence_matrix.csv", "text/csv; charset=utf-8"),
                # M06: escudo de auditoria; M09: cobertura da seleção de trechos.
                "shield": ("audit_shield.json", "application/json"),
-               "coverage": ("retrieval_coverage.json", "application/json")}
+               "coverage": ("retrieval_coverage.json", "application/json"),
+               # M16: diagnóstico das fontes antes da geração.
+               "gap_report": ("gap_report.json", "application/json"),
+               # M17 (experimental): possíveis divergências entre fontes.
+               "contradictions": ("contradictions.json", "application/json")}
     filename, content_type = filemap[file_kind]
     blob_path = f"research/{user['uid']}/{job_id}/output/{filename}"
     blob = bucket.blob(blob_path)

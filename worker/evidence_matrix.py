@@ -56,6 +56,38 @@ def extract_claims(tex: str) -> list[dict]:
     return claims
 
 
+def find_candidates(text: str, query_vector, index: LexicalIndex, vector_index, by_id: dict,
+                    sources_meta: dict, top: int = TOP_EVIDENCE) -> list[dict]:
+    """Trechos candidatos para um texto (BM25 + vetores por RRF), com página."""
+    terms = query_terms(text)
+    scores: dict[str, dict] = {}
+    for rank, hit in enumerate(index.search(terms, 10), start=1):
+        scores.setdefault(hit["chunk_id"], {"rrf": 0.0})
+        scores[hit["chunk_id"]].update(bm25_rank=rank)
+        scores[hit["chunk_id"]]["rrf"] += 1 / (60 + rank)
+    if query_vector is not None and vector_index is not None:
+        for rank, hit in enumerate(vector_index.search(query_vector, 10), start=1):
+            scores.setdefault(hit["chunk_id"], {"rrf": 0.0})
+            scores[hit["chunk_id"]].update(vector_rank=rank, similarity=hit["similarity"])
+            scores[hit["chunk_id"]]["rrf"] += 1 / (60 + rank)
+    evidence = []
+    for chunk_id, info in sorted(scores.items(), key=lambda kv: -kv[1]["rrf"])[:top]:
+        chunk = by_id[chunk_id]
+        evidence.append({
+            "chunk_id": chunk_id, "source_id": chunk["source_id"],
+            "source_name": sources_meta.get(chunk["source_id"], {}).get("name", ""),
+            "pages": chunk.get("pages"), "excerpt": chunk["text"][:280],
+            "shared_terms": len(set(terms) & set(query_terms(chunk["text"], 200))),
+            "bm25_rank": info.get("bm25_rank"), "similarity": info.get("similarity"),
+            "relation": "nao_classificado",
+        })
+    return evidence
+
+
+def is_strong(evidence: dict) -> bool:
+    return evidence["shared_terms"] >= MIN_SHARED_TERMS or (evidence["similarity"] or 0) >= MIN_SIMILARITY
+
+
 def build_matrix(tex: str, chunks: list[dict], sources_meta: dict,
                  vectors: dict | None = None, embedder=None) -> dict:
     claims = extract_claims(tex)
@@ -75,30 +107,9 @@ def build_matrix(tex: str, chunks: list[dict], sources_meta: dict,
                 claim_vectors, embedding_status = None, f"failed_fallback_lexical:{type(error).__name__}"
         rows = []
         for position, claim in enumerate(claims):
-            terms = query_terms(claim["text"])
-            scores: dict[str, dict] = {}
-            for rank, hit in enumerate(index.search(terms, 10), start=1):
-                scores.setdefault(hit["chunk_id"], {"rrf": 0.0})
-                scores[hit["chunk_id"]].update(bm25_rank=rank)
-                scores[hit["chunk_id"]]["rrf"] += 1 / (60 + rank)
-            if claim_vectors is not None:
-                for rank, hit in enumerate(vector_index.search(claim_vectors[position], 10), start=1):
-                    scores.setdefault(hit["chunk_id"], {"rrf": 0.0})
-                    scores[hit["chunk_id"]].update(vector_rank=rank, similarity=hit["similarity"])
-                    scores[hit["chunk_id"]]["rrf"] += 1 / (60 + rank)
-            evidence = []
-            for chunk_id, info in sorted(scores.items(), key=lambda kv: -kv[1]["rrf"])[:TOP_EVIDENCE]:
-                chunk = by_id[chunk_id]
-                shared = len(set(terms) & set(query_terms(chunk["text"], 200)))
-                evidence.append({
-                    "chunk_id": chunk_id, "source_id": chunk["source_id"],
-                    "source_name": sources_meta.get(chunk["source_id"], {}).get("name", ""),
-                    "pages": chunk.get("pages"), "excerpt": chunk["text"][:280],
-                    "shared_terms": shared, "bm25_rank": info.get("bm25_rank"),
-                    "similarity": info.get("similarity"), "relation": "nao_classificado",
-                })
-            strong = [e for e in evidence if e["shared_terms"] >= MIN_SHARED_TERMS
-                      or (e["similarity"] or 0) >= MIN_SIMILARITY]
+            qvec = claim_vectors[position] if claim_vectors is not None else None
+            evidence = find_candidates(claim["text"], qvec, index, vector_index, by_id, sources_meta)
+            strong = [e for e in evidence if is_strong(e)]
             rows.append({
                 **claim,
                 "evidence": evidence,

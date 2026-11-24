@@ -1060,6 +1060,8 @@
     .scientific-audit-report p.editorial-alert { color: var(--danger-text); font-weight: 600; }
     /* M05/M08: relatório de citações e evidências. */
     .evidence-report h4 { font-size: 0.9rem; margin: 14px 0 4px; color: var(--text-primary); }
+    .gap-report h4, .shield-report h4 { font-size: 0.9rem; margin: 14px 0 4px; color: var(--text-primary); }
+    .gap-report .checkbox-line { display: flex; gap: 8px; align-items: center; margin: 4px 0; font-size: 0.88rem; }
     .evidence-report small { display: block; margin: 2px 0 8px; color: var(--text-secondary); }
     .neon-report h4 { font-size: 0.9rem; margin: 12px 0 5px; color: var(--text-primary); }
     .neon-report ul { padding-left: 20px; }
@@ -1398,6 +1400,23 @@
           </div>
         </details>
 
+        <!-- M26: importação somente leitura do Zotero (a chave não é guardada) -->
+        <details class="upload-drawer" id="zotero-drawer">
+          <summary><span>+ Importar do Zotero</span><span class="subtle" aria-hidden="true">⌄</span></summary>
+          <p class="field-hint">Importa só os metadados (BibTeX) de uma coleção, como um arquivo .bib da biblioteca. Use uma chave do Zotero <strong>somente leitura</strong> (zotero.org &gt; Settings &gt; Security). A chave é usada nesta importação e não fica guardada no Scriptorium.</p>
+          <label for="zotero-key">Chave da API do Zotero</label>
+          <input id="zotero-key" type="password" autocomplete="off" maxlength="64" placeholder="Cole a chave somente leitura"/>
+          <div class="actions">
+            <button class="btn" type="button" id="zotero-list">Listar coleções</button>
+          </div>
+          <label for="zotero-collection">Coleção</label>
+          <select id="zotero-collection" disabled><option value="">Biblioteca inteira (até 500 itens)</option></select>
+          <div class="actions">
+            <button class="btn" type="button" id="zotero-import" disabled>Importar como .bib</button>
+            <span id="zotero-message" role="status" class="subtle"></span>
+          </div>
+        </details>
+
         <!-- Toolbar de busca, filtro de formato e medidor de espaço de leitura (75.000 chars) -->
         <div class="lib-toolbar">
           <div class="lib-search-row">
@@ -1561,6 +1580,14 @@
                   <span class="switch-sub">Adiciona o agente de plotagem (mais chamadas e custo).</span>
                 </label>
                 <input id="plotting" type="checkbox">
+              </div>
+
+              <div class="switch-row">
+                <label for="preflight">
+                  Diagnosticar minhas fontes antes de gerar
+                  <span class="switch-sub">Mostra o que suas fontes cobrem e o que falta; a redação só começa depois da sua aprovação.</span>
+                </label>
+                <input id="preflight" type="checkbox">
               </div>
 
               <div class="switch-row hidden" id="neon-panel">
