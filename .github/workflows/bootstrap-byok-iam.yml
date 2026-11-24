@@ -121,6 +121,21 @@ jobs:
               | python3 -c "import json,sys; d=json.load(sys.stdin); print('  ${sa}:', d.get('permissions'), (d.get('error') or {}).get('message',''))" || true
           done
 
+      - name: Conta de serviço usada pelo Cloud Build (somente leitura)
+        if: inputs.modo == 'diagnosticar'
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "Conta padrão do Cloud Build: $(gcloud builds get-default-service-account --project="$PROJECT_ID" --format='value(serviceAccountEmail)' 2>&1 | tail -1)"
+          gcloud iam service-accounts list --project="$PROJECT_ID" --format='value(email,uniqueId,disabled)' 2>&1 | sed 's/^/  conta: /'
+          TOKEN="$(gcloud auth print-access-token)"
+          for email in $(gcloud iam service-accounts list --project="$PROJECT_ID" --format='value(email)' 2>/dev/null); do
+            r="$(curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+              "https://iam.googleapis.com/v1/projects/${PROJECT_ID}/serviceAccounts/${email}:testIamPermissions" \
+              -d '{"permissions":["iam.serviceAccounts.actAs"]}')"
+            echo "  actAs em ${email}: $(echo "$r" | grep -q actAs && echo SIM || echo NÃO)"
+          done
+
       - name: Conferir confirmação
         if: inputs.modo != 'diagnosticar'
         shell: bash
