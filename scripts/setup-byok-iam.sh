@@ -27,7 +27,10 @@ API_CONDITION="resource.type == 'cloudresourcemanager.googleapis.com/Project' ||
 # Worker lê apenas versões dos segredos BYOK, NUNCA o segredo central.
 WORKER_CONDITION="resource.name.startsWith('projects/${PROJECT_NUMBER}/secrets/scriptorium-byok-')"
 
-gcloud services enable secretmanager.googleapis.com --project="$PROJECT_ID" --quiet
+# O Secret Manager já está ativo no projeto (modo legado usa). Quem roda o
+# script pode não ter serviceusage.services.enable; nesse caso apenas avisa.
+gcloud services enable secretmanager.googleapis.com --project="$PROJECT_ID" --quiet \
+  || echo "Aviso: não foi possível (re)ativar secretmanager.googleapis.com; seguindo, pois a API já é usada."
 if ! gcloud iam roles describe "$ROLE_ID" --project="$PROJECT_ID" >/dev/null 2>&1; then
   gcloud iam roles create "$ROLE_ID" --project="$PROJECT_ID" \
     --title="Scriptorium BYOK credential writer" \
