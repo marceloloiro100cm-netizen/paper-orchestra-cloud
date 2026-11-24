@@ -318,15 +318,19 @@
       "github": "mbzuai-nlp/fire",
       "track": "commits",
       "license_spdx": "a conferir",
-      "license_status": "a conferir",
-      "adopted": false,
+      "license_status": "sem arquivo LICENSE no repositório (commit cd7cb4a, conferido em 24/11/2026): só o princípio do README foi seguido, com código próprio",
+      "adopted": true,
       "modules": [
         "M22"
       ],
       "update_policy": "Trimestral; se copiar código, fixar commit e conferir licença.",
       "review_frequency": "trimestral",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "used_in": [
+        "worker/fire_audit.py"
+      ],
+      "latest_reviewed": "cd7cb4af8dab00b1ab4bd78197a52e052203873d"
     },
     {
       "id": "R15",
@@ -358,7 +362,7 @@
       "github": "unicamp-dl/InRanker",
       "track": "commits",
       "license_spdx": "Apache-2.0",
-      "license_status": "confirmada pela API do GitHub (vigia de 24/11/2026); pesos a conferir separadamente",
+      "license_status": "LICENSE do commit e85f2c6 conferido (Apache-2.0); pesos no Hugging Face a conferir",
       "model_weights_license": "a conferir",
       "adopted": false,
       "modules": [
@@ -367,7 +371,13 @@
       "update_policy": "Trimestral; repositório e model card.",
       "review_frequency": "trimestral",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "used_in": [
+        "worker/reranker.py",
+        "scripts/eval_retrieval.py"
+      ],
+      "latest_reviewed": "e85f2c690fddbfb2e724b0d23f32dbfe313c7824",
+      "migration_note": "Integração opcional pronta (classe T5Ranker, get_scores). O pacote fixa torch==2.1.1 e transformers==4.27.4: avaliar em ambiente separado; fora da imagem do worker até o gate G2."
     },
     {
       "id": "R17",
@@ -379,7 +389,7 @@
         "FlagEmbedding"
       ],
       "license_spdx": "MIT",
-      "license_status": "código confirmado no plano V2; pesos a conferir",
+      "license_status": "LICENSE conferido (MIT); pesos do bge-reranker-v2-m3 a conferir no model card",
       "model_weights_license": "a conferir por modelo",
       "adopted": false,
       "modules": [
@@ -388,7 +398,13 @@
       "update_policy": "Mensal: releases e model cards.",
       "review_frequency": "mensal",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "used_in": [
+        "worker/reranker.py",
+        "scripts/eval_retrieval.py"
+      ],
+      "latest_reviewed": "v1.4.2",
+      "migration_note": "Integração opcional pronta (FlagReranker.compute_score com normalize=True); fora da imagem do worker até o gate G2."
     },
     {
       "id": "R18",
@@ -771,13 +787,15 @@
         "V1",
         "M04",
         "M17",
+        "M22",
         "M25"
       ],
       "used_in": [
         "worker/requirements.txt",
         "worker/neon_review.py",
         "worker/embeddings.py",
-        "worker/contradictions.py"
+        "worker/contradictions.py",
+        "worker/fire_audit.py"
       ],
       "update_policy": "Dependabot semanal; conferir IDs de modelo e preços na documentação oficial.",
       "review_frequency": "mensal",
@@ -1187,9 +1205,11 @@
         "M06"
       ],
       "status": "parcial",
-      "next_step": "Matriz afirmação -> trechos candidatos (com página e similaridade), em JSON e CSV, com visualização na interface. Falta classificar apoia/contradiz (depende de LLM e avaliação humana) e persistir revisões.",
+      "next_step": "Matriz com trechos candidatos e revisão humana registrada por afirmação (somente acréscimo, histórico preservado). A classificação automática apoia/contradiz existe no M22 (experimental). Falta exportar as revisões junto com o CSV.",
       "files": [
-        "worker/evidence_matrix.py"
+        "worker/evidence_matrix.py",
+        "api/reviews.py",
+        "public/app.js"
       ]
     },
     {
@@ -1267,12 +1287,13 @@
         "M14"
       ],
       "status": "parcial",
-      "next_step": "Primeiro checkpoint (await_source_approval): depois do diagnóstico, o pesquisador aprova ou descarta as fontes; transição atômica (sem dupla aprovação), registro de quem e quando no manifesto e na declaração. Faltam os checkpoints de revisão de afirmações e de aprovação final.",
+      "next_step": "Checkpoint de aprovação de fontes pronto; revisões por afirmação registradas (base do await_claim_review). Falta o checkpoint de aprovação final, que exige dividir o motor original em etapas.",
       "files": [
         "api/main.py",
         "api/job_state.py",
         "worker/runner.py",
-        "public/app.js"
+        "public/app.js",
+        "api/reviews.py"
       ]
     },
     {
@@ -1439,8 +1460,12 @@
         "M04",
         "M19"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Comparar InRanker (R16) e FlagEmbedding (R17) com a busca híbrida atual usando scripts/eval_retrieval.py; adotar só com ganho reproduzível."
+      "status": "parcial",
+      "next_step": "Integração com FlagEmbedding (bge-reranker-v2-m3) e InRanker (T5Ranker) pronta e atrás de SCRIPTORIUM_V2_RERANKER (padrão none); avaliação com e sem reranking em scripts/eval_retrieval.py. Falta medir no corpus de referência e, se houver ganho, incluir a biblioteca na imagem.",
+      "files": [
+        "worker/reranker.py",
+        "scripts/eval_retrieval.py"
+      ]
     },
     {
       "id": "M21",
@@ -1478,8 +1503,12 @@
         "M10",
         "M15"
       ],
-      "status": "nao_iniciado",
-      "next_step": "Conferir licença do R14 antes de qualquer cópia."
+      "status": "parcial",
+      "next_step": "Experimental e desligado (SCRIPTORIUM_V2_FIRE=true): até 15 afirmações, 3 ciclos e 40 chamadas; decide só com confiança e evidência citada por ID; limite nunca vira 'apoiada'. Completa o estágio 4 do escudo. Falta conjunto rotulado para medir precisão.",
+      "files": [
+        "worker/fire_audit.py",
+        "worker/audit_shield.py"
+      ]
     },
     {
       "id": "M23",
@@ -1518,9 +1547,11 @@
         "M06"
       ],
       "status": "parcial",
-      "next_step": "Referências não confirmadas recebem links de busca (Google Acadêmico, SciELO, BRAPCI) para conferência manual; DOI SciELO identificado. Falta registrar na interface o resultado da conferência humana.",
+      "next_step": "Links de conferência manual e registro do resultado da conferência por referência (confirmada ou incorreta). Falta usar o resultado humano na próxima execução.",
       "files": [
-        "worker/source_quality.py"
+        "worker/source_quality.py",
+        "api/reviews.py",
+        "public/app.js"
       ]
     },
     {

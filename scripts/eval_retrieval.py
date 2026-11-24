@@ -8,6 +8,7 @@ rotulado por pessoas. Roda localmente; não envia nada ao Scriptorium.
 Uso:
   python scripts/eval_retrieval.py --corpus pasta_com_pdfs --queries consultas.jsonl
   GEMINI_API_KEY=... python scripts/eval_retrieval.py --corpus ... --queries ... --hybrid
+  python scripts/eval_retrieval.py --corpus ... --queries ... --reranker bge   # M20
 
 consultas.jsonl (uma consulta por linha; ver docs/AVALIACAO-RECUPERACAO.md):
   {"id": "q01", "query": "efeitos da sala de aula invertida na autonomia",
@@ -29,6 +30,7 @@ sys.path.insert(0, str(ROOT / "worker"))
 from chunking import chunk_document  # noqa: E402
 from latex_text import fold  # noqa: E402
 from retrieval_context import rank_chunks  # noqa: E402
+from reranker import rerank_hits  # noqa: E402
 from structured_extract import extract_document  # noqa: E402
 
 FORMATS = {".pdf": "pdf", ".docx": "docx", ".txt": "txt", ".bib": "bib", ".ris": "ris"}
@@ -75,7 +77,7 @@ def evaluate(results: list[list[dict]], queries: list[dict], names: dict, k: int
             "queries": len(queries), "per_query": per_query}
 
 
-def run(corpus: Path, queries_path: Path, k: int = 10, embedder=None) -> dict:
+def run(corpus: Path, queries_path: Path, k: int = 10, embedder=None, reranker=None) -> dict:
     chunks, names = load_corpus(corpus)
     by_id = {c["chunk_id"]: c for c in chunks}
     queries = [json.loads(line) for line in queries_path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -84,15 +86,20 @@ def run(corpus: Path, queries_path: Path, k: int = 10, embedder=None) -> dict:
     if embedder is not None:
         matrix = embedder.embed([c["text"] for c in chunks], "RETRIEVAL_DOCUMENT")
         vectors = {c["chunk_id"]: matrix[i] for i, c in enumerate(chunks)}
-    for name in ("lexical", "hybrid"):
-        if name == "hybrid" and vectors is None:
-            continue
-        rankings = []
-        for query in queries:
-            qvec = embedder.embed([query["query"]], "RETRIEVAL_QUERY")[0] if name == "hybrid" else None
-            hits, _, strategy = rank_chunks(chunks, query["query"], vectors if name == "hybrid" else None, qvec)
-            rankings.append([by_id[h["chunk_id"]] for h in hits])
-        report["strategies"][name] = {"strategy": strategy, **evaluate(rankings, queries, names, k)}
+    bases = ["lexical"] + (["hybrid"] if vectors is not None else [])
+    for base in bases:
+        # Com --reranker, cada base é medida com e sem reranking (comparação do M20).
+        for rerank in ([False, True] if reranker is not None else [False]):
+            name = base + (f"+rerank_{reranker.name}" if rerank else "")
+            rankings = []
+            for query in queries:
+                qvec = embedder.embed([query["query"]], "RETRIEVAL_QUERY")[0] if base == "hybrid" else None
+                hits, _, strategy = rank_chunks(chunks, query["query"], vectors if base == "hybrid" else None, qvec)
+                if rerank:
+                    hits = rerank_hits(hits, by_id, query["query"], reranker)
+                rankings.append([by_id[h["chunk_id"]] for h in hits])
+            report["strategies"][name] = {"strategy": strategy, "reranker": reranker.info() if rerank else None,
+                                          **evaluate(rankings, queries, names, k)}
     return report
 
 
@@ -102,6 +109,9 @@ def main() -> int:
     parser.add_argument("--queries", required=True, type=Path)
     parser.add_argument("--k", type=int, default=10)
     parser.add_argument("--hybrid", action="store_true", help="usa embeddings Gemini (GEMINI_API_KEY)")
+    parser.add_argument("--reranker", choices=["bge", "inranker"],
+                        help="M20: requer pip install FlagEmbedding (bge) ou inranker")
+    parser.add_argument("--reranker-model")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     embedder = None
@@ -109,7 +119,11 @@ def main() -> int:
         from embeddings import GeminiEmbedder
         from google import genai
         embedder = GeminiEmbedder(genai.Client(api_key=os.environ["GEMINI_API_KEY"]), "Gemini API (avaliação local)")
-    report = run(args.corpus, args.queries, args.k, embedder)
+    reranker = None
+    if args.reranker:
+        from reranker import make_reranker
+        reranker = make_reranker(args.reranker, args.reranker_model)
+    report = run(args.corpus, args.queries, args.k, embedder, reranker)
     text = json.dumps(report, ensure_ascii=False, indent=2)
     if args.output:
         args.output.write_text(text, encoding="utf-8")

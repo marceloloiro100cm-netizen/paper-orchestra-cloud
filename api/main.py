@@ -17,6 +17,7 @@ from access_requests import (request_access, pending_access_requests,
 from job_state import (ACTIVE_STATUSES, StateConflict, claim_active_slot, reconcile,
                        transition)
 from zotero_import import make_zotero_router
+from reviews import ReviewIn, add_review, list_reviews
 
 import firebase_admin
 from firebase_admin import auth
@@ -434,6 +435,21 @@ def access_allows_generation(user: dict, record: dict) -> bool:
     return record.get("model") in allowed and (record.get("reflection_model") or record.get("model")) in allowed
 
 
+@app.post("/api/jobs/{job_id}/reviews", status_code=201)
+def create_review(job_id: str, payload: ReviewIn, user: User):
+    """M08/M12/M24: decisão humana registrada (somente acréscimo)."""
+    record = get_research(job_id, user)
+    if record.get("status") != "completed":
+        raise HTTPException(status_code=409, detail="Revisões só para pesquisas concluídas.")
+    return add_review(db, job_id, user["uid"], payload)
+
+
+@app.get("/api/jobs/{job_id}/reviews")
+def get_reviews(job_id: str, user: User):
+    get_research(job_id, user)
+    return list_reviews(db, job_id, user["uid"])
+
+
 @app.get("/api/jobs/{job_id}")
 def get_status(job_id: str, user: User):
     return serializable(get_research(job_id, user))
@@ -442,7 +458,8 @@ def get_status(job_id: str, user: User):
 @app.get("/api/jobs/{job_id}/download/{file_kind}")
 def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "references", "neon",
                                              "manifest", "declaration", "evidence", "evidence_csv",
-                                             "shield", "coverage", "gap_report", "contradictions"],
+                                             "shield", "coverage", "gap_report", "contradictions",
+                                             "fire"],
              user: User):
     if file_kind == "neon" and not (NEON_REVIEW_ENABLED and is_admin(user, ALLOWED_EMAILS)):
         raise HTTPException(status_code=403, detail="Parecer Neon não está disponível nesta conta.")
@@ -474,7 +491,9 @@ def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "re
                # M16: diagnóstico das fontes antes da geração.
                "gap_report": ("gap_report.json", "application/json"),
                # M17 (experimental): possíveis divergências entre fontes.
-               "contradictions": ("contradictions.json", "application/json")}
+               "contradictions": ("contradictions.json", "application/json"),
+               # M22 (experimental): verificação iterativa das afirmações.
+               "fire": ("fire_audit.json", "application/json")}
     filename, content_type = filemap[file_kind]
     blob_path = f"research/{user['uid']}/{job_id}/output/{filename}"
     blob = bucket.blob(blob_path)

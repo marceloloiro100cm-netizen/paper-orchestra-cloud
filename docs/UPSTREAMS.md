@@ -26,7 +26,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R11 | [Retraction Watch via Crossref](https://www.crossref.org/documentation/retrieve-metadata/retraction-watch/) | api | sim | termos do serviço | - | M07 |
 | R12 | [Estudo MIT: citações por ponteiros](https://dspace.mit.edu/entities/publication/2994e161-6c34-4f88-973e-c13d1e8cd2ef) | artigo | sim | não se aplica | - | M05, M10 |
 | R13 | [GapView (UC Irvine)](https://escholarship.org/uc/item/2zs4w991) | artigo | sim | não se aplica | - | M09, M16 |
-| R14 | [FIRE (MBZUAI)](https://github.com/mbzuai-nlp/fire) | prototipo | não | a conferir | - | M22 |
+| R14 | [FIRE (MBZUAI)](https://github.com/mbzuai-nlp/fire) | prototipo | sim | a conferir | - | M22 |
 | R15 | [RA-RAG (POSTECH)](https://github.com/ml-postech/RA-RAG) | prototipo | sim | MIT | - | M18 |
 | R16 | [InRanker (UNICAMP)](https://github.com/unicamp-dl/InRanker) | prototipo | não | Apache-2.0 | - | M20 |
 | R17 | [FlagEmbedding (BAAI)](https://github.com/FlagOpen/FlagEmbedding) | biblioteca | não | MIT | - | M20 |
@@ -47,7 +47,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R32 | [Pydantic](https://github.com/pydantic/pydantic) | biblioteca | sim | MIT | >=2.5,<3 | V1 |
 | R33 | [Firebase Admin SDK para Python](https://github.com/firebase/firebase-admin-python) | biblioteca | sim | Apache-2.0 | >=6.5,<8 | V1 |
 | R34 | [Google Cloud Client Libraries para Python (Firestore, Storage, Run, Secret Manager)](https://github.com/googleapis/google-cloud-python) | biblioteca | sim | Apache-2.0 | faixas em api/requirements.txt e worker/requirements.txt | V1 |
-| R35 | [Google Gen AI SDK para Python (google-genai)](https://github.com/googleapis/python-genai) | biblioteca | sim | Apache-2.0 | >=2.34.0,<3 | V1, M04, M17, M25 |
+| R35 | [Google Gen AI SDK para Python (google-genai)](https://github.com/googleapis/python-genai) | biblioteca | sim | Apache-2.0 | >=2.34.0,<3 | V1, M04, M17, M22, M25 |
 | R36 | [Requests](https://github.com/psf/requests) | biblioteca | sim | Apache-2.0 | >=2.31,<3 | V1, M07 |
 | R37 | [PyMuPDF](https://github.com/pymupdf/PyMuPDF) | biblioteca | sim | AGPL-3.0 | >=2.1,<3 | V1, M01, M02, M23 |
 | R38 | [abnTeX2](https://github.com/abntex/abntex2) | biblioteca | sim | LPPL-1.3c | versão do pacote Debian texlive-publishers da imagem python:3.11-slim | V1, M27 |
@@ -367,12 +367,12 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Avisos de segurança:** https://github.com/mbzuai-nlp/fire/security/advisories
 - **Histórico de mudanças:** -
 - **Licença (SPDX):** a conferir
-- **Situação da licença:** a conferir
+- **Situação da licença:** sem arquivo LICENSE no repositório (commit cd7cb4a, conferido em 24/11/2026): só o princípio do README foi seguido, com código próprio
 - **Licença dos pesos:** -
 - **Versão fixada:** -
 - **Versão instalada:** -
-- **Última versão revisada:** -
-- **Onde é usado:** -
+- **Última versão revisada:** cd7cb4af8dab00b1ab4bd78197a52e052203873d
+- **Onde é usado:** worker/fire_audit.py
 - **Política de atualização:** Trimestral; se copiar código, fixar commit e conferir licença.
 - **Frequência de revisão:** trimestral
 - **Risco:** -
@@ -413,16 +413,16 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Avisos de segurança:** https://github.com/unicamp-dl/InRanker/security/advisories
 - **Histórico de mudanças:** -
 - **Licença (SPDX):** Apache-2.0
-- **Situação da licença:** confirmada pela API do GitHub (vigia de 24/11/2026); pesos a conferir separadamente
+- **Situação da licença:** LICENSE do commit e85f2c6 conferido (Apache-2.0); pesos no Hugging Face a conferir
 - **Licença dos pesos:** a conferir
 - **Versão fixada:** -
 - **Versão instalada:** -
-- **Última versão revisada:** -
-- **Onde é usado:** -
+- **Última versão revisada:** e85f2c690fddbfb2e724b0d23f32dbfe313c7824
+- **Onde é usado:** worker/reranker.py, scripts/eval_retrieval.py
 - **Política de atualização:** Trimestral; repositório e model card.
 - **Frequência de revisão:** trimestral
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** Integração opcional pronta (classe T5Ranker, get_scores). O pacote fixa torch==2.1.1 e transformers==4.27.4: avaliar em ambiente separado; fora da imagem do worker até o gate G2.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -436,16 +436,16 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Avisos de segurança:** https://github.com/FlagOpen/FlagEmbedding/security/advisories
 - **Histórico de mudanças:** -
 - **Licença (SPDX):** MIT
-- **Situação da licença:** código confirmado no plano V2; pesos a conferir
+- **Situação da licença:** LICENSE conferido (MIT); pesos do bge-reranker-v2-m3 a conferir no model card
 - **Licença dos pesos:** a conferir por modelo
 - **Versão fixada:** -
 - **Versão instalada:** -
-- **Última versão revisada:** -
-- **Onde é usado:** -
+- **Última versão revisada:** v1.4.2
+- **Onde é usado:** worker/reranker.py, scripts/eval_retrieval.py
 - **Política de atualização:** Mensal: releases e model cards.
 - **Frequência de revisão:** mensal
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** Integração opcional pronta (FlagReranker.compute_score com normalize=True); fora da imagem do worker até o gate G2.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -855,7 +855,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** >=2.34.0,<3
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** worker/requirements.txt, worker/neon_review.py, worker/embeddings.py, worker/contradictions.py
+- **Onde é usado:** worker/requirements.txt, worker/neon_review.py, worker/embeddings.py, worker/contradictions.py, worker/fire_audit.py
 - **Política de atualização:** Dependabot semanal; conferir IDs de modelo e preços na documentação oficial.
 - **Frequência de revisão:** mensal
 - **Risco:** -

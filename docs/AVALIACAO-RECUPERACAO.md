@@ -27,3 +27,19 @@ O plano V2 só aprova uma mudança na busca (lexical, híbrida, reranking) se a 
 4. Guarde os arquivos de resultado. Eles são a linha de base: toda mudança futura de parser (Docling), trechos, embeddings ou reranker (InRanker/FlagEmbedding) é comparada com eles.
 
 Os PDFs e as perguntas **não** devem ir para o repositório público.
+
+## Testar um reranker (M20)
+
+O plano só adota um reranker se ele melhorar recall@10 e MRR de forma reproduzível. Para medir, instale o reranker no seu computador (não vai para o worker) e rode:
+
+```bash
+pip install FlagEmbedding            # R17, modelo BAAI/bge-reranker-v2-m3
+python scripts/eval_retrieval.py --corpus corpus-referencia --queries consultas.jsonl --reranker bge --output resultado-bge.json
+
+# InRanker (R16) fixa torch==2.1.1 e transformers==4.27.4: use um ambiente virtual separado.
+pip install inranker
+python scripts/eval_retrieval.py --corpus corpus-referencia --queries consultas.jsonl --reranker inranker --output resultado-inranker.json
+```
+
+O relatório traz cada estratégia com e sem reranking (por exemplo `lexical` e `lexical+rerank_bge`). Se o ganho for consistente, o reranker escolhido entra na imagem do worker (`SCRIPTORIUM_V2_RERANKER=bge` ou `inranker`), depois de conferir a licença dos pesos no model card.
+

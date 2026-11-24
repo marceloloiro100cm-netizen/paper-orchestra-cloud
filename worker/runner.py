@@ -40,6 +40,10 @@ V2_RETRIEVAL = os.getenv("SCRIPTORIUM_V2_RETRIEVAL", "false").lower() == "true"
 V2_EMBEDDINGS = os.getenv("SCRIPTORIUM_V2_EMBEDDINGS", "true").lower() == "true"
 # M17 experimental: classifica pares de trechos com o modelo (custo extra). Desligado.
 V2_CONTRADICTIONS = os.getenv("SCRIPTORIUM_V2_CONTRADICTIONS", "false").lower() == "true"
+# M22 experimental: verificação iterativa das afirmações (orçamento fixo). Desligado.
+V2_FIRE = os.getenv("SCRIPTORIUM_V2_FIRE", "false").lower() == "true"
+# M20: reranker opcional ("none", "bge" ou "inranker"); bibliotecas fora da imagem.
+V2_RERANKER = os.getenv("SCRIPTORIUM_V2_RERANKER", "none").lower()
 
 client = firestore.Client(project=PROJECT)
 storage_client = storage.Client(project=PROJECT)
@@ -149,9 +153,17 @@ def main():
             embedder = make_embedder(auth_mode, agent_env, PROJECT)
         except Exception as exc:  # sem embeddings, a busca segue só com BM25
             print("Embeddings indisponíveis:", type(exc).__name__, flush=True)
+    reranker, reranker_note = None, None
+    if use_v2 and V2_RERANKER != "none":
+        try:
+            from reranker import make_reranker
+            reranker = make_reranker(V2_RERANKER)
+        except Exception as exc:  # biblioteca ausente: segue sem reranking
+            reranker_note = {"status": "unavailable", "name": V2_RERANKER, "reason": type(exc).__name__}
     evidence_inputs = {"chunks": [], "vectors": {}, "sources": {}} if use_v2 else None
     # M06: relatórios reunidos no escudo de auditoria; M09: cobertura publicada.
-    shield_inputs = {"audit": None, "references": None, "evidence": None, "contradictions": None}
+    shield_inputs = {"audit": None, "references": None, "evidence": None, "contradictions": None,
+                     "fire": None}
     coverage_published = False
     update(status="running", stage="Preparando arquivos de entrada", started_at=now())
     with tempfile.TemporaryDirectory(prefix="orchestra_") as tmp:
@@ -181,7 +193,9 @@ def main():
                     encoding="utf-8", errors="replace")
                 context, manifest, coverage = compose_library_context_v2(
                     safe_sources, fetch, query, cache=DerivedCache(),
-                    embedder=embedder, collect=evidence_inputs)
+                    embedder=embedder, reranker=reranker, collect=evidence_inputs)
+                if reranker_note and not coverage.get("reranker"):
+                    coverage["reranker"] = reranker_note
                 MANIFEST.set_context(coverage["strategy"], coverage)
                 coverage_path = root / "retrieval_coverage.json"
                 coverage_path.write_text(json.dumps(coverage, ensure_ascii=False, indent=2),
@@ -360,6 +374,23 @@ def main():
             except Exception as exc:
                 print("Conferência de evidências indisponível:", repr(exc), flush=True)
                 update(evidence_status="unavailable")
+        # M22 (experimental): verificação iterativa das afirmações nas fontes.
+        if V2_FIRE and embedder is not None and shield_inputs["evidence"]:
+            update(stage="Verificando afirmações nas fontes (experimental)")
+            try:
+                from fire_audit import run_fire
+                fire = run_fire(shield_inputs["evidence"]["matrix"], evidence_inputs["chunks"],
+                                evidence_inputs["vectors"], evidence_inputs["sources"],
+                                embedder.client, embedder)
+                fire_path = root / "fire_audit.json"
+                fire_path.write_text(json.dumps(fire, ensure_ascii=False, indent=2), encoding="utf-8")
+                put(fire_path, "fire_audit.json", "application/json")
+                files.append("fire")
+                shield_inputs["fire"] = fire
+                MANIFEST.add_ai_service("fire", {"model": fire["model"], "provider": embedder.provider,
+                                                 **fire["usage"]})
+            except Exception as exc:
+                print("Verificação iterativa indisponível:", repr(exc), flush=True)
         # M17 (experimental): possíveis divergências entre fontes.
         if (V2_CONTRADICTIONS and embedder is not None and evidence_inputs
                 and evidence_inputs.get("vectors")):
@@ -384,7 +415,8 @@ def main():
         try:
             from audit_shield import build_shield
             shield = build_shield(shield_inputs["audit"], shield_inputs["references"],
-                                  shield_inputs["evidence"], shield_inputs["contradictions"])
+                                  shield_inputs["evidence"], shield_inputs["contradictions"],
+                                  shield_inputs["fire"])
             shield_path = root / "audit_shield.json"
             shield_path.write_text(json.dumps(shield, ensure_ascii=False, indent=2), encoding="utf-8")
             put(shield_path, "audit_shield.json", "application/json")
