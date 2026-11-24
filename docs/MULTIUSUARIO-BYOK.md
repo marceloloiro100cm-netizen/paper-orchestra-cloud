@@ -61,8 +61,25 @@ O Secret Manager cobra por versões armazenadas e acessos. É necessário revisa
 as políticas IAM com o princípio do menor privilégio antes de implantar.
 **Não conceder automaticamente `roles/secretmanager.admin` a todas as contas.**
 
-A infraestrutura atualmente não configura essas novas concessões de IAM,
-então **o fluxo BYOK não deve ser promovido para produção** até provisioná-las.
+Foi adicionado o provisionamento controlado em
+`scripts/setup-byok-iam.sh`, que cria uma função IAM personalizada para a API
+e concede ao worker acesso de leitura **condicionado ao prefixo**
+`scriptorium-byok-`. A API não recebe permissão para ler os valores dos
+segredos; o worker não recebe permissão irrestrita de leitura de segredos.
+
+Esse script **não é executado automaticamente** pelo deploy de serviços.
+Deve ser revisado, executado explicitamente no projeto
+`paperorchestra-mestrado` e verificado com IAM efetivo antes de promover o PR.
+É necessário garantir que nenhuma outra concessão preexistente forneça acesso
+não condicionado à chave administrativa.
+
+A API precisa das permissões de criação, atualização de versão e exclusão dos
+segredos BYOK; o worker precisa somente de
+`secretmanager.versions.access`. A leitura do segredo individual continua
+validando o `owner_uid` no backend.
+
+**Não promover para produção sem esses passos e sem executar uma pesquisa
+homologada com chave de um segundo projeto Gemini.**
 
 Documentação oficial:
 - https://cloud.google.com/secret-manager/docs/best-practices
