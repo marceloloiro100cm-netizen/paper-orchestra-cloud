@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Provisionamento IAM BYOK (operação explícita, separada do deploy automático).
+# Uso após revisão: bash scripts/setup-byok-iam.sh
+# Não cria, lê ou imprime nenhuma chave Gemini.
+set -euo pipefail
+PROJECT_ID="${PROJECT_ID:-paperorchestra-mestrado}"
+EXPECTED_PROJECT="paperorchestra-mestrado"
+if [[ "$PROJECT_ID" != "$EXPECTED_PROJECT" ]]; then
+  echo "Projeto recusado: $PROJECT_ID" >&2; exit 2
+fi
+command -v gcloud >/dev/null || { echo "gcloud ausente" >&2; exit 2; }
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)' --project="$PROJECT_ID")"
+if [[ ! "$PROJECT_NUMBER" =~ ^[0-9]+$ ]]; then
+  echo "Número do projeto inválido" >&2; exit 2
+fi
+API_SA="paper-orchestra-api@${PROJECT_ID}.iam.gserviceaccount.com"
+WORKER_SA="paper-orchestra-worker@${PROJECT_ID}.iam.gserviceaccount.com"
+ROLE_ID="scriptoriumByokWriter"
+ROLE="projects/${PROJECT_ID}/roles/${ROLE_ID}"
+PERMISSIONS="secretmanager.secrets.create,secretmanager.secrets.get,secretmanager.secrets.delete,secretmanager.versions.add"
+
+# API pode criar e atualizar SOMENTE segredos do prefixo BYOK.
+# Criação é autorizada no recurso Project; demais operações no Secret.
+API_CONDITION="resource.type == 'cloudresourcemanager.googleapis.com/Project' || resource.name.startsWith('projects/${PROJECT_NUMBER}/secrets/scriptorium-byok-')"
+# Worker lê apenas versões dos segredos BYOK, NUNCA o segredo central.
+WORKER_CONDITION="resource.name.startsWith('projects/${PROJECT_NUMBER}/secrets/scriptorium-byok-')"
+
+gcloud services enable secretmanager.googleapis.com --project="$PROJECT_ID" --quiet
+if ! gcloud iam roles describe "$ROLE_ID" --project="$PROJECT_ID" >/dev/null 2>&1; then
+  gcloud iam roles create "$ROLE_ID" --project="$PROJECT_ID" \
+    --title="Scriptorium BYOK credential writer" \
+    --description="Gerencia apenas o cofre de credenciais individuais; sem acesso a valores" \
+    --permissions="$PERMISSIONS" --stage=GA --quiet
+else
+  gcloud iam roles update "$ROLE_ID" --project="$PROJECT_ID" \
+    --permissions="$PERMISSIONS" --stage=GA --quiet
+fi
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${API_SA}" --role="$ROLE" \
+  --condition="title=ScriptoriumBYOKWriter,description=Somente segredos por pesquisador,expression=${API_CONDITION}" \
+  --quiet >/dev/null
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${WORKER_SA}" \
+  --role="roles/secretmanager.secretAccessor" \
+  --condition="title=ScriptoriumBYOKReader,description=Leitura somente das chaves individuais,expression=${WORKER_CONDITION}" \
+  --quiet >/dev/null
+
+echo "Concessões BYOK condicionais configuradas para projeto ${PROJECT_ID}."
+echo "Verifique o IAM efetivo das duas contas antes de habilitar novos pesquisadores."
+echo "ATENÇÃO: uma concessão prévia de secretAccessor no nível de projeto deve ser analisada separadamente."
