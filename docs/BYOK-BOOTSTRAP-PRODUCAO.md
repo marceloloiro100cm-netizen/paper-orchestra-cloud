@@ -24,22 +24,20 @@ O bootstrap é uma operação **única e privilegiada**:
 1. Entre em https://console.cloud.google.com/?project=paperorchestra-mestrado
    com uma conta que administra o projeto, e abra **Cloud Shell**.
 2. No repositório GitHub `marceloloiro100cm-netizen/paper-orchestra-cloud`,
-   abra os arquivos `scripts/setup-byok-iam.sh` e
-   `scripts/audit-byok-iam.sh`. Faça o download desses dois arquivos pelo
-   GitHub e envie-os para o Cloud Shell (opção **Upload** do terminal).
+   abra **`scripts/bootstrap-cloudshell-unico.sh`** e baixe o arquivo pela
+   opção **Download raw file**. No Cloud Shell, use **Upload file** para
+   enviar esse único arquivo. Ele inclui o bootstrap e a auditoria.
    Não salve nem compartilhe nenhuma chave Gemini.
 3. No Cloud Shell, confira o projeto e execute:
 
    ```bash
    gcloud config set project paperorchestra-mestrado
    gcloud auth list
-   PROJECT_ID=paperorchestra-mestrado bash setup-byok-iam.sh
-   PROJECT_ID=paperorchestra-mestrado bash audit-byok-iam.sh
+   PROJECT_ID=paperorchestra-mestrado bash bootstrap-cloudshell-unico.sh
    ```
 
-   Se estiver usando a árvore completa do repositório no Cloud Shell,
-   substitua `setup-byok-iam.sh` por `scripts/setup-byok-iam.sh` e
-   `audit-byok-iam.sh` por `scripts/audit-byok-iam.sh`.
+   Se estiver na raiz do repositório, use o caminho
+   `scripts/bootstrap-cloudshell-unico.sh`.
 
 4. O resultado esperado da segunda etapa é:
    `AUDITORIA BYOK: permissões condicionais esperadas presentes.`
