@@ -1220,6 +1220,9 @@
 
     .gemini-setup { margin-top: 12px; border: 1px solid var(--border-main); border-radius: 14px; background: var(--bg-subtle); overflow: hidden; }
     .gemini-setup > summary { cursor: pointer; padding: 12px 15px; font-weight: 700; color: var(--mpie-blue-text); }
+    .eval-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: .9rem; }
+    .eval-table th, .eval-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-main); text-align: right; }
+    .eval-table th:first-child, .eval-table td:first-child { text-align: left; }
     .gemini-setup > summary:focus-visible { outline: 3px solid var(--mpie-blue); outline-offset: -3px; }
     .gemini-setup-body { padding: 5px 15px 16px; }
     .billing-split { margin: 8px 0 12px; padding: 10px 12px; border-left: 3px solid var(--mpie-blue); background: var(--bg-surface); border-radius: 8px; }
@@ -1449,6 +1452,19 @@
             <button class="btn alt" type="button" id="refresh-access-requests">Atualizar solicitações</button>
           </div>
           <div id="pending-access-list" class="subtle" role="status"></div>
+          <!-- Gate G2 (M04): teste de busca no corpus de referência, na chave pessoal do administrador. -->
+          <details class="gemini-setup" id="retrieval-eval-details">
+            <summary>Teste de busca no corpus de referência</summary>
+            <div class="gemini-setup-body">
+              <p class="subtle">Baixa os 30 PDFs de acesso aberto do corpus da tese teste e compara a busca por palavras, por significado (embeddings) e a combinação das duas, nas 42 perguntas rotuladas. Os embeddings usam a sua chave Gemini (custo de centavos no nível pago; gratuito dentro dos limites do nível gratuito). Leva alguns minutos e você pode fechar o navegador.</p>
+              <div class="actions">
+                <button class="btn" type="button" id="retrieval-eval-start">Rodar teste de busca</button>
+                <button class="btn alt hidden" type="button" id="retrieval-eval-download">Baixar resultado (JSON)</button>
+              </div>
+              <p class="subtle" id="retrieval-eval-status" role="status"></p>
+              <div id="retrieval-eval-result"></div>
+            </div>
+          </details>
         </div>
       </section>
       <!-- Navegação em 3 etapas (Estúdio Editorial) -->
@@ -2416,6 +2432,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=oa-20261125"></script>
+  <script type="module" src="/app.js?v=busca-20261125"></script>
 </body>
 </html>

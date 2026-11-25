@@ -71,7 +71,7 @@ O workflow `Corpus de referência e avaliação (gate G2)` refaz tudo: modo `col
 - Consultas específicas (35): recall@10 = 1,0 e MRR = 0,91. Consultas temáticas (7): recall@10 = 0,41, com MRR = 0,86 (o primeiro resultado costuma ser bom, mas os demais documentos do tema ficam fora dos 10 primeiros).
 - A janela móvel ganha cerca de 0,03 de MRR, o que equivale a uma ou duas consultas em 42: dentro do ruído deste corpus. **Decisão:** manter a política seção/parágrafo de 1200 caracteres, porque ela preserva página e caminho de títulos, que a interface usa para "Ver na página do PDF".
 - Ponto fraco claro: a consulta q39 ("letramento em inteligência artificial na educação") não achou nada, porque os documentos de T6 estão em inglês. É o caso que a busca híbrida com embeddings (M04) deve resolver.
-- **Busca híbrida não medida:** exige uma chave Gemini, e o teste rodou sem chave. Para medir, use `--hybrid` com a sua chave (custo baixo) e compare com `docs/corpus/resultados/lexical-2026-11-25.json`.
+- **Busca híbrida:** exige uma chave Gemini. Para não levar a chave pessoal ao GitHub, o teste roda no próprio Scriptorium: em **Minha conta > Teste de busca no corpus de referência** (só administrador), o worker baixa os 30 PDFs dos links fixos em `worker/corpus_ref/selecao.json` (cópia de `docs/corpus`, conferida por teste), confere o SHA-256 e mede três buscas na mesma política de trechos: só palavras (BM25), só significado (embeddings `gemini-embedding-001`) e a híbrida (RRF). Os embeddings usam a chave pessoal de quem pediu. O resultado fica na tela e pode ser baixado em JSON (só métricas, sem texto dos PDFs).
 
 ### Limiar de evidência (M10 e M16)
 

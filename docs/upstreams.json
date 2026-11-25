@@ -1230,14 +1230,17 @@
         "M03"
       ],
       "status": "parcial",
-      "next_step": "Linha de base lexical medida no corpus de referência (42 consultas: recall@10 0,90, MRR 0,90; específicas recall@10 1,0). Falta medir a busca híbrida com chave Gemini (--hybrid); a consulta em português contra documentos em inglês (q39) é o caso a resolver.",
+      "next_step": "Linha de base lexical medida no corpus de referência (42 consultas: recall@10 0,90, MRR 0,90). A busca híbrida é medida no próprio site (Minha conta, Teste de busca no corpus de referência), com a chave Gemini pessoal do administrador; falta registrar o resultado.",
       "files": [
         "worker/lexical_index.py",
         "worker/vector_index.py",
         "worker/embeddings.py",
         "worker/retrieval_context.py",
         "docs/AVALIACAO-RECUPERACAO.md",
-        "scripts/eval_corpus.py"
+        "scripts/eval_corpus.py",
+        "worker/retrieval_eval.py",
+        "api/retrieval_eval_api.py",
+        "worker/corpus_ref/selecao.json"
       ]
     },
     {

@@ -24,6 +24,7 @@ from library_index import make_library_index_router
 from advisor import (WORK_TYPES, academic_profile, addendum, data_policy, latest_authorization,
                      make_advisor_router, snapshot as authorization_snapshot)
 from reading_notes_api import make_reading_notes_router
+from retrieval_eval_api import make_retrieval_eval_router
 from oa_import import make_oa_import_router
 
 import firebase_admin
@@ -119,6 +120,8 @@ app.include_router(make_zotero_router(db, bucket, current_user))
 app.include_router(make_oa_import_router(db, bucket, current_user))
 
 AWAITING_SOURCES = "awaiting_source_approval"
+# Execuções à parte: não aparecem na lista de pesquisas nem ocupam a vaga de pesquisa.
+SIDE_MODES = {"reading_notes", "retrieval_eval"}
 
 
 class CheckpointDecision(BaseModel):
@@ -316,7 +319,7 @@ def list_researches(user: User):
     # Consulta simples, sem índices compostos. Ordenação em memória para acervo pessoal.
     docs = db.collection("research_jobs").where("owner_uid", "==", user["uid"]).limit(200).stream()
     items = [serializable(reconcile(s.reference, s.to_dict())) for s in docs
-             if (s.to_dict() or {}).get("mode") != "reading_notes"]
+             if (s.to_dict() or {}).get("mode") not in SIDE_MODES]
     items.sort(key=lambda x: x["created_at"], reverse=True)
     return {"items": items}
 
@@ -354,8 +357,8 @@ def create_research(payload: NewResearch, user: User):
     docs = db.collection("research_jobs").where("owner_uid", "==", owner_uid).limit(200).stream()
     for s in docs:
         current = reconcile(s.reference, s.to_dict())
-        # Fichamentos (M21) rodam à parte e não bloqueiam uma pesquisa.
-        if current.get("mode") != "reading_notes" and current.get("status") in ACTIVE_STATUSES:
+        # Fichamentos (M21) e o teste de busca rodam à parte e não bloqueiam uma pesquisa.
+        if current.get("mode") not in SIDE_MODES and current.get("status") in ACTIVE_STATUSES:
             raise HTTPException(status_code=409, detail=busy_detail)
     # Validar propriedade antes de iniciar tarefas caras ou armazenar a solicitação.
     source_ids = list(dict.fromkeys(payload.source_ids))
@@ -587,3 +590,8 @@ def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "re
 
 # M21: fichamento por IA sob demanda, na chave Gemini de quem pede.
 app.include_router(make_reading_notes_router(db, bucket, current_user, get_access_for_notes, start_job))
+
+# Gate G2 (M04): teste de busca no corpus de referência, só administrador, na chave pessoal.
+app.include_router(make_retrieval_eval_router(
+    db, bucket, current_user, lambda user: is_admin(user, ALLOWED_EMAILS),
+    lambda user: BYOK_ENABLED and get_access(db, user, ALLOWED_EMAILS).get("byok_ready", False), start_job))
