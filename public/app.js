@@ -1029,42 +1029,154 @@ async function loadMcp() {
     await loadMcpProjects();
   } catch (_) { $('mcp-details').classList.add('hidden'); /* API anterior ou conta sem acesso */ }
 }
-async function loadMcpProjects() {
-  const box = $('mcp-project-list'); box.replaceChildren();
-  let projects = [];
-  try { projects = (await (await request('/mcp-conta/projetos')).json()).projetos || []; }
-  catch (e) { box.append(el('p', e.message)); return; }
-  if (!projects.length) { box.append(el('p', 'Nenhum projeto ainda. Peça à sua IA para criar um com criar_projeto.')); return; }
-  for (const p of projects) {
-    const card = document.createElement('div'); card.style.margin = '8px 0 12px';
-    const done = (p.etapas || []).filter(s => s.status === 'aceita').length;
-    card.append(el('strong', p.titulo || p.projeto));
-    card.append(el('p', `${MCP_STATUS[p.status] || p.status} · ${done} de ${(p.etapas || []).length} etapas aceitas`, 'subtle'));
-    const steps = document.createElement('ul'); steps.style.margin = '2px 0 6px 18px';
-    for (const s of p.etapas || []) {
-      const ind = s.independencia === 'outra_ia' ? ' · outra IA' : s.independencia === 'outra_conversa' ? ' · conversa nova, mesma IA' : '';
-      steps.append(el('li', `${s.titulo}: ${MCP_STAGE_LABELS[s.status] || s.status}${s.ia ? ' (' + s.ia + ')' : ''}${ind}`));
+const MCP_TYPES = {artigo: 'Artigo', revisao_sistematica: 'Revisão sistemática'};
+const MCP_FILES = {'scriptorium.pdf': 'PDF', 'scriptorium.tex': 'LaTeX', 'references.bib': 'BibTeX', 'proveniencia.json': 'Proveniência'};
+const fmt = (n, d = 0) => (n === null || n === undefined || n === '') ? '–' : Number(n).toLocaleString('pt-BR', {maximumFractionDigits: d, minimumFractionDigits: d});
+
+async function downloadFrom(path, name) {
+  try {
+    const blob = await (await request(path)).blob();
+    const url = URL.createObjectURL(blob); const link = document.createElement('a');
+    link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (e) { mcpMessage(e.message); }
+}
+
+function mcpStepList(etapas) {
+  const list = document.createElement('ul'); list.className = 'mcp-steps';
+  const next = (etapas || []).find(s => s.status !== 'aceita');
+  for (const s of etapas || []) {
+    const li = document.createElement('li');
+    const name = el('span', (s.status === 'aceita' ? '✓ ' : '') + s.titulo, s.status === 'aceita' ? 'done' : '');
+    let meta = s.status === 'aceita' ? (s.ia || '') : s === next ? (s.status === 'recusada' ? 'devolvida para correção' : 'próxima') : '';
+    if (s.status === 'aceita' && s.independencia) {
+      meta += s.independencia === 'outra_ia' ? ' · outra IA' : s.independencia === 'outra_conversa' ? ' · conversa nova' : '';
     }
-    card.append(steps);
-    if (p.erro) card.append(el('p', p.erro, 'warning'));
-    const actions = document.createElement('div'); actions.className = 'actions';
-    const labels = {'scriptorium.pdf': 'Baixar PDF', 'scriptorium.tex': 'LaTeX', 'references.bib': 'BibTeX', 'proveniencia.json': 'Proveniência'};
-    for (const name of p.arquivos || []) {
-      if (!labels[name]) continue;
-      const b = el('button', labels[name], name.endsWith('.pdf') ? 'btn' : 'btn alt'); b.type = 'button';
-      b.addEventListener('click', async () => {
+    li.append(name, el('span', meta, 'meta')); list.append(li);
+  }
+  return list;
+}
+
+function mcpReview(box, p, r) {
+  const k = r.concordancia;
+  if (k && k.kappa !== null && k.kappa !== undefined) {
+    box.append(el('h4', 'Concordância da triagem'));
+    box.append(el('p', `Kappa de Cohen ${fmt(k.kappa, 2)} (${k.leitura}) em ${k.n} fontes · ` +
+      (k.divergencias.length ? `${k.divergencias.length} divergência(s), resolvidas no consenso` : 'sem divergências'), 'subtle'));
+  }
+  const pr = r.prisma;
+  if (pr) {
+    box.append(el('h4', 'PRISMA 2020'));
+    const grid = document.createElement('div'); grid.className = 'mcp-figures';
+    const cells = [];
+    if (pr.identificados !== undefined) cells.push(['Identificados', pr.identificados], ['Duplicados', pr.duplicados], ['Excluídos no título e resumo', pr.excluidos_titulo_resumo]);
+    cells.push(['Avaliados na íntegra', pr.avaliados], ['Excluídos na elegibilidade', pr.excluidos_elegibilidade]);
+    if (pr.excluidos_qualidade) cells.push(['Abaixo da nota de corte', pr.excluidos_qualidade]);
+    cells.push(['Incluídos', pr.incluidos]);
+    for (const [label, value] of cells) {
+      const c = document.createElement('div'); c.className = 'mcp-figure';
+      c.append(el('strong', fmt(value)), el('span', label)); grid.append(c);
+    }
+    box.append(grid);
+    const reasons = Object.entries(pr.motivos || {}).map(([m, n]) => `${m}: ${n}`).join(' · ');
+    if (reasons) box.append(el('p', 'Motivos de exclusão: ' + reasons, 'subtle'));
+    const broken = (pr.conferencias || []).filter(c => !c.ok);
+    box.append(el('p', broken.length ? 'Os números não fecham: ' + broken.map(c => c.detalhe || c.regra).join('; ') : 'Os números do fluxo fecham.', broken.length ? 'warning' : 'subtle'));
+  }
+  if ((r.estudos || []).length) {
+    box.append(el('h4', 'Qualidade e extração'));
+    const wrap = document.createElement('div'); wrap.className = 'mcp-table-wrap';
+    const table = document.createElement('table'); table.className = 'eval-table';
+    const head = document.createElement('tr');
+    for (const h of ['Estudo', 'Nota', ...(r.campos || [])]) head.append(el('th', h));
+    table.append(head);
+    for (const s of r.estudos) {
+      const tr = document.createElement('tr');
+      tr.append(el('td', s.chave), el('td', fmt(s.nota, 1) + (s.abaixo_do_corte ? ' (abaixo do corte)' : '')));
+      for (const f of r.campos || []) tr.append(el('td', s[f] || ''));
+      table.append(tr);
+    }
+    wrap.append(table); box.append(wrap);
+    const csvBtn = el('button', 'Baixar matriz (CSV)', 'btn alt'); csvBtn.type = 'button';
+    csvBtn.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/matriz.csv`, 'matriz_extracao.csv'));
+    const actions = document.createElement('div'); actions.className = 'actions'; actions.append(csvBtn); box.append(actions);
+  }
+  const qps = Object.keys(r.sintese || {});
+  if (qps.length) {
+    box.append(el('h4', 'Síntese por questão'));
+    box.append(el('p', 'A resposta da IA fica à vista. Se escrever a sua versão, ela substitui a da IA na redação.', 'subtle'));
+    const texts = Object.fromEntries((r.questoes || []).map(q => [q.id, q.texto]));
+    for (const qp of qps) {
+      const item = r.sintese[qp]; const block = document.createElement('div'); block.className = 'mcp-qp';
+      block.append(el('strong', `${qp}. ${texts[qp] || ''}`), el('div', item.ia || 'Sem resposta da IA.', 'ia'));
+      const area = document.createElement('textarea'); area.value = item.final || '';
+      area.placeholder = 'Sua versão final (opcional)'; area.setAttribute('aria-label', `Versão final de ${qp}`);
+      const save = el('button', 'Salvar versão final', 'btn alt'); save.type = 'button';
+      const status = el('span', '', 'subtle');
+      save.addEventListener('click', async () => {
+        save.disabled = true;
         try {
-          const blob = await (await request(`/mcp-conta/projetos/${p.projeto}/arquivos/${name}`)).blob();
-          const url = URL.createObjectURL(blob); const link = document.createElement('a');
-          link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 5000);
-        } catch (e) { mcpMessage(e.message); }
+          const out = await (await request(`/mcp-conta/projetos/${p.projeto}/sintese`, {method: 'PUT', body: JSON.stringify({qp, texto: area.value})})).json();
+          status.textContent = out.aviso || 'Salvo.';
+        } catch (e) { status.textContent = e.message; }
+        finally { save.disabled = false; }
       });
-      actions.append(b);
+      const actions = document.createElement('div'); actions.className = 'actions'; actions.append(save, status);
+      block.append(area, actions); box.append(block);
     }
-    card.append(actions); box.append(card);
   }
 }
-$('mcp-refresh')?.addEventListener('click', () => loadMcpProjects());
+
+async function openMcpProject(p, holder, button) {
+  if (!holder.hidden) { holder.hidden = true; button.textContent = 'Abrir'; return; }
+  holder.hidden = false; button.textContent = 'Fechar'; holder.replaceChildren(el('p', 'Carregando...', 'subtle'));
+  try {
+    const data = await (await request(`/mcp-conta/projetos/${p.projeto}/detalhe`)).json();
+    holder.replaceChildren();
+    holder.append(el('h4', 'Etapas'), mcpStepList(data.estado.etapas));
+    if (data.estado.proxima_acao) holder.append(el('p', data.estado.proxima_acao, 'subtle'));
+    if (data.revisao) mcpReview(holder, p, data.revisao);
+    const files = (data.estado.arquivos || []).filter(f => MCP_FILES[f]);
+    if (files.length) {
+      holder.append(el('h4', 'Arquivos'));
+      const actions = document.createElement('div'); actions.className = 'actions';
+      for (const name of files) {
+        const b = el('button', MCP_FILES[name], name.endsWith('.pdf') ? 'btn' : 'btn alt'); b.type = 'button';
+        b.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/arquivos/${name}`, name));
+        actions.append(b);
+      }
+      holder.append(actions);
+    }
+  } catch (e) { holder.replaceChildren(el('p', e.message, 'warning')); }
+}
+
+async function loadMcpProjects() {
+  const box = $('mcp-projects'); if (!box) return;
+  let projects = [];
+  try { projects = (await (await request('/mcp-conta/projetos')).json()).projetos || []; }
+  catch (e) { box.replaceChildren(el('p', e.message, 'subtle')); return; }
+  box.replaceChildren();
+  if (!projects.length) { box.append(el('p', 'Nenhum projeto ainda. Conecte sua IA em Minha conta e peça para ela criar um.', 'subtle')); return; }
+  for (const p of projects) {
+    const row = document.createElement('div'); row.className = 'mcp-row';
+    const head = document.createElement('div'); head.className = 'mcp-row-head';
+    const info = document.createElement('div');
+    const done = (p.etapas || []).filter(s => s.status === 'aceita').length;
+    info.append(el('strong', p.titulo || p.projeto),
+      el('p', `${MCP_TYPES[p.tipo] || 'Artigo'} · ${MCP_STATUS[p.status] || p.status} · ${done} de ${(p.etapas || []).length} etapas`, 'subtle'));
+    const actions = document.createElement('div'); actions.className = 'actions'; actions.style.margin = '0';
+    if ((p.arquivos || []).includes('scriptorium.pdf')) {
+      const pdf = el('button', 'PDF', 'btn'); pdf.type = 'button';
+      pdf.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/arquivos/scriptorium.pdf`, 'scriptorium.pdf'));
+      actions.append(pdf);
+    }
+    const open = el('button', 'Abrir', 'btn alt'); open.type = 'button';
+    const detail = document.createElement('div'); detail.className = 'mcp-detail'; detail.hidden = true;
+    open.addEventListener('click', () => openMcpProject(p, detail, open));
+    actions.append(open); head.append(info, actions); row.append(head, detail); box.append(row);
+  }
+}
+$('mcp-projects-refresh')?.addEventListener('click', () => loadMcpProjects());
+if (!API_MODE && $('step-sub-3')) $('step-sub-3').textContent = 'Projetos da sua IA e histórico';
 $('mcp-create-token')?.addEventListener('click', async () => {
   const label = $('mcp-token-label').value.trim() || 'Minha IA';
   try {

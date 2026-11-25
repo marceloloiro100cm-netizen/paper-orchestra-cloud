@@ -33,6 +33,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 import library_search as search
 import mcp_flow as flow
+import mcp_review as review
 
 MCP_PATH = "/api/mcp"
 MAX_ACTIVE_TOKENS = 5
@@ -149,7 +150,7 @@ class Store:
         return job_id
 
     def create_project(self, uid: str, title: str, question: str, ids: list[str], language: str,
-                       template: str) -> dict:
+                       template: str, tipo: str = "artigo") -> dict:
         ids = list(dict.fromkeys(ids or []))
         if not 3 <= len((title or "").strip()) <= 120:
             raise Falha("O título deve ter de 3 a 120 caracteres.")
@@ -157,14 +158,14 @@ class Store:
             raise Falha("Descreva a pergunta ou objetivo do texto em 20 a 4000 caracteres.")
         if not 1 <= len(ids) <= MAX_PROJECT_SOURCES:
             raise Falha(f"Escolha de 1 a {MAX_PROJECT_SOURCES} fontes (use listar_fontes).")
-        if template not in flow.TEMPLATES or language not in ("pt-BR", "en"):
-            raise Falha("Modelo ou idioma inválido.")
+        if template not in flow.TEMPLATES or language not in ("pt-BR", "en") or tipo not in flow.MODES:
+            raise Falha("Modelo, idioma ou tipo inválido.")
         if self._active_jobs(uid) >= MAX_ACTIVE_JOBS:
             raise Falha("Já há trabalhos em andamento no servidor. Aguarde terminarem.")
         sources = [self._source(uid, i) for i in ids]
         pid = uuid.uuid4().hex
         record = {"id": pid, "owner_uid": uid, "title": title.strip(), "question": question.strip(),
-                  "language": language, "template": template, "sources": sources,
+                  "language": language, "template": template, "tipo": tipo, "sources": sources,
                   "status": "preparando", "flow_version": flow.FLOW_VERSION, "stages": {}, "heads": {},
                   "created_at": now(), "updated_at": now(), "files": []}
         self.db.collection("mcp_projects").document(pid).create(record)
@@ -248,7 +249,7 @@ class Store:
             return (self.payload(project, entry).get("chunks") or []) if entry else []
         return get
 
-    def search(self, project: dict, query: str, limit: int) -> dict:
+    def search(self, project: dict, query: str, limit: int, zone: str = "") -> dict:
         try:
             fts = search.fts_query(query)
         except ValueError as exc:
@@ -270,10 +271,12 @@ class Store:
                 index_blob.upload_from_filename(path, content_type="application/vnd.sqlite3")
                 self.bucket.blob(meta_blob).upload_from_string(
                     json.dumps({"signature": sig, "chunks": count}), content_type="application/json")
-            rows = search.search_index(path, fts, limit)
+            rows = search.search_index(path, fts, limit * 4 if zone else limit)
+        if zone:
+            rows = [r for r in rows if review.zone_of(r["heading"]) == zone][:limit]
         return {"resultados": [{"chave": key_of.get(r["item_id"]), "fonte": r["name"], "chunk_id": r["chunk_id"],
-                                "paginas": r["pages"], "secao": r["heading"], "trecho": r["snippet"]}
-                               for r in rows],
+                                "paginas": r["pages"], "secao": r["heading"], "zona": review.zone_of(r["heading"]),
+                                "trecho": r["snippet"]} for r in rows],
                 "dica": "Use ler_trecho com o chunk_id para ler o texto inteiro antes de citar."}
 
     def read_chunk(self, project: dict, chunk_id: str, neighbors: int) -> dict:
@@ -286,6 +289,7 @@ class Store:
                     return {"chave": entry.get("key"), "fonte": entry.get("name"), "chunk_id": chunk_id,
                             "paginas": f"{pages[0]}-{pages[1]}" if pages else "",
                             "secao": " > ".join(chunk.get("heading_path") or []),
+                            "zona": review.zone_of(" > ".join(chunk.get("heading_path") or [])),
                             "texto": chunk.get("text", ""),
                             "vizinhos": [{"chunk_id": c.get("chunk_id"), "texto": c.get("text", "")}
                                          for c in window if c is not chunk]}
@@ -397,10 +401,30 @@ class Store:
 
 
 # ================================================================== lógica
+def mode(project: dict) -> str:
+    return project.get("tipo") or "artigo"
+
+
+def review_context(store: Store, project: dict, board: dict | None = None) -> dict:
+    if mode(project) != review.MODE:
+        return {}
+    board = store.board(project) if board is None else board
+    keys = [m.get("key") for m in store.manifest(project) if m.get("key")]
+    return review.context(project, board, keys)
+
+
+def stage_material(store: Store, project: dict, stage_key: str) -> dict:
+    board = store.board(project)
+    refs = store.references(project)
+    if mode(project) == review.MODE:
+        return review.material(stage_key, project, board, refs, review_context(store, project, board))
+    return flow.material(stage_key, project, board, refs)
+
+
 def _state_summary(project: dict) -> list[dict]:
     stages = project.get("stages") or {}
     out = []
-    for s in flow.STAGES:
+    for s in flow.stages_for(mode(project)):
         st = stages.get(s["key"]) or {}
         head = st.get("head") or {}
         out.append({"etapa": s["key"], "titulo": s["titulo"], "status": st.get("status", "pendente"),
@@ -411,7 +435,7 @@ def _state_summary(project: dict) -> list[dict]:
 
 
 def project_state(store: Store, project: dict) -> dict:
-    nxt = flow.next_stage(project.get("stages") or {})
+    nxt = flow.next_stage(project.get("stages") or {}, mode(project))
     status = project.get("status")
     if status == "preparando":
         action = "Aguarde: o Scriptorium está lendo as fontes."
@@ -426,7 +450,7 @@ def project_state(store: Store, project: dict) -> dict:
     else:
         action = "Todas as etapas aceitas: chame compilar."
     return {"projeto": project["id"], "titulo": project.get("title"), "status": status,
-            "etapas": _state_summary(project), "proxima_acao": action,
+            "tipo": mode(project), "etapas": _state_summary(project), "proxima_acao": action,
             "arquivos": project.get("files", []), "erro": project.get("error", "")}
 
 
@@ -435,7 +459,7 @@ def next_step(store: Store, uid: str, pid: str, head_id: str | None, model: str,
     store.ready(project)
     if project.get("status") in ("compilando", "concluido"):
         return project_state(store, project)
-    stage_def = flow.next_stage(project.get("stages") or {})
+    stage_def = flow.next_stage(project.get("stages") or {}, mode(project))
     if stage_def is None:
         return {**project_state(store, project), "instrucao": "Todas as etapas foram aceitas. Chame compilar."}
     if stage_def["nova_conversa"]:
@@ -453,11 +477,10 @@ def next_step(store: Store, uid: str, pid: str, head_id: str | None, model: str,
     issued = None
     if head is None or head.get("kind") != "redatora":
         head = issued = store.new_head(project, "redatora", None, client, model)
-    board = store.board(project)
     state = (project.get("stages") or {}).get(stage_def["key"]) or {}
     out = {"etapa": stage_def["key"], "titulo": stage_def["titulo"], "cabeca": head["id"],
            "instrucoes": flow.brief(stage_def, project.get("language", "pt-BR")),
-           "material": flow.material(stage_def["key"], project, board, store.references(project))}
+           "material": stage_material(store, project, stage_def["key"])}
     if issued:
         out["aviso"] = (f"Esta conversa é a cabeça {head['id']}. Use cabeca=\"{head['id']}\" em todas as "
                         "chamadas seguintes desta conversa.")
@@ -472,7 +495,7 @@ def open_pass(store: Store, uid: str, code: str, model: str, client: str) -> dic
     state = (project.get("stages") or {}).get(stage_def["key"]) or {}
     if state.get("status") == "aceita":
         raise Falha("Esta etapa já foi aceita; o passe não vale mais.")
-    current = flow.next_stage(project.get("stages") or {})
+    current = flow.next_stage(project.get("stages") or {}, mode(project))
     if not current or current["key"] != stage_def["key"]:
         raise Falha("Este passe ainda não está liberado: a etapa anterior não terminou.")
     head = store.new_head(project, stage_def["cabeca"], stage_def["key"], client, model)
@@ -481,7 +504,7 @@ def open_pass(store: Store, uid: str, code: str, model: str, client: str) -> dic
             "aviso": (f"Esta conversa é a cabeça {head['id']} ({stage_def['cabeca']}). Use "
                       f"cabeca=\"{head['id']}\" e projeto=\"{project['id']}\" nas chamadas seguintes."),
             "instrucoes": flow.brief(stage_def, project.get("language", "pt-BR")),
-            "material": flow.material(stage_def["key"], project, store.board(project), store.references(project))}
+            "material": stage_material(store, project, stage_def["key"])}
 
 
 def deliver(store: Store, uid: str, pid: str, stage_key: str, content: str, head_id: str, model: str,
@@ -490,10 +513,11 @@ def deliver(store: Store, uid: str, pid: str, stage_key: str, content: str, head
     store.ready(project)
     if project.get("status") in ("compilando", "concluido"):
         raise Falha("O projeto já está em compilação ou concluído.")
-    stage_def = flow.stage(stage_key) if stage_key in flow.BY_KEY else None
-    if not stage_def:
-        raise Falha("Etapa desconhecida. Etapas: " + ", ".join(flow.STAGE_KEYS))
-    current = flow.next_stage(project.get("stages") or {})
+    keys = [s["key"] for s in flow.stages_for(mode(project))]
+    if stage_key not in keys:
+        raise Falha("Etapa desconhecida. Etapas: " + ", ".join(keys))
+    stage_def = flow.stage(stage_key)
+    current = flow.next_stage(project.get("stages") or {}, mode(project))
     if not current or current["key"] != stage_key:
         raise Falha(f"A etapa atual é {current['titulo'] if current else 'nenhuma (tudo aceito)'}; "
                     f"não é possível entregar {stage_def['titulo']} agora.")
@@ -507,8 +531,12 @@ def deliver(store: Store, uid: str, pid: str, stage_key: str, content: str, head
     if client and not head.get("client"):
         head["client"] = client[:80]
     refs = store.references(project)
-    report = flow.validate(stage_key, content or "", bib_keys={r["key"] for r in refs},
-                           chunks_for_key=store.chunks_for_key(project), template=project.get("template"))
+    if stage_key in review.BY_KEY:
+        ctx = review_context(store, project)
+        report = review.validate(stage_key, content or "", ctx, store.chunks_for_key(project))
+    else:
+        report = flow.validate(stage_key, content or "", bib_keys={r["key"] for r in refs},
+                               chunks_for_key=store.chunks_for_key(project), template=project.get("template"))
     state = dict(stages.get(stage_key) or {})
     version = int(state.get("attempts", 0)) + 1
     store.save_stage(project, stage_key, version, content or "", report)
@@ -523,19 +551,32 @@ def deliver(store: Store, uid: str, pid: str, stage_key: str, content: str, head
     state.update(status="aceita", version=version, head=head, summary=summary, accepted_at=now(),
                  errors=[])
     if stage_def["cabeca"] != "redatora":
-        writer = (stages.get("reescrita") or stages.get("redacao") or {}).get("head")
+        compare = stage_def.get("compara_com") or ("reescrita", "redacao")
+        writer = next(((stages.get(k) or {}).get("head") for k in compare if (stages.get(k) or {}).get("head")), None)
         state["independencia"] = flow.independence(writer, head)
     stages[stage_key] = state
-    store.update_project(pid, stages=stages)
+    extra = {}
+    if stage_key == "triagem_independente":
+        # Concordância entre as duas triagens; sem divergências, o consenso não é preciso.
+        project["stages"] = stages
+        kappa = review_context(store, project).get("kappa") or {}
+        state["concordancia"] = kappa
+        extra["concordancia"] = kappa
+        if not kappa.get("divergencias"):
+            store.save_stage(project, "consenso", 1, "[]", {"ok": True, "erros": [], "resolvidas": 0})
+            stages["consenso"] = {"status": "aceita", "version": 1, "attempts": 1, "head": head,
+                                  "summary": {"ok": True, "resolvidas": 0, "automatico": "sem divergências"},
+                                  "accepted_at": now()}
+    store.update_project(pid, stages=stages, **({"concordancia": extra["concordancia"]} if extra else {}))
     project["stages"] = stages
-    nxt = flow.next_stage(stages)
+    nxt = flow.next_stage(stages, mode(project))
     if stage_def["nova_conversa"]:
         after = "Etapa aceita. Avise o pesquisador para voltar à conversa da redação e chamar proxima_etapa."
     elif nxt:
         after = "Etapa aceita. Chame proxima_etapa para seguir."
     else:
         after = "Todas as etapas aceitas. Chame compilar."
-    return {"aceita": True, "etapa": stage_key, "resumo": summary,
+    return {"aceita": True, "etapa": stage_key, "resumo": summary, **extra,
             "independencia": state.get("independencia"), "instrucao": after}
 
 
@@ -544,12 +585,17 @@ def compile_project(store: Store, uid: str, pid: str) -> dict:
     store.ready(project)
     if project.get("status") == "compilando":
         raise Falha("A compilação já está em andamento.")
-    if flow.next_stage(project.get("stages") or {}) is not None:
+    if flow.next_stage(project.get("stages") or {}, mode(project)) is not None:
         raise Falha("Ainda há etapas por aceitar. Veja estado_do_projeto.")
     if store._active_jobs(uid) >= MAX_ACTIVE_JOBS:
         raise Falha("Já há trabalhos em andamento no servidor. Aguarde terminarem.")
+    snapshot = {}
+    if mode(project) == review.MODE:
+        # O worker desenha o PRISMA com estes números e os grava na proveniência.
+        ctx = review_context(store, project)
+        snapshot = {"prisma": ctx.get("prisma"), "concordancia": ctx.get("kappa")}
     job = store._launch(uid, pid, "mcp_compile", [], f"Compilação MCP: {project.get('title', '')}")
-    store.update_project(pid, status="compilando", compile_job=job, error="")
+    store.update_project(pid, status="compilando", compile_job=job, error="", **snapshot)
     return {"status": "compilando", "instrucao": "Consulte estado_do_projeto em um ou dois minutos."}
 
 
@@ -615,11 +661,14 @@ def build_server(store: Store, public_url: str) -> MCPServer:
     @server.tool()
     async def criar_projeto(titulo: str, pergunta: str, ids_das_fontes: list[str],
                             idioma: Literal["pt-BR", "en"] = "pt-BR",
-                            modelo: Literal["abnt-artigo", "artigo-simples"] = "abnt-artigo") -> dict:
-        """Cria um projeto de texto com até 20 fontes da biblioteca. O Scriptorium lê as fontes e monta as
-        referências oficiais (alguns minutos, sem IA); depois disso use proxima_etapa."""
+                            modelo: Literal["abnt-artigo", "artigo-simples"] = "abnt-artigo",
+                            tipo: Literal["artigo", "revisao_sistematica"] = "artigo") -> dict:
+        """Cria um projeto com até 20 fontes da biblioteca. tipo="revisao_sistematica" segue protocolo,
+        triagem dupla às cegas (kappa), consenso, qualidade e extração, síntese por QP e PRISMA 2020 antes
+        da redação. O Scriptorium lê as fontes e monta as referências oficiais (alguns minutos, sem IA);
+        depois use proxima_etapa."""
         uid = _uid()
-        record = await run(partial(store.create_project, uid, titulo, pergunta, ids_das_fontes, idioma, modelo))
+        record = await run(partial(store.create_project, uid, titulo, pergunta, ids_das_fontes, idioma, modelo, tipo))
         return {"projeto": record["id"], "status": record["status"],
                 "instrucao": "Fontes em leitura. Chame estado_do_projeto em um ou dois minutos e depois proxima_etapa."}
 
@@ -671,12 +720,15 @@ def build_server(store: Store, public_url: str) -> MCPServer:
         return await run(store.card, project, chave)
 
     @server.tool()
-    async def buscar_trechos(projeto: str, consulta: str, limite: int = 8) -> dict:
-        """Busca (BM25) nos trechos das fontes do projeto. Devolve chave, chunk_id, páginas e um recorte."""
+    async def buscar_trechos(projeto: str, consulta: str, limite: int = 8,
+                             zona: Literal["", "resumo", "introducao", "metodo", "resultados", "discussao",
+                                           "limitacoes", "referencias"] = "") -> dict:
+        """Busca (BM25) nos trechos das fontes do projeto. Devolve chave, chunk_id, páginas, zona do artigo
+        (método, resultados, limitações...) e um recorte. Use zona para procurar só numa parte."""
         uid = _uid()
         project = await run(store.project, uid, projeto)
         store.ready(project)
-        return await run(store.search, project, consulta, max(1, min(int(limite), 20)))
+        return await run(store.search, project, consulta, max(1, min(int(limite), 20)), zona)
 
     @server.tool()
     async def ler_trecho(projeto: str, chunk_id: str, vizinhos: int = 0) -> dict:

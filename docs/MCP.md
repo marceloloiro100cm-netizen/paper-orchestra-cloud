@@ -56,6 +56,32 @@ cliente diferentes), `outra_conversa` (mesma IA, conversa nova) ou `mesma_cabeca
 modelo é **declarado** pela IA e o cliente vem do protocolo (ou do User-Agent): é
 registro de boa-fé, não prova.
 
+## Modo revisão sistemática
+
+`criar_projeto(..., tipo="revisao_sistematica")`. Ideias trazidas da LENAI, plataforma de
+revisão sistemática de uma colega do mestrado (só as ideias; nenhum código copiado).
+
+| Etapa | Cabeça | O que o Scriptorium confere |
+|---|---|---|
+| Protocolo | redatora | PICOC, QP, IC, EC, AQ, escala (3+ respostas com peso), nota de corte, campos de extração, busca declarada |
+| Triagem | redatora | todas as fontes decididas uma vez; IC/EC coerentes com a decisão; checklist de leitura; citação literal |
+| Triagem independente | triadora, **conversa nova por passe, às cegas** | o mesmo; o servidor calcula o kappa de Cohen e as divergências |
+| Consenso | redatora | resolve só as divergências (pulada automaticamente se não houver) |
+| Qualidade e extração | redatora | nota pela escala; cada campo e os trechos de método, resultados e limitações com citação literal conferida |
+| Síntese por questão | redatora | todas as QP respondidas, só com estudos da amostra final |
+| Redação, revisão, reescrita, verificação | como no artigo | a redação recebe protocolo, PRISMA, kappa, matriz e síntese |
+
+- Decisão `fora_da_triagem` para guias de método e textos teóricos: ficam fora do PRISMA.
+- `excluir_abaixo_do_corte` no protocolo tira da amostra final os estudos com nota abaixo do corte.
+- PRISMA 2020 calculado das decisões, com conferência de conservação (identificados, duplicados,
+  excluídos no título e resumo, não recuperados, avaliados, excluídos, incluídos). A figura entra
+  no PDF na linha `%PRISMA` (ou antes de Resultados), em LaTeX simples.
+- Zonas do artigo (resumo, método, resultados, limitações...) pelo título da seção:
+  `buscar_trechos(..., zona="metodo")`.
+- Site: na etapa Execuções e Auditorias, cada projeto abre etapas, concordância, PRISMA, matriz de
+  extração (CSV) e a síntese por questão. O pesquisador pode gravar a **versão final** de cada
+  resposta; ela substitui a da IA na redação e fica registrada na proveniência.
+
 ## Segurança do LaTeX
 
 O corpo vem de uma IA e é compilado no worker. Duas barreiras:
