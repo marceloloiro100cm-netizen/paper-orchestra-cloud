@@ -877,6 +877,77 @@ $('zotero-import').addEventListener('click', async () => {
   } catch (e) { zoteroMessage(e.message); }
   finally { $('zotero-import').disabled = false; }
 });
+// M11: IN IFRS 16/2026. Dados inéditos (Art. 9º) e autorização do orientador (Art. 6º e 8º).
+for (const radio of document.querySelectorAll('input[name="unpublished-data"]')) {
+  radio.addEventListener('change', () => $('unpublished-confirm').classList.toggle('hidden',
+    document.querySelector('input[name="unpublished-data"]:checked')?.value !== 'sim'));
+}
+async function loadAdvisor() {
+  try {
+    const data = await (await request('/account/advisor-authorization')).json();
+    const scope = $('advisor-scope');
+    if (!scope.querySelector('input')) {
+      for (const [code, label] of Object.entries(data.art6 || {})) {
+        const l = document.createElement('label'); l.style.display = 'block';
+        const c = document.createElement('input'); c.type = 'checkbox'; c.value = code;
+        c.checked = ['I', 'II', 'III', 'IV', 'X', 'XII'].includes(code);
+        l.append(c, ` ${code}: ${label}`); scope.append(l);
+      }
+      const form = $('advisor-form');
+      for (const f of data.forms || []) { const o = document.createElement('option'); o.value = o.textContent = f; form.append(o); }
+    }
+    const last = data.latest;
+    $('advisor-current').textContent = last
+      ? `Registrada: ${last.advisor_name}, ${last.authorized_on}, por ${last.record_form}; incisos ${last.scope.join(', ')}.`
+      : 'Nenhuma autorização registrada. As declarações de IA sairão com esse campo para preencher.';
+    $('advisor-title').textContent = 'Autorização do orientador para uso de IA (IN IFRS 16/2026)' + (last ? ' · registrada' : ' · pendente');
+  } catch (_) { /* API anterior: seção fica sem dados */ }
+}
+$('save-advisor').addEventListener('click', async () => {
+  const scope = [...$('advisor-scope').querySelectorAll('input:checked')].map(c => c.value);
+  const body = {advisor_name: $('advisor-name').value.trim(), authorized_on: $('advisor-date').value,
+    record_form: $('advisor-form').value, record_reference: $('advisor-reference').value.trim(), scope};
+  if (!body.advisor_name || !body.authorized_on || !scope.length) { $('advisor-message').textContent = 'Preencha nome, data e ao menos um uso.'; return; }
+  try { await request('/account/advisor-authorization', {method: 'POST', body: JSON.stringify(body)}); $('advisor-message').textContent = 'Autorização registrada.'; await loadAdvisor(); }
+  catch (e) { $('advisor-message').textContent = e.message; }
+});
+
+// M21: fichamento por IA sob demanda (gasta a sua chave Gemini; fica em cache).
+function renderNotes(box, n) {
+  box.append(el('h4', `Fichamento por IA (${n.model})`));
+  for (const [label, value] of [['Tema', n.tema], ['Objetivo', n.objetivo], ['Método', n.metodo]]) if (value) box.append(el('p', `${label}: ${value}`));
+  if ((n.principais_achados || []).length) {
+    box.append(el('strong', 'Principais achados'));
+    for (const a of n.principais_achados) {
+      const where = (a.trechos || []).map(t => t.pages ? `p. ${t.pages[0]}` : t.id).join(', ');
+      box.append(el('p', `${a.sem_trecho_valido ? '⚠ ' : ''}${a.texto}${where ? ' (' + where + ')' : ' (sem trecho que comprove)'}`, a.sem_trecho_valido ? 'editorial-alert' : ''));
+    }
+  }
+  if ((n.conceitos_chave || []).length) box.append(el('p', 'Conceitos: ' + n.conceitos_chave.join(', ')));
+  for (const q of n.citacoes_literais || []) box.append(el('p', `${q.situacao === 'conferida' ? '✓ conferida' : '⚠ não encontrada no documento'}${q.pages ? ' · p. ' + q.pages[0] : ''}: "${q.citacao}"`, q.situacao === 'conferida' ? '' : 'editorial-alert'));
+  for (const l of n.limitacoes || []) box.append(el('small', 'Limitação do estudo: ' + l));
+  for (const l of n.limitations || []) box.append(el('small', l));
+}
+async function aiNotes(itemId, box, start) {
+  const area = box.querySelector('.ai-notes') || box.appendChild(Object.assign(document.createElement('div'), {className: 'ai-notes'}));
+  area.textContent = start ? 'Pedindo o fichamento...' : 'Consultando...';
+  try {
+    if (start) {
+      if (!confirm('Gerar o fichamento com IA usa tokens da sua chave Gemini (modelo Flash, uma chamada). Continuar?')) { area.textContent = ''; return; }
+      await request(`/library/items/${itemId}/ai-notes`, {method: 'POST'});
+    }
+    for (let i = 0; i < 40; i++) {
+      const d = await (await request(`/library/items/${itemId}/ai-notes`)).json();
+      if (d.status === 'completed') { area.replaceChildren(); renderNotes(area, d.notes); return; }
+      if (d.status === 'failed') { area.textContent = 'O fichamento falhou: ' + (d.error || 'tente de novo.'); return; }
+      if (d.status === 'none') { area.textContent = ''; return; }
+      area.textContent = d.stage || 'Gerando o fichamento...';
+      await new Promise(r => setTimeout(r, 6000));
+    }
+    area.textContent = 'Ainda em andamento. Abra a ficha de novo em alguns minutos.';
+  } catch (e) { area.textContent = e.message; }
+}
+
 // M03/M21: busca no conteúdo já lido e ficha de leitura de cada documento.
 async function showReadingCard(itemId, holder) {
   const old = holder.querySelector('.reading-card');
@@ -895,6 +966,10 @@ async function showReadingCard(itemId, holder) {
     if (c.opening) { box.append(el('h4', 'Abertura')); box.append(el('small', c.opening)); }
     if ((c.ocr_pages_flagged || []).length) box.append(el('p', 'Páginas que precisam de OCR: ' + c.ocr_pages_flagged.join(', '), 'editorial-alert'));
     for (const lim of c.limitations || []) box.append(el('small', lim));
+    const gen = el('button', 'Fichamento com IA (usa sua chave Gemini)'); gen.type = 'button';
+    gen.addEventListener('click', () => aiNotes(itemId, box, true));
+    box.append(gen);
+    aiNotes(itemId, box, false);
   } catch (e) { box.textContent = e.message; }
 }
 async function runContentSearch() {
@@ -942,8 +1017,16 @@ $('new-paper').addEventListener('submit', async (event) => {
       source_ids:[...selectedSourceIds],
       plotting:$('plotting').checked,
       neon_review:$('neon-review').checked,
-      preflight:$('preflight').checked
+      preflight:$('preflight').checked,
+      // M11 / IN IFRS 16/2026, Art. 9º
+      unpublished_data: document.querySelector('input[name="unpublished-data"]:checked')?.value === 'sim',
+      paid_tier_confirmed: $('paid-tier').checked,
+      deidentified_confirmed: $('deidentified').checked
     };
+    if (!document.querySelector('input[name="unpublished-data"]:checked')) {
+      $('submit-status').textContent = 'Informe se o material tem dados inéditos ou sensíveis (IN IFRS 16/2026, Art. 9º).';
+      return;
+    }
     if (payload.preflight && !payload.source_ids.length) {
       $('submit-status').textContent = 'Selecione ao menos uma fonte da biblioteca para o diagnóstico.';
       return;
@@ -952,7 +1035,7 @@ $('new-paper').addEventListener('submit', async (event) => {
     $('submit-status').textContent = payload.preflight
       ? 'Diagnóstico enviado. Quando terminar, aprove as fontes no histórico para iniciar a redação.'
       : 'Pesquisa enviada. Você pode fechar o navegador.';
-    $('new-paper').reset();applyModelAccess();selectedSourceIds.clear();updateSelectedCount();displayLibrary();await loadJobs();
+    $('new-paper').reset();$('unpublished-confirm').classList.add('hidden');applyModelAccess();selectedSourceIds.clear();updateSelectedCount();displayLibrary();await loadJobs();
   } catch (e) { $('submit-status').textContent=e.message; }
   finally {button.disabled = !accountAccess?.research_generation_enabled;}
 });
@@ -1182,7 +1265,7 @@ $('retry-access').addEventListener('click', async () => {
   if (!user) return;
   await loadAccountAccess();
   if (accountAccess?.research_generation_enabled) {
-    await Promise.all([loadJobs(), loadLibrary(), loadCapabilities()]);
+    await Promise.all([loadJobs(), loadLibrary(), loadCapabilities(), loadAdvisor()]);
     if (refreshInterval) clearInterval(refreshInterval);
     refreshInterval = setInterval(loadJobs, 12000);
   }
@@ -1253,7 +1336,7 @@ $('retry-api-version').addEventListener('click', async () => {
   try {
     await loadAccountAccess();
     if (accountAccess?.research_generation_enabled && !accountAccess.legacy_backend) {
-      await Promise.all([loadJobs(), loadLibrary(), loadCapabilities()]);
+      await Promise.all([loadJobs(), loadLibrary(), loadCapabilities(), loadAdvisor()]);
       if (refreshInterval) clearInterval(refreshInterval);
       refreshInterval = setInterval(loadJobs, 12000);
     }

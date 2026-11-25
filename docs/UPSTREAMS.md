@@ -59,6 +59,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R44 | [Gemini Embedding (gemini-embedding-001)](https://ai.google.dev/api/embeddings) | api | sim | termos do serviço | gemini-embedding-001, 768 dimensões (SCRIPTORIUM_EMBEDDING_MODEL / _DIMENSIONS) | M04, M08 |
 | R45 | [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html) | normativo | sim | CC-BY-SA-4.0 | - | M13 |
 | R46 | [pdfid (Didier Stevens)](https://blog.didierstevens.com/programs/pdf-tools/) | ferramenta | sim | domínio público (declarado pelo autor) | - | M13 |
+| R47 | [Gemini API: termos adicionais de serviço (uso dos dados)](https://ai.google.dev/gemini-api/terms) | normativo | sim | termos do serviço | - | M11, M21 |
 
 ## Fichas
 
@@ -625,12 +626,12 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Situação da licença:** normativa institucional
 - **Licença dos pesos:** -
 - **Versão fixada:** -
-- **Versão instalada:** IN 16/2026 de 27/05/2026
+- **Versão instalada:** IN 16/2026, assinada em 26/05/2026 (SIG IFRS, código de verificação d3ba1f7224)
 - **Última versão revisada:** -
-- **Onde é usado:** worker/ai_declaration.py
+- **Onde é usado:** worker/ai_declaration.py, api/advisor.py, worker/run_manifest.py
 - **Política de atualização:** Semestral e sempre que a norma ou o anexo mudar; revisão humana do texto da declaração.
 - **Frequência de revisão:** semestral
-- **Risco:** O texto do Anexo (declaração) ainda não foi conferido item a item; o rascunho gerado não afirma conformidade.
+- **Risco:** Texto da IN conferido em 24/11/2026 a partir do PDF assinado (4 páginas). O modelo do Anexo I não estava nesse PDF e ainda não foi conferido; a declaração continua marcada como rascunho.
 - **Nota de migração:** -
 - **Resultado de benchmark:** -
 - **Rollback:** -
@@ -1115,6 +1116,29 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Frequência de revisão:** semestral
 - **Risco:** -
 - **Nota de migração:** Ideia de contar nomes de risco (/JavaScript, /Launch, /EmbeddedFile etc.), inclusive ofuscados com #xx; a inspeção também abre fluxos FlateDecode com limite de descompressão.
+- **Resultado de benchmark:** -
+- **Rollback:** -
+- **Responsável:** marceloloiro100cm-netizen
+- **Última checagem:** 2026-11-24
+
+### R47 · Gemini API: termos adicionais de serviço (uso dos dados)
+
+- **Fonte canônica:** https://ai.google.dev/gemini-api/terms
+- **Versões:** -
+- **Erros e correções:** -
+- **Avisos de segurança:** -
+- **Histórico de mudanças:** -
+- **Licença (SPDX):** termos do serviço
+- **Situação da licença:** termos do Google; define uso dos dados nos níveis gratuito e pago
+- **Licença dos pesos:** -
+- **Versão fixada:** -
+- **Versão instalada:** -
+- **Última versão revisada:** -
+- **Onde é usado:** api/advisor.py, worker/ai_declaration.py
+- **Política de atualização:** Mensal: conferir se a regra 'nível gratuito pode usar o conteúdo para melhorar produtos; com faturamento ativo, não' continua valendo. Mudança exige revisar o bloqueio do Art. 9º da IN 16/2026.
+- **Frequência de revisão:** mensal
+- **Risco:** Base da regra que exige faturamento ativo para dados inéditos (IN IFRS 16/2026, Art. 9º). O Scriptorium não consegue verificar o nível da chave: depende da confirmação do pesquisador.
+- **Nota de migração:** -
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen

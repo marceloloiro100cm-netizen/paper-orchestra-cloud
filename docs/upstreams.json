@@ -567,18 +567,20 @@
       "release_url": "https://ifrs.edu.br/wp-content/uploads/2026/05/Anexo-IN-IAGen.pdf",
       "license_spdx": "não se aplica",
       "license_status": "normativa institucional",
-      "installed_version": "IN 16/2026 de 27/05/2026",
+      "installed_version": "IN 16/2026, assinada em 26/05/2026 (SIG IFRS, código de verificação d3ba1f7224)",
       "adopted": true,
       "modules": [
         "M11",
         "M12"
       ],
       "used_in": [
-        "worker/ai_declaration.py"
+        "worker/ai_declaration.py",
+        "api/advisor.py",
+        "worker/run_manifest.py"
       ],
       "update_policy": "Semestral e sempre que a norma ou o anexo mudar; revisão humana do texto da declaração.",
       "review_frequency": "semestral",
-      "risk": "O texto do Anexo (declaração) ainda não foi conferido item a item; o rascunho gerado não afirma conformidade.",
+      "risk": "Texto da IN conferido em 24/11/2026 a partir do PDF assinado (4 páginas). O modelo do Anexo I não estava nesse PDF e ainda não foi conferido; a declaração continua marcada como rascunho.",
       "owner": "marceloloiro100cm-netizen",
       "last_checked": "2026-11-24"
     },
@@ -1097,6 +1099,28 @@
       "owner": "marceloloiro100cm-netizen",
       "last_checked": "2026-11-24",
       "migration_note": "Ideia de contar nomes de risco (/JavaScript, /Launch, /EmbeddedFile etc.), inclusive ofuscados com #xx; a inspeção também abre fluxos FlateDecode com limite de descompressão."
+    },
+    {
+      "id": "R47",
+      "name": "Gemini API: termos adicionais de serviço (uso dos dados)",
+      "kind": "normativo",
+      "canonical_url": "https://ai.google.dev/gemini-api/terms",
+      "license_spdx": "termos do serviço",
+      "license_status": "termos do Google; define uso dos dados nos níveis gratuito e pago",
+      "adopted": true,
+      "modules": [
+        "M11",
+        "M21"
+      ],
+      "used_in": [
+        "api/advisor.py",
+        "worker/ai_declaration.py"
+      ],
+      "update_policy": "Mensal: conferir se a regra 'nível gratuito pode usar o conteúdo para melhorar produtos; com faturamento ativo, não' continua valendo. Mudança exige revisar o bloqueio do Art. 9º da IN 16/2026.",
+      "review_frequency": "mensal",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24",
+      "risk": "Base da regra que exige faturamento ativo para dados inéditos (IN IFRS 16/2026, Art. 9º). O Scriptorium não consegue verificar o nível da chave: depende da confirmação do pesquisador."
     }
   ],
   "modules": [
@@ -1332,16 +1356,20 @@
       "decision": "Implementar política normativa própria",
       "upstreams": [
         "R25",
-        "R01"
+        "R01",
+        "R47"
       ],
       "depends_on": [
         "M14"
       ],
       "status": "parcial",
       "files": [
-        "worker/ai_declaration.py"
+        "worker/ai_declaration.py",
+        "api/advisor.py",
+        "worker/run_manifest.py",
+        "public/app.js"
       ],
-      "next_step": "Gera rascunho a partir do manifesto. Falta conferir item a item com o Anexo da IN 16/2026 e registrar a aprovação do orientador (M12)."
+      "next_step": "Declaração alinhada artigo por artigo ao texto da IN 16/2026 (Art. 2º a 10), com incisos do Art. 6º por etapa, autorização do orientador registrada na conta (Art. 6º e 8º, somente acréscimo) e política de dados por pesquisa (Art. 9º: dados inéditos só com chave de projeto com faturamento ativo e sem identificação de participantes). Falta conferir o modelo do Anexo I, que não estava no PDF recebido."
     },
     {
       "id": "M12",
@@ -1378,14 +1406,14 @@
         "R01"
       ],
       "depends_on": [],
-      "status": "parcial",
+      "status": "implementado",
       "files": [
         "worker/document_guard.py",
         "worker/source_materials.py",
         "api/library.py",
         "api/upload_guard.py"
       ],
-      "next_step": "Feito: neutralização de delimitadores e instruções embutidas no texto, e inspeção estática no upload (conteúdo ativo em PDF, inclusive em fluxos compactados e nomes ofuscados; macros, OLE, DDE e modelo externo em DOCX) com quarentena fora da biblioteca. Falta antivírus com assinaturas (ex.: ClamAV), se o volume justificar."
+      "next_step": "Neutralização de delimitadores e instruções embutidas no texto, e inspeção estática no upload (conteúdo ativo em PDF, inclusive em fluxos compactados e nomes ofuscados; macros, OLE, DDE e modelo externo em DOCX) com quarentena fora da biblioteca. Antivírus com assinaturas (ClamAV) descartado por decisão do responsável em 24/11/2026: reavaliar se o número de usuários crescer."
     },
     {
       "id": "M14",
@@ -1471,7 +1499,7 @@
         "M19"
       ],
       "status": "parcial",
-      "next_step": "Experimental, desligado por padrão (SCRIPTORIUM_V2_CONTRADICTIONS=true): até 12 pares de trechos de fontes diferentes, classificados pelo modelo, com frases conferidas contra os trechos. Falta conjunto rotulado para medir precisão.",
+      "next_step": "Experimental, ligado em produção em 24/11/2026 (SCRIPTORIUM_V2_CONTRADICTIONS=true, decisão do responsável): até 12 pares de trechos de fontes diferentes, classificados pelo modelo, com frases conferidas contra os trechos. Falta conjunto rotulado para medir precisão.",
       "files": [
         "worker/contradictions.py",
         "worker/audit_shield.py"
@@ -1549,19 +1577,22 @@
       "wave": 4,
       "decision": "Construir no GCS/Firestore",
       "upstreams": [
-        "R01"
+        "R01",
+        "R47"
       ],
       "depends_on": [
         "M03",
         "M14"
       ],
-      "status": "parcial",
-      "next_step": "Cache por SHA-256 de parsing, trechos, vetores e metadados, e ficha de leitura sem IA (estrutura, termos, abertura, OCR) por documento. Falta fichamento por modelo de linguagem, que gastaria a chave do pesquisador e depende de decisão do responsável.",
+      "status": "implementado",
+      "next_step": "Cache por SHA-256 de parsing, trechos, vetores e metadados; ficha de leitura sem IA; e fichamento por IA sob demanda (Gemini Flash na chave de quem pede, cache por conteúdo, modelo, parser e política notes-1), com achados ligados a trechos e citações literais conferidas no texto do documento.",
       "files": [
         "worker/source_materials.py",
         "worker/runner.py",
         "api/library_index.py",
-        "worker/coverage_facets.py"
+        "worker/coverage_facets.py",
+        "api/reading_notes_api.py",
+        "worker/reading_notes.py"
       ]
     },
     {
@@ -1581,7 +1612,7 @@
         "M15"
       ],
       "status": "parcial",
-      "next_step": "Experimental e desligado (SCRIPTORIUM_V2_FIRE=true): até 15 afirmações, 3 ciclos e 40 chamadas; decide só com confiança e evidência citada por ID; limite nunca vira 'apoiada'. Completa o estágio 4 do escudo. Falta conjunto rotulado para medir precisão.",
+      "next_step": "Experimental, ligado em produção em 24/11/2026 (SCRIPTORIUM_V2_FIRE=true, decisão do responsável): até 15 afirmações, 3 ciclos e 40 chamadas; decide só com confiança e evidência citada por ID; limite nunca vira 'apoiada'. Completa o estágio 4 do escudo. Falta conjunto rotulado para medir precisão.",
       "files": [
         "worker/fire_audit.py",
         "worker/audit_shield.py"

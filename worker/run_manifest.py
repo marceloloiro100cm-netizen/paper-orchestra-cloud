@@ -111,6 +111,13 @@ class RunManifest:
                           {"status": "none_recorded",
                            "reason": "Pesquisa iniciada sem o checkpoint de aprovação de fontes."}),
             "mode": record.get("mode") or "generate",
+            # M11 (IN IFRS 16/2026): política de dados (Art. 9º) e autorização do
+            # orientador (Art. 6º e 8º) registradas quando a pesquisa foi criada.
+            "institutional": {
+                "regulation": "IN IFRS nº 16/2026 (R25)",
+                "data_policy": record.get("data_policy"),
+                "advisor_authorization": record.get("advisor_authorization"),
+            },
             "limitations": [
                 "Modelos de linguagem não são determinísticos: repetir a execução com o mesmo manifesto pode gerar texto diferente.",
                 "O manifesto registra o que foi entregue aos agentes, não comprova a validade científica do manuscrito.",

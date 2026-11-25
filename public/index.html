@@ -1336,6 +1336,27 @@
             </div>
           </details>
         </div>
+        <!-- M11: IN IFRS 16/2026, Art. 6º e 8º. Registro do pesquisador, somente acréscimo. -->
+        <details class="gemini-setup" id="advisor-details">
+          <summary id="advisor-title">Autorização do orientador para uso de IA (IN IFRS 16/2026)</summary>
+          <div class="gemini-setup-body">
+            <p class="subtle">A IN 16/2026 exige autorização do docente ou orientador, formalmente registrada (Art. 6º e 8º). Registre aqui quem autorizou, quando e como; isso entra no manifesto e na declaração de uso de IA de cada pesquisa. O documento oficial continua sendo o do seu orientador.</p>
+            <p class="subtle" id="advisor-current" role="status"></p>
+            <label for="advisor-name">Nome do(a) orientador(a) ou docente</label>
+            <input id="advisor-name" type="text" maxlength="120"/>
+            <label for="advisor-date">Data da autorização</label>
+            <input id="advisor-date" type="date"/>
+            <label for="advisor-form">Forma do registro</label>
+            <select id="advisor-form"></select>
+            <label for="advisor-reference">Referência do registro (opcional: assunto do e-mail, número da ata...)</label>
+            <input id="advisor-reference" type="text" maxlength="200"/>
+            <fieldset id="advisor-scope" style="border:0;padding:0;margin:8px 0"><legend class="subtle">Usos autorizados (incisos do Art. 6º)</legend></fieldset>
+            <div class="actions">
+              <button class="btn" type="button" id="save-advisor">Registrar autorização</button>
+              <span class="subtle" id="advisor-message" role="status"></span>
+            </div>
+          </div>
+        </details>
         <div id="admin-invitations" class="hidden">
           <label for="invitation-email">Convidar pesquisador pelo e-mail Google</label>
           <input id="invitation-email" type="email" autocomplete="email" placeholder="pesquisador@universidade.br" />
@@ -1630,6 +1651,17 @@
                 </label>
                 <input id="preflight" type="checkbox">
               </div>
+
+              <!-- M11: IN IFRS 16/2026, Art. 9º (dados inéditos ou sensíveis) -->
+              <fieldset class="switch-row" id="data-policy" style="display:block">
+                <legend>O material desta pesquisa tem dados inéditos ou sensíveis? <span class="switch-sub">Ex.: resultados ainda não publicados, dados de participantes. IN IFRS 16/2026, Art. 9º.</span></legend>
+                <label><input type="radio" name="unpublished-data" value="nao" required> Não, só material já publicado ou de domínio público</label>
+                <label><input type="radio" name="unpublished-data" value="sim"> Sim</label>
+                <div id="unpublished-confirm" class="hidden" style="margin-top:6px">
+                  <label><input type="checkbox" id="paid-tier"> Minha chave Gemini está num projeto com faturamento ativo (no nível gratuito o Google pode usar o conteúdo para melhorar produtos)</label>
+                  <label><input type="checkbox" id="deidentified"> Os dados não identificam participantes (LGPD)</label>
+                </div>
+              </fieldset>
 
               <div class="switch-row hidden" id="neon-panel">
                 <label for="neon-review">
@@ -2269,6 +2301,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=onda6-20261124"></script>
+  <script type="module" src="/app.js?v=in16-20261124"></script>
 </body>
 </html>
