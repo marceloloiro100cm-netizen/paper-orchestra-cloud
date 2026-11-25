@@ -224,8 +224,8 @@ class FlowLogicTest(unittest.TestCase):
 
 
 # ------------------------------------------------------------------ servidor
-@unittest.skipUnless(HAVE_SDK, "SDK do MCP ausente")
-class McpServerTest(unittest.TestCase):
+class McpHarness(unittest.TestCase):
+    """Servidor MCP em memória com um projeto já preparado (sem testes próprios)."""
     def setUp(self):
         self.db, self.bucket, self.jobs = DB(), Bucket(), []
         self.store = mcp_server.Store(self.db, self.bucket, lambda *a: self.jobs.append(a), lambda i: True)
@@ -268,6 +268,10 @@ class McpServerTest(unittest.TestCase):
                             return out
         return asyncio.run(go())
 
+
+
+@unittest.skipUnless(HAVE_SDK, "SDK do MCP ausente")
+class McpServerTest(McpHarness):
     def test_rejects_without_token(self):
         app = self.app
 

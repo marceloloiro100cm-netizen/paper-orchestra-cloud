@@ -10,10 +10,16 @@ from typing import Callable
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
-from mcp_server import MCP_PATH, Falha, Store, project_state
+import mcp_review as review
+from mcp_server import MCP_PATH, Falha, Store, mode, project_state, review_context
 
 FILES = {"scriptorium.pdf": "application/pdf", "scriptorium.tex": "text/x-tex",
          "references.bib": "text/x-bibtex", "proveniencia.json": "application/json"}
+
+
+class FinalSynthesis(BaseModel):
+    qp: str = Field(pattern=r"^QP\d{1,2}$")
+    texto: str = Field(default="", max_length=8000)
 
 
 class NewToken(BaseModel):
@@ -54,6 +60,60 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
             return project_state(store, store.project(user["uid"], project_id))
         except Falha:
             raise HTTPException(404, "Projeto não encontrado.") from None
+
+    def owned(project_id: str, user: dict) -> dict:
+        try:
+            return store.project(user["uid"], project_id)
+        except Falha:
+            raise HTTPException(404, "Projeto não encontrado.") from None
+
+    @router.get("/projetos/{project_id}/detalhe")
+    def detail(project_id: str, user: dict = dependency):
+        project = owned(project_id, user)
+        out = {"estado": project_state(store, project)}
+        if mode(project) != review.MODE:
+            return out
+        ctx = review_context(store, project)
+        protocol = ctx.get("protocol") or {}
+        cut = protocol.get("nota_corte")
+        out["revisao"] = {
+            "questoes": protocol.get("questoes", []),
+            "campos": [e["campo"] for e in protocol.get("extracao", [])],
+            "nota_corte": cut,
+            "concordancia": ctx.get("kappa"),
+            "prisma": {k: v for k, v in (ctx.get("prisma") or {}).items() if k != "chaves_incluidas"} or None,
+            "estudos": [{"chave": r["chave"], "nota": r["nota"],
+                         "abaixo_do_corte": r["chave"] in (ctx.get("below_cut") or []), **r["extracao"]}
+                        for r in ctx.get("rows", [])],
+            "sintese": ctx.get("synthesis") or {},
+            "redacao_aceita": (project.get("stages") or {}).get("redacao", {}).get("status") == "aceita",
+        }
+        return out
+
+    @router.put("/projetos/{project_id}/sintese")
+    def save_synthesis(project_id: str, payload: FinalSynthesis, user: dict = dependency):
+        project = owned(project_id, user)
+        if mode(project) != review.MODE:
+            raise HTTPException(422, "Só projetos de revisão sistemática têm síntese por questão.")
+        final = dict(project.get("sintese_final") or {})
+        if payload.texto.strip():
+            final[payload.qp] = payload.texto.strip()
+        else:
+            final.pop(payload.qp, None)
+        store.update_project(project["id"], sintese_final=final)
+        late = (project.get("stages") or {}).get("redacao", {}).get("status") == "aceita"
+        return {"salvo": True, "aviso": "A redação já foi aceita: a nova versão vale para a reescrita." if late else ""}
+
+    @router.get("/projetos/{project_id}/matriz.csv")
+    def matrix(project_id: str, user: dict = dependency):
+        project = owned(project_id, user)
+        ctx = review_context(store, project)
+        if not ctx.get("rows"):
+            raise HTTPException(404, "A matriz de extração ainda não foi aceita.")
+        data = review.matrix_csv(ctx["rows"], ctx.get("protocol") or {})
+        return Response(content=("\ufeff" + data).encode("utf-8"), media_type="text/csv",
+                        headers={"Content-Disposition": 'attachment; filename="matriz_extracao.csv"',
+                                 "Cache-Control": "no-store"})
 
     @router.get("/projetos/{project_id}/arquivos/{name}")
     def download(project_id: str, name: str, user: dict = dependency):

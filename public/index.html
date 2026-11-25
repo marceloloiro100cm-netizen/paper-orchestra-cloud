@@ -1024,6 +1024,26 @@
     .hidden { display: none !important; }
     /* Modo sem API (MCP): geração pela API Gemini oculta; app.js liga com API_MODE. */
     body.sem-api [data-modo-api] { display: none !important; }
+    body:not(.sem-api) [data-sem-api-only] { display: none !important; }
+    /* Projetos da IA do pesquisador: lista enxuta, detalhe sob demanda. */
+    .mcp-row { padding: 12px 0; border-bottom: 1px solid var(--border-main); }
+    .mcp-row:last-child { border-bottom: 0; }
+    .mcp-row-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .mcp-row-head .subtle { margin: 2px 0 0; }
+    .mcp-detail { margin-top: 10px; }
+    .mcp-detail h4 { margin: 16px 0 6px; font-size: .95rem; }
+    .mcp-steps { list-style: none; padding: 0; margin: 0; }
+    .mcp-steps li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: .9rem; }
+    .mcp-steps .done { color: var(--mpie-blue-text); }
+    .mcp-steps .meta { color: var(--text-secondary); font-size: .84rem; text-align: right; }
+    .mcp-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 6px 0; }
+    .mcp-figure { padding: 8px 10px; border: 1px solid var(--border-main); border-radius: 10px; }
+    .mcp-figure strong { display: block; font-size: 1.15rem; }
+    .mcp-figure span { color: var(--text-secondary); font-size: .8rem; }
+    .mcp-qp { margin: 10px 0 14px; }
+    .mcp-qp .ia { margin: 6px 0; padding: 8px 10px; border-left: 3px solid var(--border-main); color: var(--text-secondary); font-size: .88rem; white-space: pre-wrap; }
+    .mcp-qp textarea { width: 100%; min-height: 90px; }
+    .mcp-table-wrap { overflow-x: auto; }
     .step-hidden { display: none !important; }
     .loading { opacity: 0.7; }
 
@@ -1441,9 +1461,7 @@
             </ol>
             <h4 style="margin:14px 0 4px">Tokens ativos</h4>
             <div id="mcp-token-list" class="subtle" role="status"></div>
-            <h4 style="margin:14px 0 4px">Projetos escritos pela sua IA</h4>
-            <div class="actions"><button class="btn alt" type="button" id="mcp-refresh">Atualizar</button></div>
-            <div id="mcp-project-list" class="subtle" role="status"></div>
+            <p class="subtle">Os projetos escritos pela sua IA ficam na etapa <strong>Execuções e Auditorias</strong>.</p>
             <p class="subtle" id="mcp-message" role="status"></p>
           </div>
         </details>
@@ -1851,6 +1869,17 @@
       </section>
 
       <!-- ETAPA 3: HISTÓRICO, AGENTES E AUDITORIAS -->
+      <!-- Modo sem API: projetos escritos pela IA do pesquisador via MCP. -->
+      <section class="panel step-hidden" id="mcp-projects-panel" data-step-panel="3" data-sem-api-only>
+        <div class="panel-header">
+          <div>
+            <h2>Projetos da sua IA</h2>
+            <p class="subtle" style="margin:4px 0 0">Escritos pela IA conectada em Minha conta, com cada etapa conferida pelo Scriptorium.</p>
+          </div>
+          <button id="mcp-projects-refresh" class="btn alt" type="button">Atualizar</button>
+        </div>
+        <div id="mcp-projects" role="status">Carregando...</div>
+      </section>
       <section class="panel step-hidden" id="history-panel" data-step-panel="3">
         <div class="panel-header">
           <div>
@@ -2485,6 +2514,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=sem-api-20261125"></script>
+  <script type="module" src="/app.js?v=revisao-20261125"></script>
 </body>
 </html>

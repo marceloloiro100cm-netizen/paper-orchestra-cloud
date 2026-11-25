@@ -39,7 +39,7 @@ ABNT_PREAMBLE = r"""\documentclass[article,12pt,oneside,a4paper,brazil]{abntex2}
 \usepackage[utf8]{inputenc}
 \usepackage[brazil]{babel}
 \usepackage{lmodern}
-\usepackage{amsmath,amssymb,booktabs}
+\usepackage{amsmath,amssymb,booktabs,array}
 \usepackage{hyperref,url}
 \usepackage[alf]{abntex2cite}
 \providecommand{\citep}[1]{\cite{#1}}
@@ -62,7 +62,7 @@ SIMPLE_PREAMBLE = r"""\documentclass[12pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[%(babel)s]{babel}
 \usepackage{lmodern}
-\usepackage{amsmath,amssymb,booktabs,url}
+\usepackage{amsmath,amssymb,booktabs,array,url}
 \usepackage[hidelinks]{hyperref}
 \usepackage[authoryear,round]{natbib}
 \providecommand{\citeonline}[1]{\citet{#1}}
@@ -87,9 +87,77 @@ def run_date(language: str, today: datetime | None = None) -> str:
     return f"{today.day} de {MONTHS[today.month - 1]} de {today.year}"
 
 
+LABELS = {
+    "pt-BR": {"ident": "Registros identificados", "dup": "Removidos antes da triagem: duplicados",
+              "screen": "Registros triados", "title": "Excluídos por título e resumo",
+              "sought": "Relatórios buscados para recuperação", "lost": "Relatórios não recuperados",
+              "assessed": "Relatórios avaliados para elegibilidade", "excl": "Relatórios excluídos",
+              "quality": "Excluídos abaixo da nota de corte de qualidade", "included": "Estudos incluídos na revisão",
+              "outside": "Referências teóricas ou metodológicas fora da triagem",
+              "caption": "Fluxograma PRISMA 2020 da seleção dos estudos",
+              "source": "Fonte: elaborado pelo autor, com as decisões registradas no Scriptorium."},
+    "en": {"ident": "Records identified", "dup": "Removed before screening: duplicates",
+           "screen": "Records screened", "title": "Excluded by title and abstract",
+           "sought": "Reports sought for retrieval", "lost": "Reports not retrieved",
+           "assessed": "Reports assessed for eligibility", "excl": "Reports excluded",
+           "quality": "Excluded below the quality cut-off", "included": "Studies included in the review",
+           "outside": "Theoretical or methodological references outside screening",
+           "caption": "PRISMA 2020 flow diagram of study selection",
+           "source": "Source: prepared by the author from the decisions recorded in Scriptorium."},
+}
+
+
+def prisma_figure(prisma: dict, language: str = "pt-BR") -> str:
+    """Fluxograma PRISMA 2020 em LaTeX simples (caixas e setas, sem TikZ)."""
+    t = LABELS.get(language, LABELS["pt-BR"])
+
+    def box(text: str) -> str:
+        return r"\fbox{\parbox{0.42\textwidth}{\centering " + text + "}}"
+
+    def n(label: str, value) -> str:
+        return label + r"\\(n = " + str(int(value or 0)) + ")"
+
+    rows = []
+    if prisma.get("bases"):
+        bases = "; ".join(f"{latex_escape(b['nome'])}: {int(b['registros'])}" for b in prisma["bases"])
+        rows.append((n(t["ident"], prisma["identificados"]) + r"\\\footnotesize " + bases,
+                     n(t["dup"], prisma.get("duplicados"))))
+        rows.append((n(t["screen"], prisma.get("triados")), n(t["title"], prisma.get("excluidos_titulo_resumo"))))
+        rows.append((n(t["sought"], prisma.get("procurados")), n(t["lost"], prisma.get("nao_recuperados"))))
+    reasons = "; ".join(f"{latex_escape(k)}: {v}" for k, v in sorted((prisma.get("motivos") or {}).items()))
+    rows.append((n(t["assessed"], prisma.get("avaliados")),
+                 n(t["excl"], prisma.get("excluidos_elegibilidade")) + (r"\\\footnotesize " + reasons if reasons else "")))
+    if prisma.get("excluidos_qualidade"):
+        rows.append(("", n(t["quality"], prisma["excluidos_qualidade"])))
+    outside = len(prisma.get("fora_da_triagem") or [])
+    rows.append((n(t["included"], prisma.get("incluidos")), n(t["outside"], outside) if outside else ""))
+    lines = []
+    for i, (left, right) in enumerate(rows):
+        lines.append((box(left) if left else "") + " & " + (box(right) if right else "") + r" \\[2pt]")
+        if i < len(rows) - 1:
+            lines.append(r"$\downarrow$ & \\[2pt]")
+    return ("\n" + r"\begin{figure}[htbp]" + "\n" + r"\centering\small" + "\n"
+            + r"\begin{tabular}{@{}>{\centering\arraybackslash}p{0.46\textwidth}>{\centering\arraybackslash}p{0.46\textwidth}@{}}"
+            + "\n" + "\n".join(lines) + "\n" + r"\end{tabular}" + "\n"
+            + r"\caption{" + t["caption"] + "}\n" + r"\label{fig:prisma}" + "\n"
+            + r"\par\footnotesize " + t["source"] + "\n" + r"\end{figure}" + "\n")
+
+
+def place_prisma(body: str, figure: str) -> str:
+    marker = re.compile(r"^[ \t]*%[ \t]*PRISMA[ \t]*$", re.M | re.I)
+    if marker.search(body):
+        return marker.sub(lambda m: figure, body, count=1)
+    results = re.search(r"\\section\*?\{(Resultados|Results)", body)
+    if results:
+        return body[:results.start()] + figure + "\n" + body[results.start():]
+    return body + "\n" + figure
+
+
 def assemble(project: dict, body: str, today: datetime | None = None) -> str:
     if FORBIDDEN.search(body or "") or "^^" in (body or ""):
         raise ValueError("Corpo com comandos não permitidos")
+    if project.get("tipo") == "revisao_sistematica" and project.get("prisma"):
+        body = place_prisma(body, prisma_figure(project["prisma"], project.get("language", "pt-BR")))
     values = {"title": latex_escape(project.get("title", "")),
               "author": "Autoria a preencher pelo pesquisador",
               "date": run_date(project.get("language", "pt-BR"), today),
@@ -154,6 +222,9 @@ def provenance(project: dict, refs: list[dict], manifest: list[dict]) -> dict:
         "etapas": steps, "ias_usadas": ais,
         "fontes": [{"chave": m.get("key"), "nome": m.get("name"), "trechos": m.get("chunks")} for m in manifest],
         "referencias_a_conferir": [r["key"] for r in refs if r.get("how") == "arquivo"],
+        "revisao_sistematica": ({"prisma": project.get("prisma"), "concordancia": project.get("concordancia"),
+                                 "sintese_editada_pelo_pesquisador": sorted((project.get("sintese_final") or {}).keys())}
+                                if project.get("tipo") == "revisao_sistematica" else None),
         "declaracao_sugerida": (
             "Texto produzido com apoio de IA generativa (" + ", ".join(ais) + ") conduzida pelo "
             "pesquisador no Scriptorium, em etapas separadas de planejamento, levantamento de "

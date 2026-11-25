@@ -39,6 +39,30 @@ class SharedRulesTest(unittest.TestCase):
         self.assertTrue(tex.rstrip().endswith("\\end{document}"))
 
 
+class PrismaFigureTest(unittest.TestCase):
+    PRISMA = {"bases": [{"nome": "Scopus & ERIC", "registros": 8}], "identificados": 8, "duplicados": 2, "triados": 6,
+              "excluidos_titulo_resumo": 3, "procurados": 3, "nao_recuperados": 1, "avaliados": 2,
+              "excluidos_elegibilidade": 1, "motivos": {"EC1": 1}, "excluidos_qualidade": 0, "incluidos": 1,
+              "fora_da_triagem": ["k"]}
+
+    def test_marker_is_replaced_and_names_escaped(self):
+        project = {"title": "T", "language": "pt-BR", "template": "abnt-artigo", "tipo": "revisao_sistematica",
+                   "prisma": self.PRISMA}
+        body = latex_body(["k"]).replace("\\section{Seção 1}", "%PRISMA\n\\section{Seção 1}")
+        tex = mcp_jobs.assemble(project, body)
+        self.assertNotIn("%PRISMA", tex)
+        self.assertIn("Fluxograma PRISMA 2020", tex)
+        self.assertIn("Scopus \\& ERIC: 8", tex)
+        self.assertIn("(n = 1)", tex)
+
+    def test_without_marker_goes_before_results_or_end(self):
+        fig = mcp_jobs.prisma_figure(self.PRISMA)
+        body = "\\section{Método}\nx\n\\section{Resultados}\ny"
+        placed = mcp_jobs.place_prisma(body, fig)
+        self.assertLess(placed.index("Fluxograma"), placed.index("\\section{Resultados}"))
+        self.assertTrue(mcp_jobs.place_prisma("texto", fig).rstrip().endswith("\\end{figure}"))
+
+
 class PrepareTest(unittest.TestCase):
     def test_prepare_writes_manifest_and_official_bib(self):
         db, bucket = DB(), Bucket()

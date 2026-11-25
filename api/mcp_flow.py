@@ -144,15 +144,28 @@ STAGE_KEYS = [s["key"] for s in STAGES]
 BY_KEY = {s["key"]: s for s in STAGES}
 
 
+MODES = ("artigo", "revisao_sistematica")
+
+
+def stages_for(mode: str = "artigo") -> list[dict]:
+    if mode == "revisao_sistematica":
+        import mcp_review
+        return mcp_review.stages()
+    return STAGES
+
+
 def stage(key: str) -> dict:
-    if key not in BY_KEY:
-        raise ValueError("Etapa desconhecida: " + str(key))
-    return BY_KEY[key]
+    if key in BY_KEY:
+        return BY_KEY[key]
+    import mcp_review
+    if key in mcp_review.BY_KEY:
+        return mcp_review.BY_KEY[key]
+    raise ValueError("Etapa desconhecida: " + str(key))
 
 
-def next_stage(stages_state: dict) -> dict | None:
-    """Primeira etapa ainda não aceita, na ordem do fluxo."""
-    for s in STAGES:
+def next_stage(stages_state: dict, mode: str = "artigo") -> dict | None:
+    """Primeira etapa ainda não aceita, na ordem do fluxo do projeto."""
+    for s in stages_for(mode):
         if (stages_state.get(s["key"]) or {}).get("status") != "aceita":
             return s
     return None
