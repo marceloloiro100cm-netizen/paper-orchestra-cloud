@@ -1176,7 +1176,7 @@ async function loadMcpProjects() {
   }
 }
 $('mcp-projects-refresh')?.addEventListener('click', () => loadMcpProjects());
-if (!API_MODE && $('step-sub-3')) $('step-sub-3').textContent = 'Projetos da sua IA e histórico';
+if (API_MODE && $('step-sub-3')) $('step-sub-3').textContent = 'Histórico, agentes e pareceres';
 $('mcp-create-token')?.addEventListener('click', async () => {
   const label = $('mcp-token-label').value.trim() || 'Minha IA';
   try {
