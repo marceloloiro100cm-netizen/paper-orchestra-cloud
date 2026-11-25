@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#1466B8">
   <meta name="scriptorium-ui-revision" content="responsive-fluid-20261124-2">
   <title>Scriptorium MPIE — Laboratório de Pesquisa</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='115 40 282 432'%3E%3Cpath fill='%232779C9' d='M251.5 48 C234 114,186 196,130 274 C126 280,126 287,131 293 C156 322,174 352,184 386 L256 386 L256 238 L251.5 238 Z'/%3E%3Cpath fill='%23145DA6' d='M260.5 48 C278 114,326 196,382 274 C386 280,386 287,381 293 C356 322,338 352,328 386 L256 386 L256 238 L260.5 238 Z'/%3E%3Crect x='249.5' y='246' width='13' height='140' fill='%23F4B93B'/%3E%3Ccircle cx='256' cy='236' r='24' fill='%23F4B93B'/%3E%3Cpath fill='none' stroke='%23F4B93B' stroke-width='13' stroke-linecap='round' stroke-linejoin='round' d='M196 276 L196 306 L224 334 L224 386 M316 276 L316 306 L288 334 L288 386'/%3E%3Ccircle cx='196' cy='272' r='16' fill='%23F4B93B'/%3E%3Ccircle cx='316' cy='272' r='16' fill='%23F4B93B'/%3E%3Cpath fill='%231466B8' d='M184 402 L328 402 L338 456 C339 461,335 466,330 466 L182 466 C177 466,173 461,174 456 Z'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="/brand/scriptorium-logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
@@ -36,8 +36,18 @@
       --warn-bg: #FFFBEB;
       --warn-border: #F4D88A;
       --warn-text: #7A4F00;
-      --ok-text: #166534;
-      --err-text: #B42318;
+      /* Identidade em duas cores (símbolo Pena-Circuito): azul MPIE e dourado MPIE.
+         Sucesso usa o azul; aviso, erro e exclusão usam a família dourado/laranja
+         do gradiente do símbolo (#FAD46B, #F4B93B, #DF9B1D). Nada de verde ou vermelho. */
+      --ok-text: #105396;
+      --ok-bg: #E8F2FC;
+      --ok-border: #B9D4F0;
+      --err-text: #8F4A00;
+      --danger: #DF9B1D;
+      --danger-strong: #A85400;
+      --danger-text: #8F4A00;
+      --danger-soft: #FFF3E0;
+      --danger-border: #F0B867;
       --shadow-sm: 0 2px 10px rgba(15, 28, 46, 0.04);
     }
 
@@ -62,8 +72,15 @@
       --warn-bg: rgba(246, 193, 67, 0.10);
       --warn-border: rgba(246, 193, 67, 0.35);
       --warn-text: #FCD87A;
-      --ok-text: #6EE7B7;
-      --err-text: #FDA4AF;
+      --ok-text: #7CC0FA;
+      --ok-bg: rgba(75, 156, 232, 0.15);
+      --ok-border: rgba(75, 156, 232, 0.40);
+      --err-text: #FFB65C;
+      --danger: #F4B93B;
+      --danger-strong: #F4B93B;
+      --danger-text: #FFB65C;
+      --danger-soft: rgba(244, 185, 59, 0.13);
+      --danger-border: rgba(244, 185, 59, 0.45);
       --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.35);
     }
 
@@ -1236,17 +1253,19 @@
     input[type="file"]::file-selector-button:hover { background: var(--mpie-blue); color: #FFFFFF; }
     html[data-theme="black"] input[type="file"]::file-selector-button:hover { color: #070A0F; }
     /* Ações que apagam: vermelho discreto, confirmação obrigatória. */
-    .btn-danger { background: #c0392b !important; border-color: #c0392b !important; color: #FFFFFF !important; }
-    .btn-danger-text, .kcard-del { color: #c0392b !important; border-color: rgba(192, 57, 43, 0.45) !important; }
-    .btn-danger-text:hover, .kcard-del:hover { background: rgba(192, 57, 43, 0.08) !important; }
-    html[data-theme="black"] .btn-danger-text, html[data-theme="black"] .kcard-del { color: #ff7a6b !important; }
+    /* Ações que apagam: laranja da família dourada do símbolo, confirmação obrigatória. */
+    .btn-danger { background: var(--danger-strong) !important; border-color: var(--danger-strong) !important; color: #FFFFFF !important; }
+    .btn-danger:hover { background: var(--danger-text) !important; border-color: var(--danger-text) !important; }
+    html[data-theme="black"] .btn-danger, html[data-theme="black"] .btn-danger:hover { color: #070A0F !important; background: var(--danger) !important; border-color: var(--danger) !important; }
+    .btn-danger-text, .kcard-del { color: var(--danger-text) !important; border-color: var(--danger-border) !important; }
+    .btn-danger-text:hover, .kcard-del:hover { background: var(--danger-soft) !important; }
 
     /* "Minha conta" como janela aberta pelo botão do cabeçalho. No primeiro acesso
        (sem autorização ou sem chave) o painel continua na página, porque é o único passo. */
     .account-btn { position: relative; }
     .account-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
-    .account-dot.ok { background: #2e9d5b; }
-    .account-dot.warn { background: #e0a21b; }
+    .account-dot.ok { background: var(--mpie-blue); }
+    .account-dot.warn { background: var(--mpie-gold); }
     #account-close { display: none; }
     #account-panel.as-modal { display: none; }
     #account-panel.as-modal.open {
@@ -2359,6 +2378,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=apagar-20261124"></script>
+  <script type="module" src="/app.js?v=identidade-20261124"></script>
 </body>
 </html>
