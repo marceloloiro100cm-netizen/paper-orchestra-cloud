@@ -8,7 +8,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from typing import Annotated, Literal
-from library import make_library_router, MAX_SELECTED_SOURCES
+from library import make_library_router, CONTEXT_LIMITS, MAX_SELECTED_SOURCES
 from access import Invitation, get_access, is_admin, set_invitation
 from credentials import GeminiCredential, store_credential, delete_credential
 from model_access import (FLASH_MODEL, PRO_MODEL, account_model_access,
@@ -83,6 +83,8 @@ class NewResearch(BaseModel):
     work_type: Literal[WORK_TYPES] = "artigo científico"  # type: ignore[valid-type]
     paid_tier_confirmed: bool = False
     deidentified_confirmed: bool = False
+    # Padrão: 8 fontes e 75 mil caracteres; ampliado: 20 fontes e 300 mil (mais custo).
+    context_size: Literal["padrao", "ampliado"] = "padrao"
 
     @field_validator("idea", "experimental_log")
     @classmethod
@@ -169,6 +171,8 @@ def serializable(record: dict) -> dict:
         "neon_review_status": record.get("neon_review_status", "not_available"),
         "reference_status": record.get("reference_status", "not_available"),
         "mode": record.get("mode", "generate"),
+        "context_size": record.get("context_size", "padrao"),
+        "bibliography_integrity": record.get("bibliography_integrity"),
         "ai_billing": "projeto" if record.get("ai_auth_mode", "admin_vertex") == "admin_vertex" else "chave_pessoal",
         "checkpoint": record.get("checkpoint"),
         "approvals": record.get("approvals", []),
@@ -364,8 +368,11 @@ def create_research(payload: NewResearch, user: User):
     source_ids = list(dict.fromkeys(payload.source_ids))
     if payload.preflight and not source_ids:
         raise HTTPException(status_code=422, detail="Selecione ao menos uma fonte para o diagnóstico.")
-    if len(source_ids) > MAX_SELECTED_SOURCES:
-        raise HTTPException(status_code=422, detail="Máximo de 8 fontes por pesquisa.")
+    limit = CONTEXT_LIMITS[payload.context_size]["max_sources"]
+    if len(source_ids) > limit:
+        raise HTTPException(status_code=422, detail=(
+            f"Máximo de {limit} fontes no contexto {payload.context_size}."
+            + (" Escolha o contexto ampliado para até 20 fontes." if payload.context_size == "padrao" else "")))
     sources = []
     for item_id in source_ids:
         if not re.fullmatch(r"[0-9a-f]{32}", item_id):
@@ -379,7 +386,7 @@ def create_research(payload: NewResearch, user: User):
         if not str(record.get("object_path", "")).startswith(f"library/{owner_uid}/{item_id}/"):
             raise HTTPException(status_code=422, detail="Caminho da fonte inválido.")
         sources.append({k: record.get(k) for k in (
-            "id", "name", "format", "sha256", "size", "object_path"
+            "id", "name", "format", "sha256", "size", "object_path", "origin"
         )})
     job_id = uuid.uuid4().hex
     prefix = f"research/{owner_uid}/{job_id}"
@@ -400,6 +407,7 @@ def create_research(payload: NewResearch, user: User):
         "neon_review_requested": payload.neon_review,
         "neon_review_status": "pending" if payload.neon_review else "disabled",
         "sources": sources,
+        "context_size": payload.context_size,
         # M11: política de dados (Art. 9º) e autorização do orientador (Art. 6º e 8º)
         # vigentes no momento da criação; vão para o manifesto e a declaração.
         "data_policy": policy,
@@ -537,7 +545,7 @@ def get_status(job_id: str, user: User):
 def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "references", "neon",
                                              "manifest", "declaration", "evidence", "evidence_csv",
                                              "shield", "coverage", "gap_report", "contradictions",
-                                             "fire"],
+                                             "fire", "bib_integrity"],
              user: User):
     if file_kind == "neon" and not (NEON_REVIEW_ENABLED and is_admin(user, ALLOWED_EMAILS)):
         raise HTTPException(status_code=403, detail="Parecer Neon não está disponível nesta conta.")
@@ -571,7 +579,9 @@ def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "re
                # M17 (experimental): possíveis divergências entre fontes.
                "contradictions": ("contradictions.json", "application/json"),
                # M22 (experimental): verificação iterativa das afirmações.
-               "fire": ("fire_audit.json", "application/json")}
+               "fire": ("fire_audit.json", "application/json"),
+               # Integridade da bibliografia (referências do .tex, fontes anexadas, enchimento).
+               "bib_integrity": ("bibliography_integrity.json", "application/json")}
     filename, content_type = filemap[file_kind]
     blob_path = f"research/{user['uid']}/{job_id}/output/{filename}"
     blob = bucket.blob(blob_path)

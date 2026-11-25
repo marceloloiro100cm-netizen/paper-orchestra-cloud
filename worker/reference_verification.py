@@ -25,7 +25,8 @@ from source_quality import manual_verification, quality_factors
 DOI_PATTERN = re.compile(r"10\.\d{4,9}/[^\s<>\"{}]+", re.I)
 ENTRY_START = re.compile(r"@([A-Za-z]+)\s*[{(]\s*([^,\s{}()]+)\s*,", re.I)
 PROVIDERS = ("crossref", "openalex", "semantic_scholar")
-MAX_REFERENCES = 20
+# 40: o modo ampliado (até 20 fontes) gera bibliografias maiores.
+MAX_REFERENCES = 40
 USER_AGENT = "PaperOrchestraAcademic/0.2 (https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud)"
 
 

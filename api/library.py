@@ -31,7 +31,13 @@ MIMES = {
     ".txt": "text/plain; charset=utf-8",
 }
 MAX_ITEMS_PER_OWNER = 500
-MAX_SELECTED_SOURCES = 8
+# Contexto padrão (8 fontes, 75 mil caracteres) ou ampliado (20 fontes, 300 mil),
+# escolhido por pesquisa. Mesma tabela em worker/context_limits.py.
+CONTEXT_LIMITS = {
+    "padrao": {"max_sources": 8, "per_source_chars": 20_000, "total_chars": 75_000},
+    "ampliado": {"max_sources": 20, "per_source_chars": 30_000, "total_chars": 300_000},
+}
+MAX_SELECTED_SOURCES = max(v["max_sources"] for v in CONTEXT_LIMITS.values())
 
 
 def utc_now() -> str:

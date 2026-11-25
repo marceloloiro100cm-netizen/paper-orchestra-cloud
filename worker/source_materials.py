@@ -43,12 +43,14 @@ def extract_text(blob: bytes, fmt: str) -> str:
     return blob.decode("utf-8-sig", errors="replace")
 
 
-def compose_library_context(sources: list[dict], fetch_bytes) -> tuple[str, list[dict]]:
+def compose_library_context(sources: list[dict], fetch_bytes, *, max_sources: int = 8,
+                            per_file: int = PER_FILE_CHAR_LIMIT,
+                            total: int = TOTAL_CHAR_LIMIT) -> tuple[str, list[dict]]:
     """Callback fetch_bytes receives an immutable bucket object path."""
     blocks: list[str] = []
     manifest: list[dict] = []
-    remaining = TOTAL_CHAR_LIMIT
-    for entry in sources[:8]:
+    remaining = total
+    for entry in sources[:max_sources]:
         fmt = entry.get("format", "")
         name = entry.get("name", "material")
         record = {"id": entry["id"], "name": name, "format": fmt,
@@ -58,7 +60,7 @@ def compose_library_context(sources: list[dict], fetch_bytes) -> tuple[str, list
             guarded = guard_text(extract_text(data, fmt))
             record.update(guarded.summary())
             text = guarded.text
-            snippet = text[:min(remaining, PER_FILE_CHAR_LIMIT)]
+            snippet = text[:min(remaining, per_file)]
             remaining -= len(snippet)
             if text and snippet:
                 blocks.append(
@@ -191,7 +193,8 @@ def embed_sources(chunks_by_source: dict[str, tuple[str, list[dict]]], embedder,
 
 def compose_library_context_v2(sources: list[dict], fetch_bytes, query_text: str,
                                cache=None, embedder=None, reranker=None,
-                               collect: dict | None = None) -> tuple[str, list[dict], dict]:
+                               collect: dict | None = None, limits: dict | None = None
+                               ) -> tuple[str, list[dict], dict]:
     """Contexto por trechos recuperados, com ponteiros de página (V2).
 
     Com `embedder`, a busca é híbrida (BM25 + embeddings, RRF); qualquer falha de
@@ -200,8 +203,10 @@ def compose_library_context_v2(sources: list[dict], fetch_bytes, query_text: str
     """
     from retrieval_context import render_context, select_passages
 
+    from context_limits import CONTEXT_LIMITS
+    limits = limits or CONTEXT_LIMITS["padrao"]
     manifest, all_chunks, meta, by_source = [], [], {}, {}
-    for entry in sources[:8]:
+    for entry in sources[:limits["max_sources"]]:
         fmt = entry.get("format", "")
         record = {"id": entry["id"], "name": entry.get("name", "material"), "format": fmt,
                   "sha256": entry.get("sha256", ""), "status": "included"}
@@ -239,7 +244,10 @@ def compose_library_context_v2(sources: list[dict], fetch_bytes, query_text: str
             embedding_info = {"status": "failed_fallback_lexical", "error": type(error).__name__,
                               **embedder.info()}
     selected, coverage = select_passages(all_chunks, query_text, vectors=vectors,
-                                         query_vector=query_vector, reranker=reranker)
+                                         query_vector=query_vector, reranker=reranker,
+                                         total_budget=limits["total_chars"],
+                                         per_source_budget=limits["per_source_chars"])
+    coverage["context_limits"] = dict(limits)
     coverage["embeddings"] = embedding_info
     if collect is not None:
         collect.update({"chunks": all_chunks, "vectors": vectors or {}, "sources": meta,

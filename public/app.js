@@ -48,9 +48,22 @@ $('logout').addEventListener('click', () => signOut(auth));
 
 function libraryMessage(text) { $('library-message').textContent = text; }
 
+// Contexto padrão (8 fontes, 75 mil caracteres) ou ampliado (20 fontes, 300 mil).
+const CONTEXT_LIMITS = {padrao: {sources: 8, chars: 75000}, ampliado: {sources: 20, chars: 300000}};
+window.SCRIPTORIUM_CONTEXT_LIMITS = CONTEXT_LIMITS;
+function contextSize() { return $('context-size')?.value === 'ampliado' ? 'ampliado' : 'padrao'; }
 function updateSelectedCount() {
-  $('selected-count').textContent = selectedSourceIds.size + ' fonte(s) selecionada(s) para a próxima pesquisa (máximo de 8).';
+  const max = CONTEXT_LIMITS[contextSize()].sources;
+  $('selected-count').textContent = selectedSourceIds.size + ` fonte(s) selecionada(s) para a próxima pesquisa (máximo de ${max} no contexto ${contextSize()}).`;
 }
+$('context-size')?.addEventListener('change', () => {
+  const max = CONTEXT_LIMITS[contextSize()].sources;
+  if (selectedSourceIds.size > max) {
+    $('context-size').value = 'ampliado';
+    libraryMessage(`Há ${selectedSourceIds.size} fontes selecionadas; desmarque algumas para voltar ao contexto padrão (até 8).`);
+  }
+  updateSelectedCount();
+});
 
 function displayLibrary() {
   const target = $('library-list');
@@ -68,8 +81,12 @@ function displayLibrary() {
     check.checked = selectedSourceIds.has(item.id);
     check.setAttribute('aria-label','Usar fonte ' + item.name + ' na próxima pesquisa');
     check.addEventListener('change', () => {
-      if (check.checked && selectedSourceIds.size >= 8) {
-        check.checked=false;libraryMessage('Máximo de 8 fontes por pesquisa.');return;
+      if (check.checked && selectedSourceIds.size >= CONTEXT_LIMITS.ampliado.sources) {
+        check.checked=false;libraryMessage('Máximo de 20 fontes por pesquisa (contexto ampliado).');return;
+      }
+      if (check.checked && selectedSourceIds.size >= CONTEXT_LIMITS.padrao.sources && contextSize() === 'padrao') {
+        $('context-size').value = 'ampliado';
+        libraryMessage('Contexto ampliado ativado: até 20 fontes e 300 mil caracteres. Cada chamada à IA fica maior, então o custo na sua chave aumenta.');
       }
       if(check.checked) selectedSourceIds.add(item.id);
       else selectedSourceIds.delete(item.id);
@@ -818,6 +835,14 @@ async function loadJobs() {
       }
       if (entry.status === 'completed' || entry.status === 'failed') {
         const files = document.createElement('div'); files.className='downloads';
+        const bi = entry.bibliography_integrity;
+        if (entry.status === 'completed' && bi) {
+          const note = document.createElement('p'); note.className = 'subtle';
+          note.textContent = `Bibliografia conferida: ${bi.corrigidas || 0} referência(s) corrigida(s) pelos dados das fontes anexadas, `
+            + `${bi.enchimento || 0} com valor genérico para conferir, ${bi.sem_referencia || 0} citação(ões) sem referência.`
+            + (bi.status === 'corrigida_e_recompilada' ? ' O PDF foi recompilado com as correções.' : '');
+          info.append(note);
+        }
         const available = entry.status === 'failed'
           ? ['log', ...((entry.files || []).includes('manifest') ? ['manifest'] : [])]
           : entry.files;
@@ -831,7 +856,7 @@ async function loadJobs() {
             gb.addEventListener('click', () => showGapReport(entry, info, false));
             files.append(gb); continue;
           }
-          const labels={pdf:'Baixar PDF',latex:'Baixar LaTeX',audit:'Ver auditoria',references:'Conferir referências',neon:'Parecer Neon',manifest:'Manifesto de proveniência',declaration:'Rascunho da declaração de IA',evidence:'Citações e evidências',evidence_csv:'Matriz de evidências (CSV)',shield:'Escudo de auditoria',coverage:'Cobertura das fontes',contradictions:'Divergências entre fontes (experimental)',fire:'Verificação de afirmações (experimental)'};
+          const labels={pdf:'Baixar PDF',latex:'Baixar LaTeX',audit:'Ver auditoria',references:'Conferir referências',neon:'Parecer Neon',manifest:'Manifesto de proveniência',declaration:'Rascunho da declaração de IA',evidence:'Citações e evidências',evidence_csv:'Matriz de evidências (CSV)',shield:'Escudo de auditoria',coverage:'Cobertura das fontes',contradictions:'Divergências entre fontes (experimental)',fire:'Verificação de afirmações (experimental)',bib_integrity:'Integridade da bibliografia (JSON)'};
           button.textContent=labels[kind]||'Logs';
           if(kind==='shield'&&entry.shield_counts){const c=entry.shield_counts;button.textContent+=` (${c.alta||0} alta · ${c.media||0} média)`;}
           if(kind==='references'&&entry.editorial_alerts>0){button.textContent+=` (${entry.editorial_alerts} aviso${entry.editorial_alerts>1?'s':''} editorial${entry.editorial_alerts>1?'is':''})`;}
@@ -1107,6 +1132,7 @@ $('new-paper').addEventListener('submit', async (event) => {
       reflection_model:$('reflection-model').value || null,
       language:$('language').value,
       source_ids:[...selectedSourceIds],
+      context_size: contextSize(),
       plotting:$('plotting').checked,
       neon_review:$('neon-review').checked,
       preflight:$('preflight').checked,
@@ -1118,6 +1144,10 @@ $('new-paper').addEventListener('submit', async (event) => {
     };
     if (!document.querySelector('input[name="unpublished-data"]:checked')) {
       $('submit-status').textContent = 'Informe se o material tem dados inéditos ou sensíveis (IN IFRS 16/2026, Art. 9º).';
+      return;
+    }
+    if (payload.source_ids.length > CONTEXT_LIMITS[payload.context_size].sources) {
+      $('submit-status').textContent = `Máximo de ${CONTEXT_LIMITS[payload.context_size].sources} fontes no contexto ${payload.context_size}.`;
       return;
     }
     if (payload.preflight && !payload.source_ids.length) {
