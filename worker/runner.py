@@ -220,6 +220,68 @@ def run_reading_notes(data: dict) -> None:
            notes_usage=notes.get("usage") or {})
 
 
+def run_retrieval_eval(data: dict) -> None:
+    """M04 (gate G2): busca lexical, vetorial e híbrida no corpus de referência.
+
+    Só administrador (a API confere). Os PDFs são de acesso aberto e vêm dos
+    links fixos da imagem (corpus_ref/selecao.json), conferidos por SHA-256.
+    Embeddings com a chave Gemini pessoal de quem pediu; nunca o projeto.
+    """
+    import tempfile
+    from urllib.parse import urljoin
+
+    import requests
+    from google import genai
+    from embeddings import PROVIDERS, GeminiEmbedder
+    from retrieval_eval import MAX_PDF_BYTES, USER_AGENT, fetch_reference_corpus, reference_eval, summary
+    if data.get("ai_auth_mode") != "user_gemini":
+        raise RuntimeError("O teste de busca usa só a chave Gemini pessoal")
+    base = Path(__file__).resolve().parent / "corpus_ref"
+    selection = json.loads((base / "selecao.json").read_text(encoding="utf-8"))
+    queries = [json.loads(line) for line in (base / "consultas.jsonl").read_text(encoding="utf-8").splitlines()
+               if line.strip()]
+    update(status="running", stage="Baixando os PDFs de acesso aberto", started_at=now())
+    session = requests.Session()
+
+    def http_get(url: str) -> bytes:
+        # Links fixos da imagem; redirecionamento só para https.
+        for _ in range(4):
+            response = session.get(url, timeout=60, allow_redirects=False, stream=True,
+                                   headers={"User-Agent": USER_AGENT})
+            if response.status_code in (301, 302, 303, 307, 308):
+                url = urljoin(url, response.headers.get("Location", ""))
+                if not url.startswith("https://"):
+                    raise ValueError("redirecionamento inseguro")
+                continue
+            response.raise_for_status()
+            data_bytes = b""
+            for piece in response.iter_content(65536):
+                data_bytes += piece
+                if len(data_bytes) > MAX_PDF_BYTES:
+                    raise ValueError("arquivo grande demais")
+            return data_bytes
+        raise ValueError("redirecionamentos demais")
+
+    env = personal_agent_environment(os.environ, client, PROJECT, OWNER_UID)
+    ai = genai.Client(api_key=env["GEMINI_API_KEY"])
+    embedder = GeminiEmbedder(ai, PROVIDERS["user_gemini"])
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            fetched = fetch_reference_corpus(selection, Path(tmp), http_get)
+            if not fetched["downloaded"]:
+                raise RuntimeError("Nenhum PDF do corpus pôde ser baixado")
+            update(stage=f"Medindo a busca em {len(fetched['downloaded'])} PDFs (embeddings na sua chave)")
+            report = reference_eval(Path(tmp), queries, embedder)
+    finally:
+        ai.close()
+    report["download"] = fetched
+    report["finished_at"] = now()
+    bucket.blob(f"{prefix}/output/retrieval_eval.json").upload_from_string(
+        json.dumps(report, ensure_ascii=False, indent=2), content_type="application/json")
+    update(status="completed", stage="Teste de busca concluído", finished_at=now(), files=["retrieval_eval"],
+           retrieval_eval_summary=summary(report))
+
+
 def main():
     doc = ref.get()
     if not doc.exists or doc.to_dict().get("owner_uid") != OWNER_UID:
@@ -228,6 +290,10 @@ def main():
     if RECHECK:
         # M07: não usa IA nem altera o estado da pesquisa concluída.
         run_editorial_recheck(data)
+        return
+    if data.get("mode") == "retrieval_eval":
+        # M04 (gate G2): teste de busca no corpus de referência (administrador).
+        run_retrieval_eval(data)
         return
     if data.get("mode") == "reading_notes":
         # M21: fichamento sob demanda de um documento da biblioteca.

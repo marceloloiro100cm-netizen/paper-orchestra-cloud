@@ -1308,7 +1308,7 @@ async function loadAccountAccess() {
         ? 'Sua chave foi cadastrada, mas ainda não há um modelo confirmado. Confira a chave abaixo.'
         : 'Para começar, conecte sua chave Gemini seguindo as instruções.'));
     applyModelAccess();
-    if (accountAccess.admin) loadAccessRequests();
+    if (accountAccess.admin) { loadAccessRequests(); loadRetrievalEval(); }
   } catch (error) {
     accountAccess = null;
     // Compatibilidade exclusiva da conta administradora já autorizada na API antiga.
@@ -1507,4 +1507,61 @@ onAuthStateChanged(auth, async (current) => {
     selectedSourceIds.clear();
     updateSelectedCount();
   }
+});
+
+// Gate G2 (M04): teste de busca no corpus de referência (só administrador).
+let retrievalEvalTimer = null;
+let retrievalEvalJob = null;
+const EVAL_LABELS = {lexical: 'Palavras (BM25)', vector: 'Significado (embeddings)', hybrid: 'Híbrida (as duas)'};
+function renderRetrievalEval(last) {
+  const status = $('retrieval-eval-status');
+  const box = $('retrieval-eval-result');
+  box.replaceChildren();
+  $('retrieval-eval-download').classList.add('hidden');
+  retrievalEvalJob = last;
+  if (!last) { status.textContent = 'Nenhum teste rodado ainda.'; return; }
+  const active = ['queued', 'running'].includes(last.status);
+  $('retrieval-eval-start').disabled = active;
+  if (active) { status.textContent = last.stage || 'Em andamento...'; return; }
+  if (last.status === 'failed') { status.textContent = 'O teste falhou: ' + (last.error || 'erro desconhecido'); return; }
+  if (last.status !== 'completed' || !last.summary) { status.textContent = last.stage || last.status; return; }
+  const s = last.summary;
+  status.textContent = `Concluído em ${new Date(last.finished_at).toLocaleString('pt-BR')}: ${s.corpus_files} PDFs, ${s.queries} perguntas, ${s.chunks} trechos. A busca híbrida mudou o resultado de ${s.changed_queries} perguntas.`;
+  const table = document.createElement('table');
+  table.className = 'eval-table';
+  const head = table.createTHead().insertRow();
+  for (const label of ['Busca', 'recall@5', 'recall@10', 'MRR', 'temáticas R@10']) {
+    const th = document.createElement('th'); th.textContent = label; head.append(th);
+  }
+  const body = table.createTBody();
+  for (const key of ['lexical', 'vector', 'hybrid']) {
+    if (!s[key]) continue;
+    const row = body.insertRow();
+    const fmt = (v) => (typeof v === 'number' ? v.toFixed(3).replace('.', ',') : '');
+    for (const value of [EVAL_LABELS[key], fmt(s[key]['recall@5']), fmt(s[key]['recall@10']), fmt(s[key].mrr),
+                         fmt(s[key]['tematicas_recall@10'])]) {
+      row.insertCell().textContent = value;
+    }
+  }
+  box.append(table);
+  $('retrieval-eval-download').classList.remove('hidden');
+}
+async function loadRetrievalEval() {
+  clearTimeout(retrievalEvalTimer);
+  try {
+    const data = await (await request('/admin/retrieval-eval')).json();
+    renderRetrievalEval(data.last);
+    if (data.last && ['queued', 'running'].includes(data.last.status)) {
+      retrievalEvalTimer = setTimeout(loadRetrievalEval, 15000);
+    }
+  } catch (e) { $('retrieval-eval-status').textContent = e.message; }
+}
+$('retrieval-eval-start').addEventListener('click', async () => {
+  $('retrieval-eval-start').disabled = true;
+  $('retrieval-eval-status').textContent = 'Iniciando...';
+  try { await request('/admin/retrieval-eval', {method: 'POST'}); await loadRetrievalEval(); }
+  catch (e) { $('retrieval-eval-status').textContent = e.message; $('retrieval-eval-start').disabled = false; }
+});
+$('retrieval-eval-download').addEventListener('click', () => {
+  if (retrievalEvalJob) downloadPath('/admin/retrieval-eval/' + retrievalEvalJob.id + '/download', 'teste_busca_corpus.json');
 });

@@ -28,4 +28,6 @@ RUN kpsewhich abntex2.cls && kpsewhich abntex2cite.sty && \
 
 # Todos os módulos do worker (tests/test_container_modules.py confere os imports).
 COPY *.py /app/
+# Corpus de referência (gate G2): cópia de docs/corpus, conferida por tests/test_retrieval_eval.py.
+COPY corpus_ref/ /app/corpus_ref/
 CMD ["python", "/app/runner.py"]

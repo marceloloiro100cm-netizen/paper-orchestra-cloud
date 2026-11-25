@@ -18,7 +18,6 @@ consultas.jsonl (uma consulta por linha; ver docs/AVALIACAO-RECUPERACAO.md):
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import sys
@@ -27,80 +26,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "worker"))
 
-from chunking import chunk_document  # noqa: E402
-from latex_text import fold  # noqa: E402
-from retrieval_context import rank_chunks  # noqa: E402
-from reranker import rerank_hits  # noqa: E402
-from structured_extract import extract_document  # noqa: E402
-
-FORMATS = {".pdf": "pdf", ".docx": "docx", ".txt": "txt", ".bib": "bib", ".ris": "ris"}
-
-
-def load_corpus(folder: Path) -> tuple[list[dict], dict]:
-    chunks, names = [], {}
-    for path in sorted(folder.iterdir()):
-        fmt = FORMATS.get(path.suffix.lower())
-        if not fmt:
-            continue
-        source_id = hashlib.sha256(path.name.encode("utf-8")).hexdigest()[:32]
-        names[source_id] = path.name
-        chunks += chunk_document(extract_document(path.read_bytes(), fmt), source_id)
-    return chunks, names
-
-
-def is_relevant(chunk: dict, label: dict, names: dict) -> bool:
-    if names.get(chunk["source_id"]) != label["file"]:
-        return False
-    if "pages" in label:
-        pages = chunk.get("pages")
-        return bool(pages) and any(pages[0] <= p <= pages[1] for p in label["pages"])
-    if "contains" in label:
-        return fold(label["contains"]) in fold(chunk["text"])
-    return True
-
-
-def evaluate(results: list[list[dict]], queries: list[dict], names: dict, k: int) -> dict:
-    """recall@k: fração dos rótulos atendidos no top-k; MRR: 1/posição do 1º relevante."""
-    recalls, reciprocal, per_query = [], [], []
-    for ranking, query in zip(results, queries):
-        labels = query["relevant"]
-        top = ranking[:k]
-        found = sum(any(is_relevant(c, label, names) for c in top) for label in labels)
-        first = next((i for i, c in enumerate(ranking, start=1)
-                      if any(is_relevant(c, label, names) for label in labels)), None)
-        recall = found / len(labels) if labels else 0.0
-        recalls.append(recall)
-        reciprocal.append(1 / first if first else 0.0)
-        per_query.append({"id": query.get("id"), "recall": round(recall, 4), "first_relevant_rank": first})
-    n = len(queries) or 1
-    return {f"recall@{k}": round(sum(recalls) / n, 4), "mrr": round(sum(reciprocal) / n, 4),
-            "queries": len(queries), "per_query": per_query}
-
-
-def run(corpus: Path, queries_path: Path, k: int = 10, embedder=None, reranker=None) -> dict:
-    chunks, names = load_corpus(corpus)
-    by_id = {c["chunk_id"]: c for c in chunks}
-    queries = [json.loads(line) for line in queries_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    report = {"corpus_files": len(names), "chunks": len(chunks), "k": k, "strategies": {}}
-    vectors = None
-    if embedder is not None:
-        matrix = embedder.embed([c["text"] for c in chunks], "RETRIEVAL_DOCUMENT")
-        vectors = {c["chunk_id"]: matrix[i] for i, c in enumerate(chunks)}
-    bases = ["lexical"] + (["hybrid"] if vectors is not None else [])
-    for base in bases:
-        # Com --reranker, cada base é medida com e sem reranking (comparação do M20).
-        for rerank in ([False, True] if reranker is not None else [False]):
-            name = base + (f"+rerank_{reranker.name}" if rerank else "")
-            rankings = []
-            for query in queries:
-                qvec = embedder.embed([query["query"]], "RETRIEVAL_QUERY")[0] if base == "hybrid" else None
-                hits, _, strategy = rank_chunks(chunks, query["query"], vectors if base == "hybrid" else None, qvec)
-                if rerank:
-                    hits = rerank_hits(hits, by_id, query["query"], reranker)
-                rankings.append([by_id[h["chunk_id"]] for h in hits])
-            report["strategies"][name] = {"strategy": strategy, "reranker": reranker.info() if rerank else None,
-                                          **evaluate(rankings, queries, names, k)}
-    return report
+# A lógica fica no worker (worker/retrieval_eval.py), que também roda a
+# avaliação na nuvem com a chave pessoal do administrador.
+from retrieval_eval import evaluate, is_relevant, load_corpus, run  # noqa: E402,F401
+from reranker import rerank_hits  # noqa: E402,F401
 
 
 def main() -> int:
