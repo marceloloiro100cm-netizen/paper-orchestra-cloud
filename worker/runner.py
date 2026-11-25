@@ -188,6 +188,38 @@ def run_editorial_recheck(data: dict) -> None:
                 "files": firestore.ArrayUnion(["editorial_recheck"])})
 
 
+def run_reading_notes(data: dict) -> None:
+    """M21: fichamento por IA de um documento, com a identidade de IA da conta."""
+    from google import genai
+    from reading_notes import generate_notes, namespace
+    from source_materials import derive_source
+    auth_mode = data.get("ai_auth_mode")
+    if auth_mode not in ("admin_vertex", "user_gemini"):
+        raise RuntimeError("Modo de autenticação de IA inválido")
+    if auth_mode == "admin_vertex" and not ALLOW_PROJECT_AI:
+        raise RuntimeError("Uso de IA pelo projeto de infraestrutura desativado. Conecte sua chave Gemini pessoal.")
+    entry = (data.get("sources") or [None])[0]
+    if not entry or not str(entry.get("object_path", "")).startswith(f"library/{OWNER_UID}/{entry.get('id', '')}/"):
+        raise ValueError("Referência inválida na biblioteca desta conta")
+    update(status="running", stage="Lendo o documento", started_at=now())
+    cache = DerivedCache()
+    payload, _ = derive_source(entry, lambda path: bucket.blob(path).download_as_bytes(), cache)
+    if auth_mode == "user_gemini":
+        env = personal_agent_environment(os.environ, client, PROJECT, OWNER_UID)
+        ai = genai.Client(api_key=env["GEMINI_API_KEY"])
+    else:
+        ai = genai.Client(enterprise=True, project=PROJECT, location="global")
+    update(stage="Gerando o fichamento com IA")
+    try:
+        notes = generate_notes(ai, data.get("model") or "gemini-3-flash-preview", entry, payload["chunks"])
+    finally:
+        ai.close()
+    key = f"{namespace(notes['model'])}/{notes['parser_version']}-{notes['chunk_policy']}/{entry['sha256']}"
+    cache.put(key, json.dumps(notes, ensure_ascii=False).encode("utf-8"))
+    update(status="completed", stage="Fichamento pronto", finished_at=now(), files=["reading_notes"],
+           notes_usage=notes.get("usage") or {})
+
+
 def main():
     doc = ref.get()
     if not doc.exists or doc.to_dict().get("owner_uid") != OWNER_UID:
@@ -196,6 +228,10 @@ def main():
     if RECHECK:
         # M07: não usa IA nem altera o estado da pesquisa concluída.
         run_editorial_recheck(data)
+        return
+    if data.get("mode") == "reading_notes":
+        # M21: fichamento sob demanda de um documento da biblioteca.
+        run_reading_notes(data)
         return
     # M15: cancelada ainda na fila? Não inicia nada.
     BUDGET.check_cancel()

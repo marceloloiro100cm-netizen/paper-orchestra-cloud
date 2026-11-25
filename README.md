@@ -225,6 +225,14 @@ Sem custo de tokens novo (nenhuma etapa desta onda chama modelo de linguagem, sa
 
 Situação de cada módulo: `docs/V2-MODULOS.md`. Testes: `tests/test_v2_onda6.py`.
 
+### IN IFRS 16/2026 e fichamento por IA (24/11/2026)
+
+- **Declaração de uso de IA (M11)** alinhada ao texto da IN 16/2026 (conferido no PDF assinado em 26/05/2026): cada etapa da execução aparece com o inciso do Art. 6º correspondente, com as vedações do Art. 7º para confirmar e com a política de dados do Art. 9º. O modelo do Anexo I ainda não foi conferido, então o arquivo continua sendo um rascunho.
+- **Autorização do orientador (Art. 6º e 8º)**: registrada em "Minha conta" (somente acréscimo) e copiada para cada pesquisa criada depois. Se for registrada depois, a declaração baixada recebe um adendo datado.
+- **Dados inéditos (Art. 9º)**: toda pesquisa pergunta se há dados inéditos ou sensíveis. Se houver, a API exige a confirmação de que a chave Gemini está num projeto com faturamento ativo e de que os dados não identificam participantes. No nível gratuito, os termos da Gemini API (R47) permitem ao Google usar o conteúdo para melhorar produtos.
+- **Fichamento por IA (M21)**: na ficha de leitura de cada documento, sob demanda, com o Gemini Flash na chave de quem pede. O resultado fica em cache: pedir de novo não gasta tokens.
+- **M17 e M22 ligados em produção** (divergências entre fontes e verificação iterativa), com os tetos fixos de cada módulo.
+
 ## Separação de custos: infraestrutura x tokens de IA (24/11/2026)
 
 - **Infraestrutura** (Cloud Run da API e do worker, Cloud Storage, Firestore, Secret Manager, Hosting, Cloud Build): projeto `paperorchestra-mestrado`, pago pela conta de faturamento do administrador.

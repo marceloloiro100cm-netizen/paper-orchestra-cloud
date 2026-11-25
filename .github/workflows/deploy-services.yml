@@ -112,7 +112,10 @@ jobs:
             | python3 -c "import json,sys; c=json.load(sys.stdin)['spec']['template']['spec']['template']['spec']['containers'][0]; [print(' ', e['name'], '=', e.get('value','(segredo)')) for e in c.get('env',[]) if e['name'].startswith('SCRIPTORIUM_V2')] or print('  (nenhuma; padrões do código)')" || true
           # Onda 1 ligada em 24/11/2026 por decisão do responsável: contexto por trechos
           # relevantes (mesmo orçamento de 75 mil caracteres). Desligar: trocar para false.
-          V2_FLAGS="SCRIPTORIUM_V2_RETRIEVAL=true"
+          # M17 (divergências entre fontes) e M22 (verificação iterativa) ligados na mesma
+          # data, também por decisão do responsável: custo extra na chave de quem gera,
+          # com tetos fixos (12 pares e 40 chamadas por pesquisa).
+          V2_FLAGS="SCRIPTORIUM_V2_RETRIEVAL=true,SCRIPTORIUM_V2_CONTRADICTIONS=true,SCRIPTORIUM_V2_FIRE=true"
           gcloud run jobs update paper-orchestra-worker --image="$WORKER_IMAGE" --update-env-vars="SCRIPTORIUM_RELEASE_SHA=${GITHUB_SHA},${V2_FLAGS}" --region="$REGION" --project="$PROJECT" --quiet
           gcloud run services update paper-orchestra-api --image="$API_IMAGE" --update-env-vars="NEON_REVIEW_ENABLED=true,BYOK_ENABLED=true,SCRIPTORIUM_RELEASE_SHA=${GITHUB_SHA}" --region="$REGION" --project="$PROJECT" --quiet
 

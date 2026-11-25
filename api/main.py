@@ -21,6 +21,9 @@ from zotero_import import make_zotero_router
 from reviews import ReviewIn, add_review, list_reviews, reference_fingerprint
 from research_tools import make_research_tools_router
 from library_index import make_library_index_router
+from advisor import (addendum, data_policy, latest_authorization, make_advisor_router,
+                     snapshot as authorization_snapshot)
+from reading_notes_api import make_reading_notes_router
 
 import firebase_admin
 from firebase_admin import auth
@@ -72,6 +75,10 @@ class NewResearch(BaseModel):
     source_ids: list[str] = Field(default_factory=list, max_length=MAX_SELECTED_SOURCES)
     # M16 + M12: diagnosticar as fontes e esperar aprovação antes de gerar.
     preflight: bool = False
+    # M11, IN IFRS 16/2026, Art. 9º: o pesquisador declara se há dados inéditos.
+    unpublished_data: bool
+    paid_tier_confirmed: bool = False
+    deidentified_confirmed: bool = False
 
     @field_validator("idea", "experimental_log")
     @classmethod
@@ -181,6 +188,8 @@ def serializable(record: dict) -> dict:
 app.include_router(make_research_tools_router(db, bucket, current_user, get_research, start_job))
 # M03/M21: busca na biblioteca inteira e ficha de leitura por documento.
 app.include_router(make_library_index_router(db, bucket, current_user))
+# M11 (IN IFRS 16/2026): autorização do orientador registrada pelo pesquisador.
+app.include_router(make_advisor_router(db, current_user))
 
 
 @app.get("/api/health")
@@ -301,7 +310,8 @@ def revoke_researcher(email: str, user: User):
 def list_researches(user: User):
     # Consulta simples, sem índices compostos. Ordenação em memória para acervo pessoal.
     docs = db.collection("research_jobs").where("owner_uid", "==", user["uid"]).limit(200).stream()
-    items = [serializable(reconcile(s.reference, s.to_dict())) for s in docs]
+    items = [serializable(reconcile(s.reference, s.to_dict())) for s in docs
+             if (s.to_dict() or {}).get("mode") != "reading_notes"]
     items.sort(key=lambda x: x["created_at"], reverse=True)
     return {"items": items}
 
@@ -325,6 +335,9 @@ def create_research(payload: NewResearch, user: User):
         # textual; só liberar após teste próprio desse modelo, ainda pendente.
         if payload.plotting:
             raise HTTPException(status_code=403, detail="Gráficos com IA ainda não estão habilitados para esta chave.")
+    # Art. 9º da IN 16/2026: dados inéditos só com chave que não alimenta treinamento.
+    policy = data_policy(payload.unpublished_data, payload.paid_tier_confirmed,
+                         payload.deidentified_confirmed, project_ai)
     if payload.neon_review and not access["admin"]:
         raise HTTPException(status_code=403, detail="A revisão Neon não está habilitada para esta conta.")
     if payload.neon_review and not NEON_REVIEW_ENABLED:
@@ -335,7 +348,9 @@ def create_research(payload: NewResearch, user: User):
     busy_detail = "Há uma pesquisa em execução. Finalize-a antes de iniciar outra."
     docs = db.collection("research_jobs").where("owner_uid", "==", owner_uid).limit(200).stream()
     for s in docs:
-        if reconcile(s.reference, s.to_dict()).get("status") in ACTIVE_STATUSES:
+        current = reconcile(s.reference, s.to_dict())
+        # Fichamentos (M21) rodam à parte e não bloqueiam uma pesquisa.
+        if current.get("mode") != "reading_notes" and current.get("status") in ACTIVE_STATUSES:
             raise HTTPException(status_code=409, detail=busy_detail)
     # Validar propriedade antes de iniciar tarefas caras ou armazenar a solicitação.
     source_ids = list(dict.fromkeys(payload.source_ids))
@@ -377,6 +392,10 @@ def create_research(payload: NewResearch, user: User):
         "neon_review_requested": payload.neon_review,
         "neon_review_status": "pending" if payload.neon_review else "disabled",
         "sources": sources,
+        # M11: política de dados (Art. 9º) e autorização do orientador (Art. 6º e 8º)
+        # vigentes no momento da criação; vão para o manifesto e a declaração.
+        "data_policy": policy,
+        "advisor_authorization": authorization_snapshot(latest_authorization(db, owner_uid)),
         "audit_status": "pending",
         "reference_status": "pending",
         # Etapas efetivas serão atualizadas pelo worker por evidências no disco.
@@ -447,6 +466,17 @@ def decide_checkpoint(job_id: str, payload: CheckpointDecision, user: User):
             "finished_at": datetime.now(timezone.utc).isoformat()})
         raise HTTPException(status_code=503, detail="Não foi possível iniciar. Verifique as permissões do Cloud Run Job.") from None
     return {"id": job_id, "status": "queued", "sources_kept": event["sources_kept"]}
+
+
+def get_access_for_notes(user: dict) -> dict:
+    """M21: quem pode gerar fichamento por IA e com qual identidade de IA."""
+    access = get_access(db, user, ALLOWED_EMAILS)
+    project_ai = uses_project_ai(access)
+    if project_ai:
+        return {"ai_auth_mode": "admin_vertex", "models": [FLASH_MODEL, PRO_MODEL]}
+    if not (BYOK_ENABLED and access["byok_ready"]):
+        raise HTTPException(status_code=409, detail="Configure sua chave Gemini antes de gerar fichamentos.")
+    return {"ai_auth_mode": "user_gemini", "models": allowed_models(account_model_access(db, user["uid"]))}
 
 
 def access_allows_generation(user: dict, record: dict) -> bool:
@@ -536,7 +566,16 @@ def download(job_id: str, file_kind: Literal["pdf", "latex", "log", "audit", "re
     blob = bucket.blob(blob_path)
     if not blob.exists():
         raise HTTPException(status_code=404, detail="Arquivo indisponível para esta pesquisa")
+    content = blob.download_as_bytes()
+    if file_kind == "declaration" and not item.get("advisor_authorization"):
+        # M11: autorização registrada depois da geração entra como adendo datado.
+        current = latest_authorization(db, user["uid"])
+        if current:
+            content += addendum(current).encode("utf-8")
     return Response(
-        content=blob.download_as_bytes(), media_type=content_type,
+        content=content, media_type=content_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"},
     )
+
+# M21: fichamento por IA sob demanda, na chave Gemini de quem pede.
+app.include_router(make_reading_notes_router(db, bucket, current_user, get_access_for_notes, start_job))
