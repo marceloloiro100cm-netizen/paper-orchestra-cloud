@@ -77,6 +77,8 @@ def find_candidates(text: str, query_vector, index: LexicalIndex, vector_index, 
             "chunk_id": chunk_id, "source_id": chunk["source_id"],
             "source_name": sources_meta.get(chunk["source_id"], {}).get("name", ""),
             "pages": chunk.get("pages"), "excerpt": chunk["text"][:280],
+            # M02: página e bbox normalizada de cada bloco do trecho (só PDF).
+            "locations": (chunk.get("locations") or [])[:8],
             "shared_terms": len(set(terms) & set(query_terms(chunk["text"], 200))),
             "bm25_rank": info.get("bm25_rank"), "similarity": info.get("similarity"),
             "relation": "nao_classificado",

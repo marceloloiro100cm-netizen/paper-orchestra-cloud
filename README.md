@@ -207,6 +207,24 @@ Com isso, os 27 módulos do plano têm ao menos uma parte implementada (situaç�
 - **Verificação iterativa (M22, experimental):** com `SCRIPTORIUM_V2_FIRE=true`, cada afirmação é verificada pelo modelo só com trechos das fontes anexadas. Quando ele não tem certeza, busca mais trechos e tenta de novo, até 3 ciclos e 40 chamadas por pesquisa. Ele só decide com confiança e citando os trechos pelo identificador; atingir o limite nunca conta como "apoiada". Afirmações contrariadas viram alerta alto no escudo.
 - **Revisões humanas (M08, M12, M24):** em "Citações e evidências", "Conferir referências" e "Verificação de afirmações", cada item tem um campo para registrar a sua conclusão (por exemplo, "o trecho apoia" ou "referência correta"). Cada registro é novo e o histórico é preservado.
 
+### Onda 6 do plano V2: lacunas de engenharia (24/11/2026)
+
+Sem custo de tokens novo (nenhuma etapa desta onda chama modelo de linguagem, salvo o parecer Neon, que já era opcional):
+
+- **M02** "Ver na página do PDF": a API renderiza a página com o trecho destacado (PyMuPDF, R37; o rodapé do site linka o código-fonte, como pede a AGPL-3.0).
+- **M03/M21** busca no conteúdo da biblioteca com índice FTS5 salvo por conta e ficha de leitura sem IA por documento.
+- **M07** botão "Reavaliar retratações agora" em pesquisas concluídas (modo `editorial_recheck` do worker, só Crossref).
+- **M08** matriz de evidências exportada com a sua revisão mais recente de cada afirmação.
+- **M09** cobertura agrupada por autor, época e tema.
+- **M13** inspeção estática dos arquivos enviados e quarentena fora da biblioteca (não é antivírus).
+- **M15** orçamento de tempo por etapa (registrado no manifesto) e botão "Cancelar pesquisa".
+- **M24** a sua conferência manual de uma referência reaparece nas pesquisas seguintes.
+- **M25** o parecer Neon vê só um recorte da matriz de evidências.
+- **M26** Zotero incremental (guarda só o número de versão) e anexos PDF com consentimento.
+- **M27** referências da pesquisa em CSL-JSON e em lista ABNT (NBR 6023:2018).
+
+Situação de cada módulo: `docs/V2-MODULOS.md`. Testes: `tests/test_v2_onda6.py`.
+
 ## Separação de custos: infraestrutura x tokens de IA (24/11/2026)
 
 - **Infraestrutura** (Cloud Run da API e do worker, Cloud Storage, Firestore, Secret Manager, Hosting, Cloud Build): projeto `paperorchestra-mestrado`, pago pela conta de faturamento do administrador.

@@ -11,7 +11,6 @@ import re
 import json
 import shutil
 import subprocess
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 import tempfile
 import traceback
 from datetime import datetime, timezone
@@ -27,6 +26,7 @@ from byok import personal_agent_environment
 from run_manifest import RunManifest
 from ai_declaration import build_declaration
 from embeddings import make_embedder
+from stage_budget import STAGES, Cancelled, StageBudget
 
 PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
 BUCKET = os.environ["RESEARCH_BUCKET"]
@@ -55,6 +55,45 @@ ref = client.collection("research_jobs").document(RESEARCH_ID)
 prefix = f"research/{OWNER_UID}/{RESEARCH_ID}"
 # Manifesto de proveniência da execução atual (M14). Criado em main().
 MANIFEST: RunManifest | None = None
+# M07: modo especial que só reconsulta avisos editoriais de uma pesquisa concluída.
+RECHECK = os.getenv("RESEARCH_MODE") == "editorial_recheck"
+
+
+def cancel_requested() -> bool:
+    """M15: o navegador grava cancel_requested; o worker confere entre ciclos e etapas."""
+    snap = ref.get()
+    return bool(snap.exists and (snap.to_dict() or {}).get("cancel_requested"))
+
+
+BUDGET = StageBudget(cancel_requested)
+
+
+def stop_process(process, grace: int = 20) -> None:
+    """Encerra o motor: SIGTERM, espera, depois SIGKILL."""
+    process.terminate()
+    try:
+        process.wait(timeout=grace)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+
+
+def optional_stage(name: str) -> bool:
+    """Confere cancelamento e orçamento antes de uma etapa opcional (M15).
+
+    Etapas opcionais só rodam depois que o PDF já foi entregue; um cancelamento
+    nesse ponto pula o que falta e conclui a pesquisa com o que já existe.
+    """
+    try:
+        BUDGET.check_cancel()
+    except Cancelled:
+        BUDGET.records[name] = {"status": "pulada_por_cancelamento"}
+        return False
+    if not BUDGET.allows(name):
+        print(f"Etapa {name} pulada: tempo restante insuficiente.", flush=True)
+        return False
+    BUDGET.start(name, check_cancel=False)
+    return True
 
 
 def update(**fields):
@@ -97,6 +136,8 @@ class DerivedCache:
 
 def publish_manifest(root: Path, status: str, error: str = "") -> dict:
     """Finaliza e envia run_manifest.json; devolve o conteúdo final."""
+    # M15: tempos por etapa, tetos e etapas puladas por orçamento.
+    MANIFEST.data["stage_budget"] = BUDGET.report()
     manifest = MANIFEST.finish(status, error)
     path = MANIFEST.write(root / "run_manifest.json")
     put(path, "run_manifest.json", "application/json", record=False)
@@ -125,11 +166,39 @@ def run_preflight(root: Path, raw: Path, data: dict, evidence_inputs: dict,
            checkpoint={"name": "source_approval", "requested_at": now()})
 
 
+def run_editorial_recheck(data: dict) -> None:
+    """M07: reconsulta avisos editoriais (retratações etc.) de uma pesquisa concluída."""
+    import requests
+    from editorial_recheck import recheck
+    from editorial_status import editorial_status
+    from reference_verification import USER_AGENT, _request
+    if data.get("status") != "completed":
+        raise RuntimeError("Só pesquisas concluídas podem ser reavaliadas")
+    ref.update({"editorial_recheck.status": "running", "editorial_recheck.started_at": now()})
+    blob = bucket.blob(f"{prefix}/output/reference_verification.json")
+    if not blob.exists():
+        raise FileNotFoundError("Esta pesquisa não tem conferência de referências")
+    report = json.loads(blob.download_as_bytes().decode("utf-8"))
+    session = requests.Session()
+    result = recheck(report, lambda doi: editorial_status(doi, session, _request, user_agent=USER_AGENT))
+    bucket.blob(f"{prefix}/output/editorial_recheck.json").upload_from_string(
+        json.dumps(result, ensure_ascii=False, indent=2), content_type="application/json")
+    ref.update({"editorial_recheck": {"status": "completed", "checked_at": result["checked_at"],
+                                      **result["summary"]},
+                "files": firestore.ArrayUnion(["editorial_recheck"])})
+
+
 def main():
     doc = ref.get()
     if not doc.exists or doc.to_dict().get("owner_uid") != OWNER_UID:
         raise ValueError("Pesquisa ou responsável inválidos")
     data = doc.to_dict()
+    if RECHECK:
+        # M07: não usa IA nem altera o estado da pesquisa concluída.
+        run_editorial_recheck(data)
+        return
+    # M15: cancelada ainda na fila? Não inicia nada.
+    BUDGET.check_cancel()
     auth_mode = data.get("ai_auth_mode", "admin_vertex")
     if auth_mode not in ("admin_vertex", "user_gemini"):
         raise RuntimeError("Modo de autenticação de IA inválido")
@@ -170,7 +239,11 @@ def main():
     shield_inputs = {"audit": None, "references": None, "evidence": None, "contradictions": None,
                      "fire": None}
     coverage_published = False
-    update(status="running", stage="Preparando arquivos de entrada", started_at=now())
+    update(status="running", stage="Preparando arquivos de entrada", started_at=now(),
+           # Identificador da execução do Cloud Run, para auditoria e suporte.
+           execution=os.getenv("CLOUD_RUN_EXECUTION", ""))
+    BUDGET.start("preparo_das_fontes")
+    derived_cache = DerivedCache()
     with tempfile.TemporaryDirectory(prefix="orchestra_") as tmp:
         root = Path(tmp)
         raw = root / "raw_materials"
@@ -197,8 +270,20 @@ def main():
                 query = data.get("title", "") + "\n" + (raw / "idea_sparse.md").read_text(
                     encoding="utf-8", errors="replace")
                 context, manifest, coverage = compose_library_context_v2(
-                    safe_sources, fetch, query, cache=DerivedCache(),
+                    safe_sources, fetch, query, cache=derived_cache,
                     embedder=embedder, reranker=reranker, collect=evidence_inputs)
+                # M09: cobertura por autor, época e tema do que os agentes leram.
+                try:
+                    from coverage_facets import build_facets, source_metadata
+                    from gap_report import extract_questions
+                    metadata = {x["id"]: source_metadata(x, fetch, derived_cache) for x in safe_sources}
+                    original_idea = (raw / "idea_sparse.md").read_text(encoding="utf-8", errors="replace")
+                    coverage["facets"] = build_facets(
+                        extract_questions(data.get("title", ""), original_idea),
+                        evidence_inputs["chunks"], evidence_inputs.get("selected_ids") or [],
+                        evidence_inputs["sources"], metadata)
+                except Exception as exc:
+                    coverage["facets"] = {"status": "unavailable", "reason": type(exc).__name__}
                 if reranker_note and not coverage.get("reranker"):
                     coverage["reranker"] = reranker_note
                 MANIFEST.set_context(coverage["strategy"], coverage)
@@ -225,6 +310,7 @@ def main():
                 "included": sum(m["status"] == "included" for m in manifest),
                 "strategy": "v2" if V2_RETRIEVAL else "v1",
             })
+        BUDGET.finish("preparo_das_fontes")
         if mode == "preflight":
             run_preflight(root, raw, data, evidence_inputs, manifest if data.get("sources") else [], embedder)
             return
@@ -257,29 +343,37 @@ def main():
         # Executa o motor original sem alterar sua ordem de agentes. A cada
         # intervalo, observa os artefatos reais produzidos no disco e atualiza
         # somente as mudanças de etapa (não inventa porcentagens de progresso).
+        # M15: no mesmo ciclo confere se o pesquisador pediu o cancelamento.
+        BUDGET.start("agentes_de_redacao")
+        returncode = None
         try:
             with open(logpath, "w", encoding="utf-8") as log:
-                with ThreadPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(
-                        subprocess.run, command, cwd=str(BASE), stdout=log,
-                        stderr=subprocess.STDOUT, timeout=10400, check=False,
-                        env=agent_env
-                    )
-                    last_agents = None
+                process = subprocess.Popen(command, cwd=str(BASE), stdout=log,
+                                           stderr=subprocess.STDOUT, env=agent_env)
+                deadline = BUDGET.clock() + STAGES["agentes_de_redacao"]["max_seconds"]
+                last_agents = None
+                try:
                     while True:
                         agents = inspect_agents(output, bool(data["plotting"]))
                         if agents != last_agents:
                             update(agents=agents, stage=current_stage(agents))
                             last_agents = agents
                         try:
-                            process = future.result(timeout=12)
+                            returncode = process.wait(timeout=12)
                             break
-                        except FutureTimeout:
-                            continue
-                    final_agents = inspect_agents(output, bool(data["plotting"]))
-                    if final_agents != last_agents:
-                        update(agents=final_agents, stage=current_stage(final_agents))
+                        except subprocess.TimeoutExpired:
+                            pass
+                        BUDGET.check_cancel()
+                        if BUDGET.clock() > deadline:
+                            raise TimeoutError("O motor excedeu o tempo máximo da etapa de redação.")
+                finally:
+                    if process.poll() is None:
+                        stop_process(process)
+                final_agents = inspect_agents(output, bool(data["plotting"]))
+                if final_agents != last_agents:
+                    update(agents=final_agents, stage=current_stage(final_agents))
         finally:
+            BUDGET.finish("agentes_de_redacao", "concluida" if returncode == 0 else "interrompida")
             # Preserva o registro mesmo que o motor falhe ou exceda o timeout.
             if logpath.exists():
                 # Logs do pipeline não podem revelar a chave em caso de erro externo.
@@ -289,8 +383,8 @@ def main():
                     if secret in contents:
                         logpath.write_text(contents.replace(secret, "[REDACTED]"), encoding="utf-8")
                 put(logpath, "execution.log", "text/plain; charset=utf-8")
-        if process.returncode != 0:
-            raise RuntimeError(f"O pipeline terminou com código {process.returncode}; consulte os logs do trabalho no Cloud Run.")
+        if returncode != 0:
+            raise RuntimeError(f"O pipeline terminou com código {returncode}; consulte os logs do trabalho no Cloud Run.")
         update(stage="Armazenando o manuscrito")
         pdf = output / "final_paper.pdf"
         # O projeto salva este PDF na pasta principal do output.
@@ -304,50 +398,71 @@ def main():
                  # O diagnóstico aprovado (M16/M12) continua disponível no histórico.
                  + (["gap_report"] if "gap_report" in (data.get("files") or []) else []))
         # Auditoria local não gera texto ou evidências novas.
-        try:
-            refined_tex = output / "content_refinement_workdir" / "final_refined_paper.tex"
-            raw_tex = output / "latex_writeup" / "raw_draft_paper.tex"
-            bib = output / "latex_writeup" / "references.bib"
-            report = audit_pdf(pdf, refined_tex if refined_tex.is_file() else raw_tex,
-                               bib, raw / "experimental_log.md")
-            report_file = root / "scientific_audit.json"
-            report_file.write_text(json.dumps(report, ensure_ascii=False, indent=2),
-                                   encoding="utf-8")
-            put(report_file, "scientific_audit.json", "application/json")
-            files.append("audit")
-            update(audit_status=report["status"], audit_findings=report["summary"]["findings"])
-            shield_inputs["audit"] = report
-        except Exception as exc:
-            print("Auditoria local indisponível:", repr(exc), flush=True)
+        if optional_stage("triagem_cientifica"):
+            try:
+                refined_tex = output / "content_refinement_workdir" / "final_refined_paper.tex"
+                raw_tex = output / "latex_writeup" / "raw_draft_paper.tex"
+                bib = output / "latex_writeup" / "references.bib"
+                report = audit_pdf(pdf, refined_tex if refined_tex.is_file() else raw_tex,
+                                   bib, raw / "experimental_log.md")
+                report_file = root / "scientific_audit.json"
+                report_file.write_text(json.dumps(report, ensure_ascii=False, indent=2),
+                                       encoding="utf-8")
+                put(report_file, "scientific_audit.json", "application/json")
+                files.append("audit")
+                update(audit_status=report["status"], audit_findings=report["summary"]["findings"])
+                shield_inputs["audit"] = report
+                BUDGET.finish("triagem_cientifica")
+            except Exception as exc:
+                print("Auditoria local indisponível:", repr(exc), flush=True)
+                update(audit_status="unavailable")
+                BUDGET.finish("triagem_cientifica", "indisponivel")
+        else:
             update(audit_status="unavailable")
         # Consulta metadados de referências somente depois que o PDF estiver pronto.
         # Nunca substitui citações nem marca publicações como cientificamente validadas.
-        try:
-            bib_path = output / "latex_writeup" / "references.bib"
-            if bib_path.is_file():
-                reference_report = verify_bibliography(bib_path.read_text(
-                    encoding="utf-8", errors="replace"
-                ))
-                reference_file = root / "reference_verification.json"
-                reference_file.write_text(
-                    json.dumps(reference_report, ensure_ascii=False, indent=2),
-                    encoding="utf-8"
-                )
-                put(reference_file, "reference_verification.json", "application/json")
-                files.append("references")
-                shield_inputs["references"] = reference_report
-                update(reference_status="completed_with_limitations",
-                       references_checked=reference_report["checked"],
-                       references_skipped=reference_report["skipped_by_limit"],
-                       editorial_alerts=reference_report["editorial_summary"]["alerts"])
-            else:
+        bib_path = output / "latex_writeup" / "references.bib"
+        if bib_path.is_file():
+            # M27: BibTeX final disponível sozinho, base da exportação CSL-JSON e ABNT.
+            put(bib_path, "references.bib", "application/x-bibtex")
+            files.append("bibtex")
+        if optional_stage("conferencia_de_referencias"):
+            try:
+                if bib_path.is_file():
+                    reference_report = verify_bibliography(bib_path.read_text(
+                        encoding="utf-8", errors="replace"
+                    ))
+                    # M24: decisões humanas de pesquisas anteriores, lado a lado.
+                    try:
+                        from manual_reviews import apply_history, load_history
+                        apply_history(reference_report, load_history(client, OWNER_UID, RESEARCH_ID))
+                    except Exception as exc:
+                        print("Histórico de conferência manual indisponível:", repr(exc), flush=True)
+                    reference_file = root / "reference_verification.json"
+                    reference_file.write_text(
+                        json.dumps(reference_report, ensure_ascii=False, indent=2),
+                        encoding="utf-8"
+                    )
+                    put(reference_file, "reference_verification.json", "application/json")
+                    files.append("references")
+                    shield_inputs["references"] = reference_report
+                    update(reference_status="completed_with_limitations",
+                           references_checked=reference_report["checked"],
+                           references_skipped=reference_report["skipped_by_limit"],
+                           editorial_alerts=reference_report["editorial_summary"]["alerts"])
+                    BUDGET.finish("conferencia_de_referencias", checked=reference_report["checked"])
+                else:
+                    update(reference_status="unavailable")
+                    BUDGET.finish("conferencia_de_referencias", "sem_bibtex")
+            except Exception as exc:
+                print("Conferência bibliográfica externa indisponível:", repr(exc), flush=True)
                 update(reference_status="unavailable")
-        except Exception as exc:
-            print("Conferência bibliográfica externa indisponível:", repr(exc), flush=True)
+                BUDGET.finish("conferencia_de_referencias", "indisponivel")
+        else:
             update(reference_status="unavailable")
         # M05 + M08/M10: citações literais e matriz de evidências (V2). Não
         # altera o manuscrito; falhas não invalidam o PDF já entregue.
-        if evidence_inputs is not None:
+        if evidence_inputs is not None and optional_stage("citacoes_e_evidencias"):
             update(stage="Conferindo citações e evidências")
             try:
                 from quote_verification import verify as verify_quotes
@@ -376,11 +491,14 @@ def main():
                     "claims": matrix["summary"]["claims"],
                     "claims_without_evidence": matrix["summary"]["without_evidence_in_corpus"],
                 })
+                BUDGET.finish("citacoes_e_evidencias", claims=matrix["summary"]["claims"])
             except Exception as exc:
                 print("Conferência de evidências indisponível:", repr(exc), flush=True)
                 update(evidence_status="unavailable")
+                BUDGET.finish("citacoes_e_evidencias", "indisponivel")
         # M22 (experimental): verificação iterativa das afirmações nas fontes.
-        if V2_FIRE and embedder is not None and shield_inputs["evidence"]:
+        if (V2_FIRE and embedder is not None and shield_inputs["evidence"]
+                and optional_stage("verificacao_fire")):
             update(stage="Verificando afirmações nas fontes (experimental)")
             try:
                 from fire_audit import run_fire
@@ -394,11 +512,13 @@ def main():
                 shield_inputs["fire"] = fire
                 MANIFEST.add_ai_service("fire", {"model": fire["model"], "provider": embedder.provider,
                                                  **fire["usage"]})
+                BUDGET.finish("verificacao_fire", model_calls=fire["usage"].get("calls"))
             except Exception as exc:
                 print("Verificação iterativa indisponível:", repr(exc), flush=True)
+                BUDGET.finish("verificacao_fire", "indisponivel")
         # M17 (experimental): possíveis divergências entre fontes.
         if (V2_CONTRADICTIONS and embedder is not None and evidence_inputs
-                and evidence_inputs.get("vectors")):
+                and evidence_inputs.get("vectors") and optional_stage("divergencias_entre_fontes")):
             update(stage="Comparando fontes (experimental)")
             try:
                 from contradictions import detect
@@ -412,8 +532,10 @@ def main():
                 shield_inputs["contradictions"] = result
                 MANIFEST.add_ai_service("contradictions", {"model": result["model"],
                                                            "provider": embedder.provider, **result["usage"]})
+                BUDGET.finish("divergencias_entre_fontes", model_calls=result["usage"].get("calls"))
             except Exception as exc:
                 print("Comparação de fontes indisponível:", repr(exc), flush=True)
+                BUDGET.finish("divergencias_entre_fontes", "indisponivel")
         if embedder is not None:
             MANIFEST.add_ai_service("embeddings", embedder.info())
         # M06: escudo de auditoria em camadas (sem nota geral nem selo).
@@ -432,25 +554,32 @@ def main():
         # Parecer Neon totalmente opcional, isolado do pipeline original.
         # Falhas não invalidam PDF já gerado nem disparam múltiplas cobranças.
         if data.get("neon_review_requested"):
-            update(stage="Revisão crítica opcional com Gemini Neon", neon_review_status="running")
-            try:
-                # Tokens do Neon na chave pessoal de quem gera (não no projeto).
-                neon_client = None
-                if auth_mode == "user_gemini":
-                    from google import genai
-                    neon_client = genai.Client(api_key=agent_env["GEMINI_API_KEY"])
-                review = generate_review(
-                    pdf, raw / "idea_sparse.md", raw / "experimental_log.md", client=neon_client
-                )
-                review_path = root / "neon_critical_review.json"
-                review_path.write_text(
-                    json.dumps(review, ensure_ascii=False, indent=2), encoding="utf-8"
-                )
-                put(review_path, "neon_critical_review.json", "application/json")
-                files.append("neon")
-                update(neon_review_status="completed")
-            except Exception as exc:
-                print("Revisão Neon indisponível:", repr(exc), flush=True)
+            if optional_stage("parecer_neon"):
+                update(stage="Revisão crítica opcional com Gemini Neon", neon_review_status="running")
+                try:
+                    # Tokens do Neon na chave pessoal de quem gera (não no projeto).
+                    neon_client = None
+                    if auth_mode == "user_gemini":
+                        from google import genai
+                        neon_client = genai.Client(api_key=agent_env["GEMINI_API_KEY"])
+                    # M25: parecer com acesso restrito à matriz de evidências (M08).
+                    review = generate_review(
+                        pdf, raw / "idea_sparse.md", raw / "experimental_log.md", client=neon_client,
+                        evidence_matrix=(shield_inputs["evidence"] or {}).get("matrix"),
+                    )
+                    review_path = root / "neon_critical_review.json"
+                    review_path.write_text(
+                        json.dumps(review, ensure_ascii=False, indent=2), encoding="utf-8"
+                    )
+                    put(review_path, "neon_critical_review.json", "application/json")
+                    files.append("neon")
+                    update(neon_review_status="completed")
+                    BUDGET.finish("parecer_neon")
+                except Exception as exc:
+                    print("Revisão Neon indisponível:", repr(exc), flush=True)
+                    update(neon_review_status="unavailable")
+                    BUDGET.finish("parecer_neon", "indisponivel")
+            else:
                 update(neon_review_status="unavailable")
         latex_workdir = output / "latex_writeup"
         final_tex = output / "content_refinement_workdir" / "final_refined_paper.tex"
@@ -465,6 +594,7 @@ def main():
         # M14 + M11: manifesto e rascunho de declaração. Falha aqui não
         # invalida o manuscrito já entregue.
         try:
+            BUDGET.start("registro_final", check_cancel=False)
             update(stage="Registrando proveniência")
             manifest = publish_manifest(root, "completed")
             files.append("manifest")
@@ -472,27 +602,44 @@ def main():
             declaration.write_text(build_declaration(manifest, final_agents), encoding="utf-8")
             put(declaration, "declaracao_uso_ia.md", "text/markdown; charset=utf-8", record=False)
             files.append("declaration")
+            BUDGET.finish("registro_final")
         except Exception as exc:
             print("Manifesto ou declaração indisponíveis:", repr(exc), flush=True)
-        update(status="completed", stage="Concluído", agents=final_agents, finished_at=now(), files=files)
+        skipped = any(r.get("status") == "pulada_por_cancelamento" for r in BUDGET.records.values())
+        update(status="completed", agents=final_agents, finished_at=now(), files=files,
+               stage="Concluído (etapas opcionais canceladas)" if skipped else "Concluído")
 
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as exc:
-        # Guardar erro genérico para o navegador; detalhes somente nos Cloud Logs.
         print(traceback.format_exc(), flush=True)
+        if RECHECK:
+            # A pesquisa continua concluída; só a reavaliação falhou.
+            try:
+                ref.update({"editorial_recheck": {"status": "failed", "error": str(exc)[:300],
+                                                  "checked_at": now()}})
+            except Exception:
+                pass
+            raise
+        cancelled = isinstance(exc, Cancelled)
+        # Guardar erro genérico para o navegador; detalhes somente nos Cloud Logs.
         try:
-            update(status="failed", stage="Falha", error=str(exc)[:400], finished_at=now())
+            if cancelled:
+                update(status="cancelled", stage="Cancelada pelo pesquisador", finished_at=now(),
+                       error="")
+            else:
+                update(status="failed", stage="Falha", error=str(exc)[:400], finished_at=now())
         except Exception:
             pass
         # Manifesto também em falhas: mostra até onde a execução chegou.
         if MANIFEST is not None:
             try:
                 with tempfile.TemporaryDirectory(prefix="manifest_") as tmp:
-                    publish_manifest(Path(tmp), "failed", str(exc))
+                    publish_manifest(Path(tmp), "cancelled" if cancelled else "failed", str(exc))
                 ref.update({"files": firestore.ArrayUnion(["manifest"])})
             except Exception as manifest_error:
                 print("Manifesto de falha indisponível:", repr(manifest_error), flush=True)
-        raise
+        if not cancelled:
+            raise

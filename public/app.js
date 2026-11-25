@@ -114,6 +114,15 @@ async function loadLibrary() {
     const r=await request('/library/items');
     const data=await r.json();
     libraryItems=data.items||[];
+    // M13: arquivos retidos na verificação de segurança (não podem ser usados).
+    const held=data.quarantined||[];const q=$('quarantine-list');
+    if(q){q.replaceChildren();q.classList.toggle('hidden',!held.length);
+      if(held.length){q.append(el('strong','Arquivos retidos na verificação de segurança (não entram nas pesquisas)'));
+        for(const h of held){const reasons=((h.guard||{}).findings||[]).filter(f=>f.severity==='alta').map(f=>f.detail).join(' ');
+          const row=el('p',`${h.name}: ${reasons}`);const drop=el('button','Descartar');drop.type='button';
+          drop.addEventListener('click',async()=>{drop.disabled=true;try{await request('/library/items/'+h.id+'/archive',{method:'POST'});await loadLibrary();}catch(e){libraryMessage(e.message);drop.disabled=false}});
+          row.append(' ',drop);q.append(row);}
+        q.append(el('small','Verificação estática (não é antivírus). Se o arquivo for legítimo, gere um PDF novo e envie de novo.'));}}
     const activeIds=new Set(libraryItems.map(i=>i.id));
     selectedSourceIds=new Set([...selectedSourceIds].filter(id=>activeIds.has(id)));
     updateSelectedCount();displayLibrary();
@@ -163,9 +172,51 @@ async function download(id, kind) {
   } catch (e) { alert(e.message); }
 }
 
+// Onda 6: arquivos gerados na hora pela API (matriz revisada, CSL-JSON, ABNT).
+async function downloadPath(path, filename) {
+  try {
+    const blob = await (await request(path)).blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  } catch (e) { alert(e.message); }
+}
+
+// M02: abre a página do PDF com o trecho destacado (imagem gerada no servidor).
+async function showOnPage(jobId, ev, holder, page) {
+  const old = holder.querySelector('.page-view');
+  if (old && !page) { old.remove(); return; }
+  const box = old || document.createElement('div');
+  box.className = 'page-view'; box.textContent = 'Abrindo a página...';
+  if (!old) holder.append(box);
+  try {
+    const r = await request(`/jobs/${jobId}/evidence-view/${ev.chunk_id}` + (page ? `?page=${page}` : ''));
+    const url = URL.createObjectURL(await r.blob());
+    const shown = Number(r.headers.get('X-Scriptorium-Page'));
+    const pages = (r.headers.get('X-Scriptorium-Pages') || '').split(',').filter(Boolean).map(Number);
+    box.replaceChildren();
+    box.append(el('small', `${ev.source_name || 'Fonte'} · página ${shown}` + (pages.length > 1 ? ` (o trecho ocupa as páginas ${pages.join(', ')})` : '') + ' · área destacada em amarelo'));
+    if (pages.length > 1) {
+      const nav = document.createElement('div'); nav.className = 'downloads';
+      for (const p of pages) {
+        const b = el('button', 'p. ' + p); b.type = 'button'; b.disabled = p === shown;
+        b.addEventListener('click', () => showOnPage(jobId, ev, holder, p));
+        nav.append(b);
+      }
+      box.append(nav);
+    }
+    const img = document.createElement('img');
+    img.src = url; img.alt = `Página ${shown} do PDF com o trecho destacado`;
+    img.style.maxWidth = '100%'; img.style.border = '1px solid var(--line, #444)'; img.style.marginTop = '6px';
+    img.addEventListener('load', () => setTimeout(() => URL.revokeObjectURL(url), 1000));
+    box.append(img);
+  } catch (e) { box.textContent = 'Não foi possível abrir a página: ' + e.message; }
+}
+
 function el(tag, text, cls) { const e = document.createElement(tag); e.textContent = text; if (cls) e.className = cls; return e; }
 
-async function toggleReport(id, target, cls, kind, render) {
+async function toggleReport(id, target, cls, kind, render, path) {
   const old = target.querySelector('.' + cls);
   if (old) { old.remove(); return; }
   const box = document.createElement('section');
@@ -173,7 +224,7 @@ async function toggleReport(id, target, cls, kind, render) {
   box.textContent = 'Carregando...';
   target.append(box);
   try {
-    const data = await (await request(`/jobs/${id}/download/${kind}`)).json();
+    const data = await (await request(path || `/jobs/${id}/download/${kind}`)).json();
     box.replaceChildren();
     await render(box, data);
   } catch (err) { box.textContent = 'Não foi possível abrir o relatório: ' + err.message; }
@@ -349,6 +400,22 @@ function showCoverage(id, target) {
     for (const [sourceId, info] of Object.entries(cov.sources || {})) {
       box.append(el('p', `${sourceId.slice(0, 8)}…: ${info.chunks_selected} de ${info.chunks_total} trechos selecionados (${info.chunks_matched} correspondências), ${modes[info.selection] || info.selection || ''}`));
     }
+    // M09: o que os agentes leram, agrupado por autor, época e tema.
+    const f = cov.facets;
+    if (f && !f.status) {
+      box.append(el('h4', 'Por autor'));
+      for (const [name, v] of Object.entries(f.by_author || {})) box.append(el('p', `${name}: ${v.sources} fonte(s), ${v.chunks_selected} trecho(s) lido(s)`));
+      box.append(el('h4', 'Por época'));
+      for (const [name, v] of Object.entries(f.by_epoch || {})) box.append(el('p', `${name}: ${v.sources} fonte(s), ${v.chunks_selected} trecho(s) lido(s)`));
+      for (const src of f.sources || []) box.append(el('small', `${src.name}: ${src.author} · ${src.year_note}`));
+      box.append(el('h4', 'Por tema (perguntas e subtópicos da ideia)'));
+      const covLabels = {lacuna: '⚠ nenhum trecho lido', uma_fonte: 'uma fonte só', varias_fontes: 'várias fontes'};
+      for (const t of f.by_theme || []) {
+        const names = Object.entries(t.sources || {}).map(([n, c]) => `${n} (${c})`).join('; ');
+        box.append(el('p', `${covLabels[t.coverage] || t.coverage}: ${t.text}` + (names ? ` · ${names}` : ''), t.coverage === 'lacuna' ? 'editorial-alert' : ''));
+      }
+      for (const lim of f.limitations || []) box.append(el('small', lim));
+    }
   });
 }
 
@@ -375,6 +442,12 @@ async function showEvidenceReport(id, target) {
       const where = q.pages ? ` · ${q.source_name || q.source_id} p. ${q.pages[0]}${q.pages[1] !== q.pages[0] ? '-' + q.pages[1] : ''}` : '';
       box.append(line('p', `${q.status === 'not_found_in_sources' ? '⚠ ' : ''}${qLabels[q.status] || q.status}${where}: "${q.quote}"`,
         q.status === 'not_found_in_sources' ? 'editorial-alert' : ''));
+      if (q.chunk_id && (q.locations || []).length) {
+        const holder = document.createElement('div');
+        const view = line('button', 'Ver na página do PDF'); view.type = 'button';
+        view.addEventListener('click', () => showOnPage(id, q, holder));
+        holder.append(view); box.append(holder);
+      }
     }
     const matrix = report.matrix || {};
     const ms = matrix.summary || {};
@@ -389,6 +462,12 @@ async function showEvidenceReport(id, target) {
         const pages = ev.pages ? `p. ${ev.pages[0]}${ev.pages[1] !== ev.pages[0] ? '-' + ev.pages[1] : ''}` : 'sem página';
         detail.append(line('p', `${ev.source_name || ev.source_id} · ${pages} · termos em comum: ${ev.shared_terms}${ev.similarity != null ? ' · similaridade: ' + ev.similarity : ''}`));
         detail.append(line('small', ev.excerpt || ''));
+        if ((ev.locations || []).length) {
+          const holder = document.createElement('div');
+          const view = line('button', 'Ver na página do PDF'); view.type = 'button';
+          view.addEventListener('click', () => showOnPage(id, ev, holder));
+          holder.append(view); detail.append(holder);
+        }
       }
       if (!(row.evidence || []).length) detail.append(line('p', 'Nenhum trecho candidato nas fontes anexadas.'));
       detail.append(reviewControl(id, 'claim', row.claim_id, latest));
@@ -601,7 +680,7 @@ async function loadCapabilities() {
 
 function statusLabel(value) {
   return ({queued:'Na fila',running:'Em execução',completed:'Concluído',failed:'Falhou',
-    awaiting_source_approval:'Aguardando sua aprovação',discarded:'Descartada'})[value] || value;
+    awaiting_source_approval:'Aguardando sua aprovação',discarded:'Descartada',cancelled:'Cancelada'})[value] || value;
 }
 
 const AGENT_LABELS = {
@@ -676,6 +755,19 @@ async function loadJobs() {
         info.append(aud);
       }
       if (entry.error) {const err=document.createElement('small'); err.textContent=entry.error; info.append(err);}
+      // M15: cancelamento pelo navegador enquanto a pesquisa roda.
+      if (entry.status === 'queued' || entry.status === 'running') {
+        const actions = document.createElement('div'); actions.className = 'downloads';
+        const stop = el('button', entry.cancel_requested ? 'Cancelamento solicitado' : 'Cancelar pesquisa'); stop.type = 'button';
+        stop.disabled = !!entry.cancel_requested;
+        stop.addEventListener('click', async () => {
+          if (!confirm('Cancelar esta pesquisa? O que já foi feito fica registrado, mas a redação para.')) return;
+          stop.disabled = true;
+          try { await request(`/jobs/${entry.id}/cancel`, {method: 'POST'}); stop.textContent = 'Cancelamento solicitado'; }
+          catch (e) { alert(e.message); stop.disabled = false; }
+        });
+        actions.append(stop); info.append(actions);
+      }
       if (entry.status === 'awaiting_source_approval') {
         const g = entry.gap_summary || {};
         info.append(el('small', `Diagnóstico pronto: ${g.boa || 0} ponto(s) com boa cobertura, ${g.parcial || 0} parcial(is), ${g.lacuna || 0} lacuna(s). A redação só começa depois da sua aprovação.`, 'scientific-warning'));
@@ -691,6 +783,8 @@ async function loadJobs() {
           : entry.files;
         for (const kind of available) {
           if (kind === 'neon' && !accountAccess?.admin) continue;
+          // Tratados pelos botões da onda 6 (exportação ABNT/CSL e reavaliação editorial).
+          if (kind === 'bibtex' || kind === 'editorial_recheck') continue;
           const button = document.createElement('button'); button.type='button';
           if (kind === 'gap_report') {
             const gb = el('button', 'Diagnóstico das fontes'); gb.type = 'button';
@@ -703,6 +797,42 @@ async function loadJobs() {
           if(kind==='references'&&entry.editorial_alerts>0){button.textContent+=` (${entry.editorial_alerts} aviso${entry.editorial_alerts>1?'s':''} editorial${entry.editorial_alerts>1?'is':''})`;}
           button.addEventListener('click', ()=>kind==='fire' ? showFire(entry.id, info) : kind==='contradictions' ? showContradictions(entry.id, info) : kind==='shield' ? showShield(entry.id, info) : kind==='coverage' ? showCoverage(entry.id, info) : kind==='evidence' ? showEvidenceReport(entry.id, info) : kind==='audit' ? showScientificAudit(entry.id, info) : kind==='references' ? showReferenceVerification(entry.id, info) : kind==='neon' ? showNeonReport(entry.id, info) : download(entry.id,kind));
           files.append(button);
+        }
+        if (entry.status === 'completed') {
+          const have = new Set(entry.files || []);
+          const extra = (label, fn) => { const b = el('button', label); b.type = 'button'; b.addEventListener('click', fn); files.append(b); };
+          // M08: matriz com as suas revisões; M27: referências em CSL-JSON e ABNT.
+          if (have.has('evidence_csv')) extra('Matriz com suas revisões (CSV)', () => downloadPath(`/jobs/${entry.id}/export/evidence_reviewed_csv`, `${entry.id}_matriz_revisada.csv`));
+          if (have.has('bibtex')) {
+            extra('Referências ABNT', () => downloadPath(`/jobs/${entry.id}/export/abnt`, `${entry.id}_referencias_abnt.md`));
+            extra('Referências CSL-JSON', () => downloadPath(`/jobs/${entry.id}/export/csl_json`, `${entry.id}_referencias.csl.json`));
+          }
+          // M07: reconsultar retratações e avisos editoriais (sem IA, sem custo de tokens).
+          if (have.has('references')) {
+            const rc = entry.editorial_recheck || {};
+            const busy = rc.status === 'queued' || rc.status === 'running';
+            const b = el('button', busy ? 'Reavaliando retratações...' : 'Reavaliar retratações agora'); b.type = 'button'; b.disabled = busy;
+            b.addEventListener('click', async () => {
+              b.disabled = true;
+              try { await request(`/jobs/${entry.id}/editorial-recheck`, {method: 'POST'}); b.textContent = 'Reavaliando retratações...'; setTimeout(loadJobs, 20000); }
+              catch (e) { alert(e.message); b.disabled = false; }
+            });
+            files.append(b);
+            if (rc.status === 'completed') {
+              extra(`Resultado da reavaliação (${rc.changed || 0} mudança(s))`, () => toggleReport(entry.id, info, 'recheck-report', null, (box, data) => {
+                box.append(el('strong', `Reavaliação editorial de ${new Date(data.checked_at).toLocaleString('pt-BR')}`));
+                const sm = data.summary || {};
+                box.append(el('p', `DOIs reconsultados: ${sm.dois_checked || 0} · com mudança: ${sm.changed || 0} · com avisos: ${sm.with_notices || 0}`));
+                for (const it of data.items || []) {
+                  if (!it.changed && !((it.after || {}).notices || []).length) continue;
+                  box.append(el('p', `${it.changed ? '⚠ ' : ''}${it.title || it.doi}: ${(it.before || {}).label || 'sem aviso'} → ${(it.after || {}).label || 'sem aviso'}`, 'editorial-alert'));
+                }
+                for (const lim of data.limitations || []) box.append(el('small', lim));
+              }, `/jobs/${entry.id}/export/editorial_recheck`));
+            } else if (rc.status === 'failed') {
+              info.append(el('small', 'A reavaliação editorial falhou: ' + (rc.error || 'tente de novo mais tarde.'), 'scientific-warning'));
+            }
+          }
         }
         info.append(files);
       }
@@ -734,14 +864,61 @@ $('zotero-import').addEventListener('click', async () => {
   if (!key) { zoteroMessage('Cole a chave do Zotero.'); return; }
   $('zotero-import').disabled = true; zoteroMessage('Importando metadados...');
   try {
-    const body = {api_key: key, collection_key: $('zotero-collection').value || null};
+    const body = {api_key: key, collection_key: $('zotero-collection').value || null,
+      incremental: $('zotero-incremental').checked, attachments_consent: $('zotero-attachments').checked};
     const data = await (await request('/library/zotero/import', {method: 'POST', body: JSON.stringify(body)})).json();
-    zoteroMessage(`${data.items_imported} item(ns) importado(s) como .bib.`);
+    const att = data.attachments || {};
+    zoteroMessage((data.up_to_date ? 'Nada mudou no Zotero desde a última importação.' :
+      `${data.items_imported} item(ns) importado(s) como .bib${data.incremental ? ` (alterados desde a versão ${data.since_version})` : ''}.`)
+      + (data.deleted_in_zotero ? ` ${data.deleted_in_zotero} item(ns) foram apagados no Zotero (a biblioteca daqui não muda sozinha).` : '')
+      + ($('zotero-attachments').checked ? ` PDFs: ${att.imported || 0} importado(s), ${att.quarantined || 0} retido(s) na verificação, ${att.skipped || 0} ignorado(s).` : ''));
     $('zotero-key').value = '';
     await loadLibrary();
   } catch (e) { zoteroMessage(e.message); }
   finally { $('zotero-import').disabled = false; }
 });
+// M03/M21: busca no conteúdo já lido e ficha de leitura de cada documento.
+async function showReadingCard(itemId, holder) {
+  const old = holder.querySelector('.reading-card');
+  if (old) { old.remove(); return; }
+  const box = document.createElement('section'); box.className = 'scientific-audit-report reading-card';
+  box.textContent = 'Carregando ficha...'; holder.append(box);
+  try {
+    const c = await (await request(`/library/items/${itemId}/card`)).json();
+    box.replaceChildren();
+    box.append(el('strong', 'Ficha de leitura: ' + (c.item.name || '')));
+    box.append(el('p', `${c.pages_total ?? '?'} página(s) · ${c.chunks} trecho(s) · ${c.characters} caracteres · parser ${c.parser_version || '?'}`));
+    const m = c.metadata || {};
+    if (m.author || m.pdf_title) box.append(el('p', `Metadados do PDF: ${m.author || 'autor não informado'}${m.pdf_title ? ' · ' + m.pdf_title : ''}`));
+    if ((c.structure || []).length) { box.append(el('h4', 'Estrutura')); for (const h of c.structure.slice(0, 20)) box.append(el('small', h)); }
+    if ((c.frequent_terms || []).length) box.append(el('p', 'Termos frequentes: ' + c.frequent_terms.join(', ')));
+    if (c.opening) { box.append(el('h4', 'Abertura')); box.append(el('small', c.opening)); }
+    if ((c.ocr_pages_flagged || []).length) box.append(el('p', 'Páginas que precisam de OCR: ' + c.ocr_pages_flagged.join(', '), 'editorial-alert'));
+    for (const lim of c.limitations || []) box.append(el('small', lim));
+  } catch (e) { box.textContent = e.message; }
+}
+async function runContentSearch() {
+  const q = $('content-search').value.trim();
+  const out = $('content-search-results'); const msg = $('content-search-message');
+  if (q.length < 2) { msg.textContent = 'Digite ao menos uma palavra.'; return; }
+  msg.textContent = 'Buscando...'; out.replaceChildren();
+  try {
+    const data = await (await request('/library/search?q=' + encodeURIComponent(q))).json();
+    msg.textContent = `${data.results.length} resultado(s) · ${data.indexed_documents} de ${data.active_documents} documento(s) indexado(s).`;
+    if (!data.results.length) out.append(el('small', data.note));
+    for (const r of data.results) {
+      const d = document.createElement('div'); d.className = 'reference-item';
+      d.append(el('p', `${r.name}${r.pages ? ' · p. ' + r.pages : ''}${r.heading ? ' · ' + r.heading : ''}`));
+      d.append(el('small', r.snippet));
+      const b = el('button', 'Ficha do documento'); b.type = 'button';
+      b.addEventListener('click', () => showReadingCard(r.item_id, d));
+      d.append(b); out.append(d);
+    }
+  } catch (e) { msg.textContent = e.message; }
+}
+$('content-search-run').addEventListener('click', runContentSearch);
+$('content-search').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runContentSearch(); } });
+
 $('new-paper').addEventListener('submit', async (event) => {
   event.preventDefault();
   const button=$('submit'); button.disabled=true; $('submit-status').textContent='Salvando e iniciando...';

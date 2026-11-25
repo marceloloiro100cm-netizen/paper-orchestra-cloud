@@ -123,4 +123,5 @@ def verify(tex: str, chunks: list[dict], sources_meta: dict) -> dict:
 
 def _where(chunk: dict, source_id: str, meta: dict) -> dict:
     return {"source_id": source_id, "source_name": meta.get(source_id, {}).get("name", ""),
-            "chunk_id": chunk["chunk_id"], "pages": chunk.get("pages")}
+            "chunk_id": chunk["chunk_id"], "pages": chunk.get("pages"),
+            "locations": (chunk.get("locations") or [])[:8]}

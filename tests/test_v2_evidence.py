@@ -212,7 +212,8 @@ class QuoteVerificationTest(unittest.TestCase):
         self.assertEqual(report["quotes"][0]["source_name"], "Bergmann.pdf")
         self.assertEqual(report["pointers"], [{"chunk_id": "aaaaaaaaaaaa-0000-12345678", "status": "valid",
                                                "source_id": "a", "source_name": "Bergmann.pdf",
-                                               "chunk_id": "aaaaaaaaaaaa-0000-12345678", "pages": [3, 3]}])
+                                               "chunk_id": "aaaaaaaaaaaa-0000-12345678", "pages": [3, 3],
+                                           "locations": []}])
 
     def test_unknown_pointer_and_no_sources(self):
         report = verify(TEX.replace("aaaaaaaaaaaa-0000-12345678", "bbbbbbbbbbbb-0001-87654321"), [], {})
