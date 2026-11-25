@@ -1161,9 +1161,11 @@
       ],
       "depends_on": [],
       "status": "parcial",
-      "next_step": "Extração estruturada por blocos com PyMuPDF (títulos por tamanho de fonte e estilo DOCX). Falta comparar com Docling (R03) no corpus de 30 PDFs e extrair tabelas.",
+      "next_step": "Comparado com Docling (R03) em 12 PDFs do corpus de referência: Docling 200 vezes mais lento (31,2 s contra 0,16 s por documento) e tabelas em só 2 documentos. PyMuPDF segue como padrão. Falta extração de tabelas sob demanda com Docling.",
       "files": [
-        "worker/structured_extract.py"
+        "worker/structured_extract.py",
+        "docs/AVALIACAO-RECUPERACAO.md",
+        "scripts/eval_corpus.py"
       ]
     },
     {
@@ -1228,12 +1230,14 @@
         "M03"
       ],
       "status": "parcial",
-      "next_step": "Busca híbrida: BM25 + embeddings Gemini (gemini-embedding-001, 768 dimensões), fundidos por RRF (k=60), com cache de vetores e volta automática para BM25 se o serviço falhar. Falta medir recall@10 e MRR no corpus de referência (scripts/eval_retrieval.py).",
+      "next_step": "Linha de base lexical medida no corpus de referência (42 consultas: recall@10 0,90, MRR 0,90; específicas recall@10 1,0). Falta medir a busca híbrida com chave Gemini (--hybrid); a consulta em português contra documentos em inglês (q39) é o caso a resolver.",
       "files": [
         "worker/lexical_index.py",
         "worker/vector_index.py",
         "worker/embeddings.py",
-        "worker/retrieval_context.py"
+        "worker/retrieval_context.py",
+        "docs/AVALIACAO-RECUPERACAO.md",
+        "scripts/eval_corpus.py"
       ]
     },
     {
@@ -1367,9 +1371,11 @@
         "M06"
       ],
       "status": "parcial",
-      "next_step": "Sinaliza afirmações sem evidência localizada nas fontes anexadas (limiares provisórios). Falta abstenção durante a geração e calibrar limiares no corpus.",
+      "next_step": "Limiar de 3 termos calibrado no corpus de referência (precisão 0,667, cobertura 0,895, nenhuma das 6 perguntas sem resposta acusada). Falta abstenção durante a geração.",
       "files": [
-        "worker/evidence_matrix.py"
+        "worker/evidence_matrix.py",
+        "docs/AVALIACAO-RECUPERACAO.md",
+        "scripts/eval_corpus.py"
       ]
     },
     {
@@ -1502,12 +1508,14 @@
         "M04",
         "M09"
       ],
-      "status": "parcial",
-      "next_step": "Modo preflight: cobertura por pergunta ou subtópico da ideia (boa, parcial, lacuna), termos sem cobertura, fontes sem relação e páginas para OCR, antes de pagar pela redação. Falta calibrar limiares no corpus de referência.",
+      "status": "implementado",
+      "next_step": "Preflight com limiar calibrado no corpus de referência (3 termos; ver docs/AVALIACAO-RECUPERACAO.md).",
       "files": [
         "worker/gap_report.py",
         "worker/runner.py",
-        "public/app.js"
+        "public/app.js",
+        "docs/AVALIACAO-RECUPERACAO.md",
+        "scripts/eval_corpus.py"
       ]
     },
     {
@@ -1568,10 +1576,12 @@
         "M01",
         "M03"
       ],
-      "status": "parcial",
-      "next_step": "Política section-paragraph-1 (seção/parágrafo, ~1200 caracteres, heading_path). Falta benchmark em pt-BR contra janelas móveis.",
+      "status": "implementado",
+      "next_step": "Benchmark feito no corpus de referência: janela móvel ganha cerca de 0,03 de MRR (ruído em 42 consultas). Mantida a política seção/parágrafo de 1200 caracteres, que preserva página e títulos.",
       "files": [
-        "worker/chunking.py"
+        "worker/chunking.py",
+        "docs/AVALIACAO-RECUPERACAO.md",
+        "scripts/eval_corpus.py"
       ]
     },
     {
@@ -1590,10 +1600,12 @@
         "M19"
       ],
       "status": "parcial",
-      "next_step": "Integração com FlagEmbedding (bge-reranker-v2-m3) e InRanker (T5Ranker) pronta e atrás de SCRIPTORIUM_V2_RERANKER (padrão none); avaliação com e sem reranking em scripts/eval_retrieval.py. Falta medir no corpus de referência e, se houver ganho, incluir a biblioteca na imagem.",
+      "next_step": "bge-reranker-v2-m3 impraticável na CPU do CI (mais de 68 min sem terminar; cancelado). Não entra no worker. Se fizer sentido, testar InRanker-small ou reranking dos 20 primeiros no computador local.",
       "files": [
         "worker/reranker.py",
-        "scripts/eval_retrieval.py"
+        "scripts/eval_retrieval.py",
+        "docs/AVALIACAO-RECUPERACAO.md",
+        "scripts/eval_corpus.py"
       ]
     },
     {
