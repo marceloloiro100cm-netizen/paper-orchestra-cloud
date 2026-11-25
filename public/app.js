@@ -1135,6 +1135,43 @@ $('request-invitation').addEventListener('click', async () => {
   }
 });
 
+// "Minha conta" fica atrás do botão do cabeçalho. No primeiro acesso (aguardando
+// autorização ou sem chave) o painel continua na página, porque é o único passo possível.
+function setAccountPanelOpen(open) {
+  const panel = $('account-panel');
+  panel.classList.toggle('open', open && panel.classList.contains('as-modal'));
+  const shown = panel.classList.contains('open');
+  $('account-backdrop').classList.toggle('hidden', !shown);
+  $('account-button').setAttribute('aria-expanded', String(shown));
+  if (shown) { panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); $('account-close').focus(); }
+  else { panel.removeAttribute('role'); panel.removeAttribute('aria-modal'); }
+}
+function updateAccountMode() {
+  const ws = $('workspace');
+  const firstAccess = ws.classList.contains('access-pending') || ws.classList.contains('access-setup');
+  const panel = $('account-panel');
+  const wasOpen = panel.classList.contains('open');
+  panel.classList.toggle('as-modal', !firstAccess);
+  setAccountPanelOpen(!firstAccess && wasOpen);
+  const state = $('account-state').textContent || '';
+  const dot = $('account-dot');
+  const ok = !!accountAccess?.research_generation_enabled;
+  dot.classList.toggle('ok', ok);
+  dot.classList.toggle('warn', !ok);
+  $('account-button').title = 'Minha conta · ' + state;
+  $('account-button').setAttribute('aria-label', 'Minha conta: ' + state);
+}
+$('account-button').addEventListener('click', () => {
+  const panel = $('account-panel');
+  if (!panel.classList.contains('as-modal')) { panel.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+  setAccountPanelOpen(!panel.classList.contains('open'));
+});
+$('account-close').addEventListener('click', () => { setAccountPanelOpen(false); $('account-button').focus(); });
+$('account-backdrop').addEventListener('click', () => setAccountPanelOpen(false));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('account-panel').classList.contains('open')) { setAccountPanelOpen(false); $('account-button').focus(); }
+});
+
 async function loadAccountAccess() {
   $('account-panel').classList.remove('hidden');
   $('workspace').classList.remove('access-setup');
@@ -1217,6 +1254,7 @@ async function loadAccountAccess() {
     accountAccess = null;
   } finally {
     clearTimeout(timeout);
+    updateAccountMode();
   }
 }
 
@@ -1293,7 +1331,7 @@ $('save-personal-key').addEventListener('click', async () => {
     $('toggle-personal-key').setAttribute('aria-pressed','false');
     await loadAccountAccess();
     if (accountAccess?.research_generation_enabled) {
-      await Promise.all([loadJobs(),loadLibrary(),loadCapabilities()]);
+      await Promise.all([loadJobs(),loadLibrary(),loadCapabilities(),loadAdvisor()]);
     }
     const models = saved.model_access?.models || {};
     const hasPro = models['gemini-3.1-pro-preview'] === 'supported';
@@ -1354,18 +1392,20 @@ onAuthStateChanged(auth, async (current) => {
   $('login-panel').classList.toggle('hidden', !!user);
   $('workspace').classList.toggle('hidden', !user);
   $('logout').classList.toggle('hidden', !user);
+  $('account-button').classList.toggle('hidden', !user);
   $('identity').textContent=user?.email || '';
   if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
   if (user) {
     await loadAccountAccess();
     if (accountAccess?.research_generation_enabled) {
-      await Promise.all([loadJobs(),loadLibrary(),loadCapabilities()]);
+      await Promise.all([loadJobs(),loadLibrary(),loadCapabilities(),loadAdvisor()]);
       refreshInterval = setInterval(loadJobs, 12000);
     }
   } else {
     accountAccess = null;
     $('workspace').classList.remove('access-pending', 'access-setup');
     $('account-panel').classList.add('hidden');
+    setAccountPanelOpen(false);
     $('access-pending').classList.add('hidden');
     $('guest-credential').classList.add('hidden');
     $('personal-gemini-key').value = '';
