@@ -1,0 +1,704 @@
+"""Servidor MCP do Scriptorium: a IA do pesquisador escreve; o Scriptorium guarda e confere.
+
+Endereço: https://<site>/api/mcp (Streamable HTTP, sem estado, respostas JSON).
+Autenticação nesta fase: token pessoal gerado no site (Minha conta), enviado como
+"Authorization: Bearer scr_..." ou, para clientes que não aceitam cabeçalho, no
+caminho /api/mcp/t/<token>. O token só dá acesso às ferramentas abaixo: ler a
+própria biblioteca e escrever no quadro dos próprios projetos. Não roda IA, não
+apaga nada e não usa a chave Gemini.
+
+Nenhuma ferramenta chama modelo de linguagem. Os dois trabalhos pesados (ler as
+fontes e compilar o PDF) rodam no worker, também sem IA.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import tempfile
+import time
+import uuid
+from datetime import datetime, timezone
+from functools import partial
+from typing import Callable, Literal
+
+import anyio
+from mcp.server.auth.middleware.auth_context import get_access_token
+from mcp.server.auth.provider import AccessToken
+from mcp.server.auth.settings import AuthSettings
+from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.transport_security import TransportSecuritySettings
+
+import library_search as search
+import mcp_flow as flow
+
+MCP_PATH = "/api/mcp"
+MAX_ACTIVE_TOKENS = 5
+MAX_PROJECT_SOURCES = 20
+MAX_ACTIVE_JOBS = 2
+FORMATS = {"pdf", "docx", "txt"}
+ID = re.compile(r"[0-9a-f]{32}")
+INSTRUCTIONS = (
+    "Scriptorium: escrita acadêmica com as fontes do pesquisador, sem API paga. Você (a IA) lê e "
+    "escreve; o Scriptorium guarda as fontes, entrega trechos e confere cada entrega. Fluxo: "
+    "listar_fontes -> criar_projeto -> proxima_etapa (repetir) -> compilar. Guarde o identificador de "
+    "cabeça que proxima_etapa devolver e use-o em todas as chamadas desta conversa. Quando uma etapa "
+    "pedir conversa nova, entregue o PASSE ao pesquisador e pare: a etapa será feita em outra conversa."
+)
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class Falha(ToolError):
+    """Erro previsto: a mensagem vai inteira para a IA, que pode corrigir e tentar de novo."""
+
+
+# ====================================================================== dados
+class Store:
+    """Acesso a Firestore e Cloud Storage, sempre restrito ao dono (uid)."""
+
+    def __init__(self, db, bucket, start_job: Callable[[str, str, str], None],
+                 is_allowed: Callable[[dict], bool]):
+        self.db, self.bucket, self.start_job, self.is_allowed = db, bucket, start_job, is_allowed
+        self._payloads: dict[str, dict] = {}
+
+    # ---------------------------------------------------------------- tokens
+    def token_owner(self, token: str) -> dict | None:
+        if not flow.looks_like_token(token):
+            return None
+        snap = self.db.collection("mcp_tokens").document(flow.token_hash(token)).get()
+        record = snap.to_dict() if snap.exists else None
+        if not record or record.get("revoked"):
+            return None
+        identity = {"uid": record["owner_uid"], "email": record.get("email", ""),
+                    "email_verified": True}
+        if not self.is_allowed(identity):
+            return None
+        return identity
+
+    def create_token(self, uid: str, email: str, label: str) -> dict:
+        active = [d.to_dict() for d in self.db.collection("mcp_tokens").where("owner_uid", "==", uid).stream()]
+        if sum(1 for t in active if not t.get("revoked")) >= MAX_ACTIVE_TOKENS:
+            raise ValueError(f"Limite de {MAX_ACTIVE_TOKENS} tokens ativos. Revogue um antes de criar outro.")
+        token, digest = flow.new_token()
+        record = {"id": digest[:16], "hash": digest, "owner_uid": uid, "email": email,
+                  "label": (label or "Minha IA").strip()[:60], "created_at": now(), "revoked": False}
+        self.db.collection("mcp_tokens").document(digest).set(record)
+        return {**self.public_token(record), "token": token}
+
+    @staticmethod
+    def public_token(record: dict) -> dict:
+        return {k: record.get(k) for k in ("id", "label", "created_at", "revoked", "revoked_at")}
+
+    def list_tokens(self, uid: str) -> list[dict]:
+        docs = [d.to_dict() for d in self.db.collection("mcp_tokens").where("owner_uid", "==", uid).stream()]
+        return sorted((self.public_token(d) for d in docs), key=lambda d: d.get("created_at") or "", reverse=True)
+
+    def revoke_token(self, uid: str, token_id: str) -> bool:
+        for snap in self.db.collection("mcp_tokens").where("owner_uid", "==", uid).stream():
+            record = snap.to_dict()
+            if record.get("id") == token_id and not record.get("revoked"):
+                self.db.collection("mcp_tokens").document(record["hash"]).update(
+                    {"revoked": True, "revoked_at": now()})
+                return True
+        return False
+
+    # ------------------------------------------------------------- biblioteca
+    def library(self, uid: str) -> list[dict]:
+        docs = self.db.collection("library_items").where("owner_uid", "==", uid).limit(500).stream()
+        items = [d.to_dict() for d in docs]
+        return [{"id": i["id"], "nome": i.get("name", ""), "formato": i.get("format", ""),
+                 "doi": (i.get("origin") or {}).get("doi", "")}
+                for i in items if i.get("status") == "active" and i.get("format") in FORMATS]
+
+    def _source(self, uid: str, item_id: str) -> dict:
+        if not ID.fullmatch(item_id or ""):
+            raise Falha(f"Identificador de fonte inválido: {item_id}")
+        snap = self.db.collection("library_items").document(item_id).get()
+        record = snap.to_dict() if snap.exists else None
+        if not record or record.get("owner_uid") != uid or record.get("status") != "active":
+            raise Falha(f"Fonte {item_id} não encontrada na sua biblioteca.")
+        if record.get("format") not in FORMATS:
+            raise Falha(f"A fonte {record.get('name')} não é PDF, DOCX ou TXT.")
+        if not str(record.get("object_path", "")).startswith(f"library/{uid}/{item_id}/"):
+            raise Falha("Caminho da fonte inválido.")
+        return {k: record.get(k) for k in ("id", "name", "format", "sha256", "size", "object_path", "origin")}
+
+    # --------------------------------------------------------------- projetos
+    def _active_jobs(self, uid: str) -> int:
+        docs = self.db.collection("mcp_projects").where("owner_uid", "==", uid).stream()
+        return sum(1 for d in docs if d.to_dict().get("status") in ("preparando", "compilando"))
+
+    def _launch(self, uid: str, pid: str, mode: str, sources: list[dict], title: str) -> str:
+        job_id = uuid.uuid4().hex
+        self.db.collection("research_jobs").document(job_id).create({
+            "id": job_id, "owner_uid": uid, "title": title[:120], "status": "queued",
+            "stage": "Na fila", "mode": mode, "mcp_project_id": pid, "sources": sources,
+            "created_at": now(), "finished_at": "", "files": [], "error": ""})
+        try:
+            self.start_job(job_id, uid, mode)
+        except Exception:
+            self.db.collection("research_jobs").document(job_id).update(
+                {"status": "failed", "error": "Falha ao iniciar", "finished_at": now()})
+            raise Falha("Não foi possível iniciar o trabalho no servidor. Tente de novo em instantes.") from None
+        return job_id
+
+    def create_project(self, uid: str, title: str, question: str, ids: list[str], language: str,
+                       template: str) -> dict:
+        ids = list(dict.fromkeys(ids or []))
+        if not 3 <= len((title or "").strip()) <= 120:
+            raise Falha("O título deve ter de 3 a 120 caracteres.")
+        if not 20 <= len((question or "").strip()) <= 4000:
+            raise Falha("Descreva a pergunta ou objetivo do texto em 20 a 4000 caracteres.")
+        if not 1 <= len(ids) <= MAX_PROJECT_SOURCES:
+            raise Falha(f"Escolha de 1 a {MAX_PROJECT_SOURCES} fontes (use listar_fontes).")
+        if template not in flow.TEMPLATES or language not in ("pt-BR", "en"):
+            raise Falha("Modelo ou idioma inválido.")
+        if self._active_jobs(uid) >= MAX_ACTIVE_JOBS:
+            raise Falha("Já há trabalhos em andamento no servidor. Aguarde terminarem.")
+        sources = [self._source(uid, i) for i in ids]
+        pid = uuid.uuid4().hex
+        record = {"id": pid, "owner_uid": uid, "title": title.strip(), "question": question.strip(),
+                  "language": language, "template": template, "sources": sources,
+                  "status": "preparando", "flow_version": flow.FLOW_VERSION, "stages": {}, "heads": {},
+                  "created_at": now(), "updated_at": now(), "files": []}
+        self.db.collection("mcp_projects").document(pid).create(record)
+        job = self._launch(uid, pid, "mcp_prepare", sources, f"Preparo MCP: {title}")
+        self.db.collection("mcp_projects").document(pid).update({"prepare_job": job})
+        return record
+
+    def project(self, uid: str, pid: str) -> dict:
+        if not ID.fullmatch(pid or ""):
+            raise Falha("Projeto não encontrado.")
+        snap = self.db.collection("mcp_projects").document(pid).get()
+        record = snap.to_dict() if snap.exists else None
+        if not record or record.get("owner_uid") != uid:
+            raise Falha("Projeto não encontrado.")
+        return self._reconcile(record)
+
+    def _reconcile(self, record: dict) -> dict:
+        """Trabalho do worker que morreu sem atualizar o projeto não fica preso."""
+        job_key = {"preparando": "prepare_job", "compilando": "compile_job"}.get(record.get("status"))
+        if not job_key or not record.get(job_key):
+            return record
+        snap = self.db.collection("research_jobs").document(record[job_key]).get()
+        job = snap.to_dict() if snap.exists else {}
+        if job.get("status") == "failed":
+            status = "falhou_preparo" if job_key == "prepare_job" else "pronto"
+            fields = {"status": status, "error": job.get("error", "Falha no servidor"), "updated_at": now()}
+            self.db.collection("mcp_projects").document(record["id"]).update(fields)
+            return {**record, **fields}
+        return record
+
+    def projects(self, uid: str) -> list[dict]:
+        docs = [d.to_dict() for d in self.db.collection("mcp_projects").where("owner_uid", "==", uid).stream()]
+        return sorted(docs, key=lambda d: d.get("created_at", ""), reverse=True)
+
+    def update_project(self, pid: str, **fields) -> None:
+        self.db.collection("mcp_projects").document(pid).update({**fields, "updated_at": now()})
+
+    @staticmethod
+    def prefix(project: dict) -> str:
+        return f"mcp/{project['owner_uid']}/{project['id']}"
+
+    def _json(self, path: str, default=None):
+        blob = self.bucket.blob(path)
+        if not blob.exists():
+            return default
+        try:
+            return json.loads(blob.download_as_bytes())
+        except ValueError:
+            return default
+
+    def ready(self, project: dict) -> None:
+        status = project.get("status")
+        if status == "preparando":
+            raise Falha("O Scriptorium ainda está lendo as fontes do projeto (alguns minutos). "
+                        "Tente de novo daqui a pouco com estado_do_projeto.")
+        if status == "falhou_preparo":
+            raise Falha("A leitura das fontes falhou: " + str(project.get("error", "")) +
+                        ". Crie o projeto de novo ou troque as fontes.")
+
+    def references(self, project: dict) -> list[dict]:
+        return self._json(self.prefix(project) + "/references.json", []) or []
+
+    def manifest(self, project: dict) -> list[dict]:
+        return self._json(self.prefix(project) + "/sources.json", []) or []
+
+    def payload(self, project: dict, entry: dict) -> dict:
+        path = entry.get("derived") or ""
+        if not path.startswith(f"library/{project['owner_uid']}/derived/"):
+            return {}
+        if path not in self._payloads:
+            if len(self._payloads) > 64:
+                self._payloads.clear()
+            self._payloads[path] = self._json(path, {}) or {}
+        return self._payloads[path]
+
+    def chunks_for_key(self, project: dict) -> Callable[[str], list[dict]]:
+        by_key = {e.get("key"): e for e in self.manifest(project)}
+
+        def get(key: str) -> list[dict]:
+            entry = by_key.get(key)
+            return (self.payload(project, entry).get("chunks") or []) if entry else []
+        return get
+
+    def search(self, project: dict, query: str, limit: int) -> dict:
+        try:
+            fts = search.fts_query(query)
+        except ValueError as exc:
+            raise Falha(str(exc)) from None
+        manifest = [e for e in self.manifest(project) if e.get("derived")]
+        sig = hashlib.sha256(("mcp-" + search.INDEX_VERSION + "\n" + "\n".join(
+            sorted(f"{e['id']}:{e['derived']}" for e in manifest))).encode()).hexdigest()
+        prefix = self.prefix(project)
+        index_blob, meta_blob = self.bucket.blob(prefix + "/index.sqlite"), prefix + "/index.json"
+        key_of = {e["id"]: e.get("key") for e in manifest}
+        with tempfile.TemporaryDirectory(prefix="mcpidx_") as tmp:
+            path = os.path.join(tmp, "index.sqlite")
+            meta = self._json(meta_blob, {}) or {}
+            if meta.get("signature") == sig and index_blob.exists():
+                index_blob.download_to_filename(path)
+            else:
+                docs = [({"id": e["id"], "name": e.get("name", "")}, self.payload(project, e)) for e in manifest]
+                count = search.build_index(path, docs)
+                index_blob.upload_from_filename(path, content_type="application/vnd.sqlite3")
+                self.bucket.blob(meta_blob).upload_from_string(
+                    json.dumps({"signature": sig, "chunks": count}), content_type="application/json")
+            rows = search.search_index(path, fts, limit)
+        return {"resultados": [{"chave": key_of.get(r["item_id"]), "fonte": r["name"], "chunk_id": r["chunk_id"],
+                                "paginas": r["pages"], "secao": r["heading"], "trecho": r["snippet"]}
+                               for r in rows],
+                "dica": "Use ler_trecho com o chunk_id para ler o texto inteiro antes de citar."}
+
+    def read_chunk(self, project: dict, chunk_id: str, neighbors: int) -> dict:
+        for entry in self.manifest(project):
+            chunks = self.payload(project, entry).get("chunks") or []
+            for n, chunk in enumerate(chunks):
+                if chunk.get("chunk_id") == chunk_id:
+                    window = chunks[max(0, n - neighbors): n + neighbors + 1]
+                    pages = chunk.get("pages")
+                    return {"chave": entry.get("key"), "fonte": entry.get("name"), "chunk_id": chunk_id,
+                            "paginas": f"{pages[0]}-{pages[1]}" if pages else "",
+                            "secao": " > ".join(chunk.get("heading_path") or []),
+                            "texto": chunk.get("text", ""),
+                            "vizinhos": [{"chunk_id": c.get("chunk_id"), "texto": c.get("text", "")}
+                                         for c in window if c is not chunk]}
+        raise Falha("Trecho não encontrado nas fontes deste projeto. Use buscar_trechos.")
+
+    def card(self, project: dict, key: str) -> dict:
+        entry = next((e for e in self.manifest(project) if e.get("key") == key), None)
+        if not entry:
+            raise Falha(f"Chave '{key}' não está neste projeto. Veja referencias_do_projeto.")
+        item = {"id": entry["id"], "name": entry.get("name"), "format": entry.get("format"),
+                "sha256": entry.get("sha256")}
+        card = search.reading_card(item, self.payload(project, entry))
+        card["chave"] = key
+        return card
+
+    # ------------------------------------------------------------------ quadro
+    def stage_content(self, project: dict, key: str, version: int) -> tuple[str, dict]:
+        base = f"{self.prefix(project)}/etapas/{key}-v{version}"
+        blob = self.bucket.blob(base + ".txt")
+        content = blob.download_as_bytes().decode("utf-8") if blob.exists() else ""
+        return content, self._json(base + ".json", {}) or {}
+
+    def board(self, project: dict) -> dict:
+        out = {}
+        for key, state in (project.get("stages") or {}).items():
+            if state.get("status") == "aceita":
+                content, validation = self.stage_content(project, key, state["version"])
+                out[key] = {"content": content, "validation": validation}
+        return out
+
+    def save_stage(self, project: dict, key: str, version: int, content: str, validation: dict) -> None:
+        base = f"{self.prefix(project)}/etapas/{key}-v{version}"
+        self.bucket.blob(base + ".txt").upload_from_string(content, content_type="text/plain; charset=utf-8")
+        self.bucket.blob(base + ".json").upload_from_string(
+            json.dumps(validation, ensure_ascii=False), content_type="application/json")
+
+    # ------------------------------------------------------------------ passes
+    def pass_for(self, project: dict, stage_def: dict) -> str:
+        state = (project.get("stages") or {}).get(stage_def["key"]) or {}
+        if state.get("passe"):
+            return state["passe"]
+        code = flow.new_pass_code()
+        self.db.collection("mcp_passes").document(code).set(
+            {"code": code, "owner_uid": project["owner_uid"], "project": project["id"],
+             "stage": stage_def["key"], "created_at": now()})
+        stages = dict(project.get("stages") or {})
+        stages[stage_def["key"]] = {**state, "status": state.get("status", "pendente"), "passe": code}
+        self.update_project(project["id"], stages=stages)
+        project["stages"] = stages
+        return code
+
+    def open_pass(self, uid: str, code: str) -> tuple[dict, dict]:
+        code = (code or "").strip().upper()
+        if not re.fullmatch(r"[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}", code):
+            raise Falha("Passe inválido. Ele tem o formato XXXX-XXXX-XXXX.")
+        snap = self.db.collection("mcp_passes").document(code).get()
+        record = snap.to_dict() if snap.exists else None
+        if not record or record.get("owner_uid") != uid:
+            raise Falha("Passe não encontrado nesta conta.")
+        project = self.project(uid, record["project"])
+        return project, flow.stage(record["stage"])
+
+    def new_head(self, project: dict, kind: str, stage_key: str | None, client: str, model: str) -> dict:
+        head = {"id": flow.new_head_id(), "kind": kind, "stage": stage_key, "client": client[:80],
+                "model": (model or "").strip()[:80], "created_at": now()}
+        heads = dict(project.get("heads") or {})
+        if len(heads) >= 60:
+            raise Falha("Limite de cabeças deste projeto atingido.")
+        heads[head["id"]] = head
+        self.update_project(project["id"], heads=heads)
+        project["heads"] = heads
+        return head
+
+
+# ================================================================== lógica
+def _state_summary(project: dict) -> list[dict]:
+    stages = project.get("stages") or {}
+    out = []
+    for s in flow.STAGES:
+        st = stages.get(s["key"]) or {}
+        head = st.get("head") or {}
+        out.append({"etapa": s["key"], "titulo": s["titulo"], "status": st.get("status", "pendente"),
+                    "tentativas": st.get("attempts", 0), "nova_conversa": s["nova_conversa"],
+                    "ia": head.get("model") or head.get("client") or "",
+                    "independencia": (st.get("independencia") or {}).get("nivel")})
+    return out
+
+
+def project_state(store: Store, project: dict) -> dict:
+    nxt = flow.next_stage(project.get("stages") or {})
+    status = project.get("status")
+    if status == "preparando":
+        action = "Aguarde: o Scriptorium está lendo as fontes."
+    elif status == "falhou_preparo":
+        action = "A leitura das fontes falhou: " + str(project.get("error", ""))
+    elif status == "compilando":
+        action = "Compilando o PDF. Consulte de novo em um ou dois minutos."
+    elif status == "concluido":
+        action = "PDF pronto: baixe no site, em Minha conta > Conectar sua IA."
+    elif nxt:
+        action = f"Próxima etapa: {nxt['titulo']} (chame proxima_etapa)."
+    else:
+        action = "Todas as etapas aceitas: chame compilar."
+    return {"projeto": project["id"], "titulo": project.get("title"), "status": status,
+            "etapas": _state_summary(project), "proxima_acao": action,
+            "arquivos": project.get("files", []), "erro": project.get("error", "")}
+
+
+def next_step(store: Store, uid: str, pid: str, head_id: str | None, model: str, client: str) -> dict:
+    project = store.project(uid, pid)
+    store.ready(project)
+    if project.get("status") in ("compilando", "concluido"):
+        return project_state(store, project)
+    stage_def = flow.next_stage(project.get("stages") or {})
+    if stage_def is None:
+        return {**project_state(store, project), "instrucao": "Todas as etapas foram aceitas. Chame compilar."}
+    if stage_def["nova_conversa"]:
+        code = store.pass_for(project, stage_def)
+        return {
+            "etapa": stage_def["key"], "titulo": stage_def["titulo"], "precisa_de_conversa_nova": True,
+            "passe": code,
+            "instrucao": (
+                "PARE AQUI nesta conversa. Mostre ao pesquisador o passe abaixo e explique: abra uma "
+                "conversa NOVA (de preferência em outra IA conectada ao Scriptorium) e peça: "
+                f"\"Use o Scriptorium: abrir_passe com o código {code}\". Depois que essa etapa for "
+                "aceita, volte a esta conversa e chame proxima_etapa."),
+        }
+    head = (project.get("heads") or {}).get(head_id or "")
+    issued = None
+    if head is None or head.get("kind") != "redatora":
+        head = issued = store.new_head(project, "redatora", None, client, model)
+    board = store.board(project)
+    state = (project.get("stages") or {}).get(stage_def["key"]) or {}
+    out = {"etapa": stage_def["key"], "titulo": stage_def["titulo"], "cabeca": head["id"],
+           "instrucoes": flow.brief(stage_def, project.get("language", "pt-BR")),
+           "material": flow.material(stage_def["key"], project, board, store.references(project))}
+    if issued:
+        out["aviso"] = (f"Esta conversa é a cabeça {head['id']}. Use cabeca=\"{head['id']}\" em todas as "
+                        "chamadas seguintes desta conversa.")
+    if state.get("status") == "recusada":
+        out["ultima_recusa"] = state.get("errors", [])
+    return out
+
+
+def open_pass(store: Store, uid: str, code: str, model: str, client: str) -> dict:
+    project, stage_def = store.open_pass(uid, code)
+    store.ready(project)
+    state = (project.get("stages") or {}).get(stage_def["key"]) or {}
+    if state.get("status") == "aceita":
+        raise Falha("Esta etapa já foi aceita; o passe não vale mais.")
+    current = flow.next_stage(project.get("stages") or {})
+    if not current or current["key"] != stage_def["key"]:
+        raise Falha("Este passe ainda não está liberado: a etapa anterior não terminou.")
+    head = store.new_head(project, stage_def["cabeca"], stage_def["key"], client, model)
+    return {"projeto": project["id"], "etapa": stage_def["key"], "titulo": stage_def["titulo"],
+            "cabeca": head["id"],
+            "aviso": (f"Esta conversa é a cabeça {head['id']} ({stage_def['cabeca']}). Use "
+                      f"cabeca=\"{head['id']}\" e projeto=\"{project['id']}\" nas chamadas seguintes."),
+            "instrucoes": flow.brief(stage_def, project.get("language", "pt-BR")),
+            "material": flow.material(stage_def["key"], project, store.board(project), store.references(project))}
+
+
+def deliver(store: Store, uid: str, pid: str, stage_key: str, content: str, head_id: str, model: str,
+            client: str) -> dict:
+    project = store.project(uid, pid)
+    store.ready(project)
+    if project.get("status") in ("compilando", "concluido"):
+        raise Falha("O projeto já está em compilação ou concluído.")
+    stage_def = flow.stage(stage_key) if stage_key in flow.BY_KEY else None
+    if not stage_def:
+        raise Falha("Etapa desconhecida. Etapas: " + ", ".join(flow.STAGE_KEYS))
+    current = flow.next_stage(project.get("stages") or {})
+    if not current or current["key"] != stage_key:
+        raise Falha(f"A etapa atual é {current['titulo'] if current else 'nenhuma (tudo aceito)'}; "
+                    f"não é possível entregar {stage_def['titulo']} agora.")
+    stages = dict(project.get("stages") or {})
+    head = dict((project.get("heads") or {}).get(head_id or "") or {})
+    problem = flow.check_head(stage_def, head, stages)
+    if problem:
+        raise Falha(problem)
+    if model and not head.get("model"):
+        head["model"] = model.strip()[:80]
+    if client and not head.get("client"):
+        head["client"] = client[:80]
+    refs = store.references(project)
+    report = flow.validate(stage_key, content or "", bib_keys={r["key"] for r in refs},
+                           chunks_for_key=store.chunks_for_key(project), template=project.get("template"))
+    state = dict(stages.get(stage_key) or {})
+    version = int(state.get("attempts", 0)) + 1
+    store.save_stage(project, stage_key, version, content or "", report)
+    summary = {k: v for k, v in report.items() if k not in ("itens", "erros")}
+    state.update(attempts=version, last_delivery=now())
+    if not report["ok"]:
+        state.update(status="recusada", errors=report["erros"])
+        stages[stage_key] = state
+        store.update_project(pid, stages=stages)
+        return {"aceita": False, "etapa": stage_key, "erros": report["erros"], "resumo": summary,
+                "instrucao": "Corrija os pontos acima e chame entregar_etapa de novo."}
+    state.update(status="aceita", version=version, head=head, summary=summary, accepted_at=now(),
+                 errors=[])
+    if stage_def["cabeca"] != "redatora":
+        writer = (stages.get("reescrita") or stages.get("redacao") or {}).get("head")
+        state["independencia"] = flow.independence(writer, head)
+    stages[stage_key] = state
+    store.update_project(pid, stages=stages)
+    project["stages"] = stages
+    nxt = flow.next_stage(stages)
+    if stage_def["nova_conversa"]:
+        after = "Etapa aceita. Avise o pesquisador para voltar à conversa da redação e chamar proxima_etapa."
+    elif nxt:
+        after = "Etapa aceita. Chame proxima_etapa para seguir."
+    else:
+        after = "Todas as etapas aceitas. Chame compilar."
+    return {"aceita": True, "etapa": stage_key, "resumo": summary,
+            "independencia": state.get("independencia"), "instrucao": after}
+
+
+def compile_project(store: Store, uid: str, pid: str) -> dict:
+    project = store.project(uid, pid)
+    store.ready(project)
+    if project.get("status") == "compilando":
+        raise Falha("A compilação já está em andamento.")
+    if flow.next_stage(project.get("stages") or {}) is not None:
+        raise Falha("Ainda há etapas por aceitar. Veja estado_do_projeto.")
+    if store._active_jobs(uid) >= MAX_ACTIVE_JOBS:
+        raise Falha("Já há trabalhos em andamento no servidor. Aguarde terminarem.")
+    job = store._launch(uid, pid, "mcp_compile", [], f"Compilação MCP: {project.get('title', '')}")
+    store.update_project(pid, status="compilando", compile_job=job, error="")
+    return {"status": "compilando", "instrucao": "Consulte estado_do_projeto em um ou dois minutos."}
+
+
+# ================================================================== servidor
+def client_name(ctx: Context | None) -> str:
+    try:
+        params = ctx.request_context.connection.client_params
+        if params and params.client_info:
+            return f"{params.client_info.name} {params.client_info.version or ''}".strip()
+    except Exception:
+        pass
+    try:
+        return str((ctx.headers or {}).get("user-agent", ""))[:80]
+    except Exception:
+        return ""
+
+
+class TokenVerifier:
+    """Tokens pessoais do Scriptorium (scr_...), com cache curto em memória."""
+
+    def __init__(self, store: Store, ttl: float = 60.0):
+        self.store, self.ttl, self.cache = store, ttl, {}
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        hit = self.cache.get(token)
+        if hit and hit[0] > time.monotonic():
+            return hit[1]
+        identity = await anyio.to_thread.run_sync(self.store.token_owner, token)
+        if not identity:
+            self.cache.pop(token, None)
+            return None
+        access = AccessToken(token=token, client_id="scriptorium-token-pessoal", scopes=["scriptorium"],
+                             subject=identity["uid"], claims={"email": identity.get("email", "")})
+        if len(self.cache) > 500:
+            self.cache.clear()
+        self.cache[token] = (time.monotonic() + self.ttl, access)
+        return access
+
+
+def _uid() -> str:
+    token = get_access_token()
+    if not token or not token.subject:
+        raise Falha("Conecte o Scriptorium com o seu token pessoal (Minha conta > Conectar sua IA).")
+    return token.subject
+
+
+def build_server(store: Store, public_url: str) -> MCPServer:
+    base = public_url.rstrip("/")
+    server = MCPServer(
+        name="scriptorium", title="Scriptorium", version=flow.FLOW_VERSION, instructions=INSTRUCTIONS,
+        website_url=base, token_verifier=TokenVerifier(store),
+        auth=AuthSettings(issuer_url=base, resource_server_url=base + MCP_PATH, required_scopes=["scriptorium"],
+                          validate_token_resource=False),
+    )
+    run = anyio.to_thread.run_sync
+
+    @server.tool()
+    async def listar_fontes() -> dict:
+        """Lista as fontes (PDF, DOCX, TXT) da biblioteca do pesquisador no Scriptorium, com os ids para criar_projeto."""
+        uid = _uid()
+        return {"fontes": await run(store.library, uid)}
+
+    @server.tool()
+    async def criar_projeto(titulo: str, pergunta: str, ids_das_fontes: list[str],
+                            idioma: Literal["pt-BR", "en"] = "pt-BR",
+                            modelo: Literal["abnt-artigo", "artigo-simples"] = "abnt-artigo") -> dict:
+        """Cria um projeto de texto com até 20 fontes da biblioteca. O Scriptorium lê as fontes e monta as
+        referências oficiais (alguns minutos, sem IA); depois disso use proxima_etapa."""
+        uid = _uid()
+        record = await run(partial(store.create_project, uid, titulo, pergunta, ids_das_fontes, idioma, modelo))
+        return {"projeto": record["id"], "status": record["status"],
+                "instrucao": "Fontes em leitura. Chame estado_do_projeto em um ou dois minutos e depois proxima_etapa."}
+
+    @server.tool()
+    async def listar_projetos() -> dict:
+        """Lista os projetos de escrita do pesquisador neste modo (sem API)."""
+        uid = _uid()
+        items = await run(store.projects, uid)
+        return {"projetos": [{"projeto": p["id"], "titulo": p.get("title"), "status": p.get("status"),
+                              "criado_em": p.get("created_at")} for p in items]}
+
+    @server.tool()
+    async def estado_do_projeto(projeto: str) -> dict:
+        """Mostra o status do projeto, cada etapa (quem entregou, independência) e a próxima ação."""
+        uid = _uid()
+        project = await run(store.project, uid, projeto)
+        return project_state(store, project)
+
+    @server.tool()
+    async def proxima_etapa(projeto: str, ctx: Context, cabeca: str = "", modelo_declarado: str = "") -> dict:
+        """Entrega a etapa atual: papel, instruções e o material necessário. Na primeira chamada da
+        conversa, deixe cabeca vazio e informe seu modelo em modelo_declarado (ex.: "Claude Opus 5.5");
+        guarde o identificador de cabeça devolvido. Se a etapa pedir conversa nova, devolve um passe."""
+        uid = _uid()
+        return await run(partial(next_step, store, uid, projeto, cabeca or None, modelo_declarado, client_name(ctx)))
+
+    @server.tool()
+    async def abrir_passe(codigo: str, ctx: Context, modelo_declarado: str = "") -> dict:
+        """Abre, numa conversa nova, a etapa independente (revisão ou verificação) indicada pelo passe
+        XXXX-XXXX-XXXX. Informe seu modelo em modelo_declarado."""
+        uid = _uid()
+        return await run(partial(open_pass, store, uid, codigo, modelo_declarado, client_name(ctx)))
+
+    @server.tool()
+    async def referencias_do_projeto(projeto: str) -> dict:
+        """Chaves e dados oficiais (BibTeX) das fontes do projeto. Cite somente com estas chaves."""
+        uid = _uid()
+        project = await run(store.project, uid, projeto)
+        store.ready(project)
+        refs = await run(store.references, project)
+        return {"referencias": [{"chave": r["key"], "tipo": r.get("type"), **(r.get("fields") or {})} for r in refs]}
+
+    @server.tool()
+    async def ficha_da_fonte(projeto: str, chave: str) -> dict:
+        """Ficha de leitura sem IA de uma fonte do projeto: estrutura, páginas, termos frequentes e abertura."""
+        uid = _uid()
+        project = await run(store.project, uid, projeto)
+        store.ready(project)
+        return await run(store.card, project, chave)
+
+    @server.tool()
+    async def buscar_trechos(projeto: str, consulta: str, limite: int = 8) -> dict:
+        """Busca (BM25) nos trechos das fontes do projeto. Devolve chave, chunk_id, páginas e um recorte."""
+        uid = _uid()
+        project = await run(store.project, uid, projeto)
+        store.ready(project)
+        return await run(store.search, project, consulta, max(1, min(int(limite), 20)))
+
+    @server.tool()
+    async def ler_trecho(projeto: str, chunk_id: str, vizinhos: int = 0) -> dict:
+        """Texto integral de um trecho (e, opcionalmente, dos vizinhos). Copie daqui as citações literais."""
+        uid = _uid()
+        project = await run(store.project, uid, projeto)
+        store.ready(project)
+        return await run(store.read_chunk, project, chunk_id, max(0, min(int(vizinhos), 2)))
+
+    @server.tool()
+    async def entregar_etapa(projeto: str, etapa: str, conteudo: str, cabeca: str, ctx: Context,
+                             modelo_declarado: str = "") -> dict:
+        """Entrega o resultado da etapa atual. O Scriptorium confere formato, chaves e citações literais;
+        se recusar, devolve os erros para corrigir e entregar de novo."""
+        uid = _uid()
+        return await run(partial(deliver, store, uid, projeto, etapa, conteudo, cabeca, modelo_declarado,
+                                 client_name(ctx)))
+
+    @server.tool()
+    async def compilar(projeto: str) -> dict:
+        """Depois de todas as etapas aceitas, monta o LaTeX com a bibliografia oficial e gera o PDF (sem IA)."""
+        uid = _uid()
+        return await run(partial(compile_project, store, uid, projeto))
+
+    return server
+
+
+def build_app(store: Store, public_url: str):
+    """App Starlette do MCP (sem estado e com respostas JSON, por causa do Firebase Hosting)."""
+    server = build_server(store, public_url)
+    return server.streamable_http_app(
+        streamable_http_path=MCP_PATH, json_response=True, stateless_http=True,
+        # Atrás do Firebase Hosting o Host varia; a proteção vem do token.
+        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
+
+
+class Dispatcher:
+    """Encaminha /api/mcp para o app MCP e o resto para a API FastAPI.
+
+    /api/mcp/t/<token> vira /api/mcp com o token no cabeçalho, para clientes que
+    só aceitam um endereço (o token fica no log de acesso do Cloud Run: por isso
+    ele é revogável e só dá acesso às ferramentas do MCP).
+    """
+
+    def __init__(self, api_app, mcp_app):
+        self.api_app, self.mcp_app = api_app, mcp_app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "lifespan":
+            return await self.mcp_app(scope, receive, send)
+        path = scope.get("path", "")
+        if scope["type"] == "http" and (path.rstrip("/") == MCP_PATH or path.startswith(MCP_PATH + "/t/")
+                                        or path.startswith("/.well-known/oauth-protected-resource")):
+            if path.startswith(MCP_PATH + "/t/"):
+                token = path[len(MCP_PATH) + 3:].strip("/")
+                headers = [(k, v) for k, v in scope.get("headers", []) if k.lower() != b"authorization"]
+                headers.append((b"authorization", b"Bearer " + token.encode("latin-1", "ignore")))
+                scope = {**scope, "headers": headers}
+            if path.startswith(MCP_PATH) and path != MCP_PATH:
+                scope = {**scope, "path": MCP_PATH, "raw_path": MCP_PATH.encode()}
+            return await self.mcp_app(scope, receive, send)
+        return await self.api_app(scope, receive, send)

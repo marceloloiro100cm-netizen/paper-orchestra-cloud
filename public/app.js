@@ -991,6 +991,92 @@ async function loadAdvisor() {
     $('advisor-title').textContent = 'Declaração de uso de IA (IN IFRS 16/2026, Anexo I)' + (last ? ' · autorização registrada' : ' · autorização pendente');
   } catch (_) { /* API anterior: seção fica sem dados */ }
 }
+// Modo sem API (MCP): tokens pessoais e projetos escritos pela IA do pesquisador.
+const MCP_STAGE_LABELS = {pendente: 'pendente', recusada: 'devolvida para correção', aceita: 'aceita'};
+const MCP_STATUS = {preparando: 'Lendo as fontes', pronto: 'Em andamento', falhou_preparo: 'Falha na leitura das fontes',
+  compilando: 'Compilando o PDF', concluido: 'PDF pronto'};
+function mcpMessage(text) { $('mcp-message').textContent = text; }
+async function loadMcp() {
+  try {
+    const data = await (await request('/mcp-conta/tokens')).json();
+    $('mcp-details').classList.remove('hidden');
+    const list = $('mcp-token-list'); list.replaceChildren();
+    const active = (data.tokens || []).filter(t => !t.revoked);
+    if (!active.length) list.append(el('p', 'Nenhum token ativo. Gere um para conectar sua IA.'));
+    for (const t of active) {
+      const row = document.createElement('div'); row.className = 'actions';
+      row.append(el('span', `${t.label} · criado em ${new Date(t.created_at).toLocaleDateString('pt-BR')}`));
+      const revoke = el('button', 'Revogar', 'btn btn-danger'); revoke.type = 'button';
+      revoke.addEventListener('click', async () => {
+        const ok = await confirmAction('Revogar token?', [
+          `A IA conectada com "${t.label}" perde o acesso ao Scriptorium na hora.`,
+          'Os projetos continuam guardados; para voltar, gere outro token.'], 'Revogar');
+        if (!ok) return;
+        try { await request('/mcp-conta/tokens/' + t.id, {method: 'DELETE'}); await loadMcp(); mcpMessage('Token revogado.'); }
+        catch (e) { mcpMessage(e.message); }
+      });
+      row.append(revoke); list.append(row);
+    }
+    $('mcp-title').textContent = 'Conectar sua IA, sem API paga (MCP)' + (active.length ? ` · ${active.length} conectada(s)` : '');
+    await loadMcpProjects();
+  } catch (_) { $('mcp-details').classList.add('hidden'); /* API anterior ou conta sem acesso */ }
+}
+async function loadMcpProjects() {
+  const box = $('mcp-project-list'); box.replaceChildren();
+  let projects = [];
+  try { projects = (await (await request('/mcp-conta/projetos')).json()).projetos || []; }
+  catch (e) { box.append(el('p', e.message)); return; }
+  if (!projects.length) { box.append(el('p', 'Nenhum projeto ainda. Peça à sua IA para criar um com criar_projeto.')); return; }
+  for (const p of projects) {
+    const card = document.createElement('div'); card.style.margin = '8px 0 12px';
+    const done = (p.etapas || []).filter(s => s.status === 'aceita').length;
+    card.append(el('strong', p.titulo || p.projeto));
+    card.append(el('p', `${MCP_STATUS[p.status] || p.status} · ${done} de ${(p.etapas || []).length} etapas aceitas`, 'subtle'));
+    const steps = document.createElement('ul'); steps.style.margin = '2px 0 6px 18px';
+    for (const s of p.etapas || []) {
+      const ind = s.independencia === 'outra_ia' ? ' · outra IA' : s.independencia === 'outra_conversa' ? ' · conversa nova, mesma IA' : '';
+      steps.append(el('li', `${s.titulo}: ${MCP_STAGE_LABELS[s.status] || s.status}${s.ia ? ' (' + s.ia + ')' : ''}${ind}`));
+    }
+    card.append(steps);
+    if (p.erro) card.append(el('p', p.erro, 'warning'));
+    const actions = document.createElement('div'); actions.className = 'actions';
+    const labels = {'scriptorium.pdf': 'Baixar PDF', 'scriptorium.tex': 'LaTeX', 'references.bib': 'BibTeX', 'proveniencia.json': 'Proveniência'};
+    for (const name of p.arquivos || []) {
+      if (!labels[name]) continue;
+      const b = el('button', labels[name], name.endsWith('.pdf') ? 'btn' : 'btn alt'); b.type = 'button';
+      b.addEventListener('click', async () => {
+        try {
+          const blob = await (await request(`/mcp-conta/projetos/${p.projeto}/arquivos/${name}`)).blob();
+          const url = URL.createObjectURL(blob); const link = document.createElement('a');
+          link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+        } catch (e) { mcpMessage(e.message); }
+      });
+      actions.append(b);
+    }
+    card.append(actions); box.append(card);
+  }
+}
+$('mcp-refresh')?.addEventListener('click', () => loadMcpProjects());
+$('mcp-create-token')?.addEventListener('click', async () => {
+  const label = $('mcp-token-label').value.trim() || 'Minha IA';
+  try {
+    const data = await (await request('/mcp-conta/tokens', {method: 'POST', body: JSON.stringify({label})})).json();
+    $('mcp-url-token').value = data.endereco_com_token;
+    $('mcp-gemini-config').value = JSON.stringify({mcpServers: {scriptorium: {httpUrl: data.endereco,
+      headers: {Authorization: 'Bearer ' + data.token}, timeout: 120000}}}, null, 2);
+    $('mcp-new-token').classList.remove('hidden');
+    $('mcp-token-label').value = '';
+    mcpMessage('Token gerado. Copie o endereço agora.');
+    await loadMcp();
+  } catch (e) { mcpMessage(e.message); }
+});
+for (const button of document.querySelectorAll('[data-copy]')) {
+  button.addEventListener('click', async () => {
+    const field = $(button.dataset.copy);
+    try { await navigator.clipboard.writeText(field.value); mcpMessage('Copiado.'); }
+    catch (_) { field.select(); mcpMessage('Selecione e copie manualmente.'); }
+  });
+}
 $('save-profile').addEventListener('click', async () => {
   const body = {full_name: $('profile-name').value.trim(), enrollment: $('profile-enrollment').value.trim(),
     unit: $('profile-unit').value.trim(), program: $('profile-program').value.trim()};
@@ -1429,7 +1515,7 @@ $('retry-access').addEventListener('click', async () => {
   if (!user) return;
   await loadAccountAccess();
   if (accountAccess?.research_generation_enabled) {
-    await Promise.all([loadJobs(), loadLibrary(), loadCapabilities(), loadAdvisor()]);
+    await Promise.all([loadJobs(), loadLibrary(), loadCapabilities(), loadAdvisor(), loadMcp()]);
     if (refreshInterval) clearInterval(refreshInterval);
     refreshInterval = setInterval(loadJobs, 12000);
   }
@@ -1457,7 +1543,7 @@ $('save-personal-key').addEventListener('click', async () => {
     $('toggle-personal-key').setAttribute('aria-pressed','false');
     await loadAccountAccess();
     if (accountAccess?.research_generation_enabled) {
-      await Promise.all([loadJobs(),loadLibrary(),loadCapabilities(),loadAdvisor()]);
+      await Promise.all([loadJobs(),loadLibrary(),loadCapabilities(),loadAdvisor(),loadMcp()]);
     }
     const models = saved.model_access?.models || {};
     const hasPro = models['gemini-3.1-pro-preview'] === 'supported';
@@ -1502,7 +1588,7 @@ $('retry-api-version').addEventListener('click', async () => {
   try {
     await loadAccountAccess();
     if (accountAccess?.research_generation_enabled && !accountAccess.legacy_backend) {
-      await Promise.all([loadJobs(), loadLibrary(), loadCapabilities(), loadAdvisor()]);
+      await Promise.all([loadJobs(), loadLibrary(), loadCapabilities(), loadAdvisor(), loadMcp()]);
       if (refreshInterval) clearInterval(refreshInterval);
       refreshInterval = setInterval(loadJobs, 12000);
     }
@@ -1526,7 +1612,7 @@ onAuthStateChanged(auth, async (current) => {
   if (user) {
     await loadAccountAccess();
     if (accountAccess?.research_generation_enabled) {
-      await Promise.all([loadJobs(),loadLibrary(),loadCapabilities(),loadAdvisor()]);
+      await Promise.all([loadJobs(),loadLibrary(),loadCapabilities(),loadAdvisor(),loadMcp()]);
       refreshInterval = setInterval(loadJobs, 12000);
     }
   } else {
