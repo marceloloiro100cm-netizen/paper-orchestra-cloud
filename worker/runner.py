@@ -24,6 +24,8 @@ from source_materials import compose_library_context, compose_library_context_v2
 from neon_review import generate_review
 from byok import personal_agent_environment
 import billing_alert
+import bib_integrity
+from context_limits import limits_for
 from run_manifest import RunManifest
 from ai_declaration import build_declaration
 from embeddings import make_embedder
@@ -294,6 +296,46 @@ def run_retrieval_eval(data: dict) -> None:
            retrieval_eval_summary=summary(report))
 
 
+def openalex_json(url: str) -> dict:
+    import requests
+    from reference_verification import USER_AGENT
+    response = requests.get(url, timeout=20, headers={"User-Agent": USER_AGENT})
+    response.raise_for_status()
+    return response.json()
+
+
+def check_bibliography(output: Path, pdf: Path, official: list[dict]) -> tuple[Path, dict]:
+    """Junta referências escritas no .tex ao references.bib, corrige fontes anexadas e recompila."""
+    workdir = output / "latex_writeup"
+    refined = output / "content_refinement_workdir" / "final_refined_paper.tex"
+    tex_path = refined if refined.is_file() else workdir / "raw_draft_paper.tex"
+    bib_path = workdir / "references.bib"
+    if not tex_path.is_file():
+        return pdf, {"version": bib_integrity.VERSION, "status": "sem_tex", "findings": [],
+                     "summary": {"corrigidas": 0, "enchimento": 0, "sem_referencia": 0}}
+    tex = tex_path.read_text(encoding="utf-8", errors="replace")
+    bib = bib_path.read_text(encoding="utf-8", errors="replace") if bib_path.is_file() else ""
+    result = bib_integrity.repair(tex, bib, official)
+    report = result["report"]
+    changed = result["tex"] != tex or result["bib"].strip() != bib.strip()
+    report["status"] = "sem_alteracao"
+    if changed:
+        if bib_path.is_file():
+            shutil.copy2(bib_path, workdir / "references_original_do_motor.bib")
+        bib_path.write_text(result["bib"], encoding="utf-8")
+        new_pdf, note = bib_integrity.recompile(workdir, result["tex"])
+        report["recompilation"] = note
+        if new_pdf is not None:
+            shutil.copy2(tex_path, tex_path.with_name(tex_path.stem + "_original_do_motor.tex"))
+            tex_path.write_text(result["tex"], encoding="utf-8")
+            pdf = new_pdf
+            report["status"] = "corrigida_e_recompilada"
+        else:
+            report["status"] = "corrigida_sem_recompilar"
+    report["summary"]["status"] = report["status"]
+    return pdf, report
+
+
 def main():
     doc = ref.get()
     if not doc.exists or doc.to_dict().get("owner_uid") != OWNER_UID:
@@ -366,10 +408,12 @@ def main():
         for filename in ("idea_sparse.md", "experimental_log.md"):
             bucket.blob(f"{prefix}/input/{filename}").download_to_filename(str(raw / filename))
             MANIFEST.add_input(filename, raw / filename)
+        official_bib = []
         # Fontes próprias anexadas são extraídas como contexto limitado e não confiável.
         # Não apagamos nem alteramos os originais da biblioteca.
         if data.get("sources"):
-            sources = data["sources"][:8]
+            limits = limits_for(data)
+            sources = data["sources"][:limits["max_sources"]]
             safe_sources = [
                 x for x in sources
                 if str(x.get("object_path", "")).startswith(
@@ -385,7 +429,7 @@ def main():
                     encoding="utf-8", errors="replace")
                 context, manifest, coverage = compose_library_context_v2(
                     safe_sources, fetch, query, cache=derived_cache,
-                    embedder=embedder, reranker=reranker, collect=evidence_inputs)
+                    embedder=embedder, reranker=reranker, collect=evidence_inputs, limits=limits)
                 # M09: cobertura por autor, época e tema do que os agentes leram.
                 try:
                     from coverage_facets import build_facets, source_metadata
@@ -407,11 +451,24 @@ def main():
                 put(coverage_path, "retrieval_coverage.json", "application/json")
                 coverage_published = True
             else:
-                context, manifest = compose_library_context(safe_sources, fetch)
+                context, manifest = compose_library_context(
+                    safe_sources, fetch, max_sources=limits["max_sources"],
+                    per_file=limits["per_source_chars"], total=limits["total_chars"])
                 MANIFEST.set_context("v1-truncation-1")
+            # Integridade da bibliografia: BibTeX oficial das fontes anexadas
+            # (DOI/OpenAlex ou só o que o arquivo diz) vai para o motor ANTES da
+            # redação e serve depois para corrigir o que ele escrever.
+            try:
+                from coverage_facets import source_metadata
+                pdf_meta = {x["id"]: source_metadata(x, fetch, derived_cache) for x in safe_sources}
+                official_bib = bib_integrity.library_entries(safe_sources, openalex_json, pdf_meta)
+            except Exception as exc:
+                print("BibTeX oficial das fontes indisponível:", repr(exc), flush=True)
+                official_bib = []
             if context:
                 with (raw / "idea_sparse.md").open("a", encoding="utf-8") as source_file:
                     source_file.write(context)
+                    source_file.write(bib_integrity.bibtex_block(official_bib))
             MANIFEST.add_sources(manifest)
             manifest_path = root / "source_manifest.json"
             manifest_path.write_text(
@@ -512,10 +569,21 @@ def main():
                     raise RuntimeError(billing_alert.MESSAGE)
                 raise FileNotFoundError("O motor concluiu sem gerar final_paper.pdf")
             pdf = matches[0]
+        integrity_published = False
+        try:
+            pdf, integrity = check_bibliography(output, pdf, official_bib)
+            integrity_path = root / "bibliography_integrity.json"
+            integrity_path.write_text(json.dumps(integrity, ensure_ascii=False, indent=2), encoding="utf-8")
+            put(integrity_path, "bibliography_integrity.json", "application/json")
+            integrity_published = True
+            update(bibliography_integrity=integrity["summary"])
+        except Exception as exc:
+            print("Conferência da bibliografia indisponível:", repr(exc), flush=True)
         put(pdf, "final_paper.pdf", "application/pdf")
         files = (["pdf", "log"] + (["coverage"] if coverage_published else [])
                  # O diagnóstico aprovado (M16/M12) continua disponível no histórico.
-                 + (["gap_report"] if "gap_report" in (data.get("files") or []) else []))
+                 + (["gap_report"] if "gap_report" in (data.get("files") or []) else [])
+                 + (["bib_integrity"] if integrity_published else []))
         # Auditoria local não gera texto ou evidências novas.
         if optional_stage("triagem_cientifica"):
             try:
