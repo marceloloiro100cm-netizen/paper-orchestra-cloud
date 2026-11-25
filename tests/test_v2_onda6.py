@@ -465,8 +465,10 @@ class ResearchToolsTest(unittest.TestCase):
                                                   "locations": locations}]}]}}).encode()
         response = endpoint(router, "/evidence-view/{chunk_id}")(job_id=JOB, chunk_id=CHUNK, page=3, user={"uid": "u1"})
         self.assertTrue(response.body.startswith(b"\x89PNG"))
-        self.assertEqual(response.kwargs["headers"]["X-Scriptorium-Page"], "3")
-        self.assertEqual(response.kwargs["headers"]["X-Scriptorium-Pages"], "2,3")
+        # FastAPI real expõe .headers; o stub local guarda os argumentos em .kwargs.
+        headers = response.headers if hasattr(response, "headers") else response.kwargs["headers"]
+        self.assertEqual(headers["X-Scriptorium-Page"], "3")
+        self.assertEqual(headers["X-Scriptorium-Pages"], "2,3")
 
 
 # ------------------------------------------------------------- M03, M21
