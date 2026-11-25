@@ -43,7 +43,7 @@ jobs:
           # Assim, o que foi apagado no site vira versão antiga, recuperável por
           # 90 dias, e depois some. Sem versionamento, nada é removido do destino.
           VERSIONING="$(gcloud storage buckets describe "$DEST" --format='value(versioning_enabled)' 2>/dev/null || true)"
-          if [ "$VERSIONING" = "True" ]; then
+          if [ "${VERSIONING,,}" = "true" ]; then
             gcloud storage rsync --recursive --delete-unmatched-destination-objects "$SOURCE" "$DEST"
             echo "Backup concluído; exclusões espelhadas como versões antigas (90 dias)."
           else
