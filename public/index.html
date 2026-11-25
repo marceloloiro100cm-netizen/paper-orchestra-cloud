@@ -1022,6 +1022,8 @@
 
     /* Utilitários de visibilidade (sem conflito com app.js) */
     .hidden { display: none !important; }
+    /* Modo sem API (MCP): geração pela API Gemini oculta; app.js liga com API_MODE. */
+    body.sem-api [data-modo-api] { display: none !important; }
     .step-hidden { display: none !important; }
     .loading { opacity: 0.7; }
 
@@ -1366,7 +1368,7 @@
           </details>
           <p class="subtle" id="pending-help" role="status"></p>
         </div>
-        <div id="guest-credential" class="hidden">
+        <div id="guest-credential" class="hidden" data-modo-api>
           <p id="gemini-key-ready" class="subtle hidden" role="status">Chave cadastrada. Você já pode iniciar pesquisas; o acesso real aos modelos será confirmado durante a execução.</p>
           <details class="gemini-setup" id="gemini-setup-details">
             <summary id="gemini-setup-title">Conectar minha chave Gemini (primeiro acesso)</summary>
@@ -1487,13 +1489,13 @@
             <button class="btn" type="button" id="invite-researcher">Autorizar acesso</button>
             <button class="btn alt" type="button" id="revoke-researcher">Revogar acesso</button>
           </div>
-          <p class="subtle">Cada pesquisador conecta a própria chave Gemini; os tokens de IA nunca saem do projeto do Scriptorium nem da chave de outra pessoa.</p>
+          <p class="subtle" data-modo-api>Cada pesquisador conecta a própria chave Gemini; os tokens de IA nunca saem do projeto do Scriptorium nem da chave de outra pessoa.</p>
           <div class="actions">
             <button class="btn alt" type="button" id="refresh-access-requests">Atualizar solicitações</button>
           </div>
           <div id="pending-access-list" class="subtle" role="status"></div>
           <!-- Gate G2 (M04): teste de busca no corpus de referência, na chave pessoal do administrador. -->
-          <details class="gemini-setup" id="retrieval-eval-details">
+          <details class="gemini-setup" id="retrieval-eval-details" data-modo-api>
             <summary>Teste de busca no corpus de referência</summary>
             <div class="gemini-setup-body">
               <p class="subtle">Baixa os 30 PDFs de acesso aberto do corpus da tese teste e compara a busca por palavras, por significado (embeddings) e a combinação das duas, nas 42 perguntas rotuladas. Os embeddings usam a sua chave Gemini (custo de centavos no nível pago; gratuito dentro dos limites do nível gratuito). Leva alguns minutos e você pode fechar o navegador.</p>
@@ -1516,7 +1518,7 @@
             <span class="step-sub" id="step-sub-1">Biblioteca privada (até 8 ou 20)</span>
           </span>
         </button>
-        <button type="button" class="step-btn" data-step="2">
+        <button type="button" class="step-btn" data-step="2" data-modo-api>
           <span class="step-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></span>
           <span>
             <span class="step-title">Estúdio de Pesquisa</span>
@@ -1617,7 +1619,7 @@
         <!-- M03/M21: busca no conteúdo dos documentos já lidos e ficha de leitura -->
         <details class="upload-drawer" id="content-search-drawer">
           <summary><span>Buscar no conteúdo da biblioteca</span><span class="subtle" aria-hidden="true">⌄</span></summary>
-          <p class="field-hint">Procura palavras dentro dos documentos que já foram lidos numa pesquisa ou diagnóstico (o índice fica salvo na sua conta). Cada resultado abre a ficha de leitura do documento.</p>
+          <p class="field-hint">Procura palavras dentro dos documentos que já foram lidos numa pesquisa ou num projeto da sua IA (o índice fica salvo na sua conta). Cada resultado abre a ficha de leitura do documento.</p>
           <label for="content-search">Palavras</label>
           <input id="content-search" type="search" maxlength="200" placeholder="Ex.: sala de aula invertida avaliação"/>
           <div class="actions">
@@ -1644,13 +1646,13 @@
             </select>
           </div>
 
-          <label class="budget-context" for="context-size" style="margin:0">Contexto das fontes
+          <label class="budget-context" for="context-size" style="margin:0" data-modo-api>Contexto das fontes
             <select id="context-size" title="Quanto das suas fontes os agentes leem em cada pesquisa">
               <option value="padrao">Padrão: até 8 fontes e 75 mil caracteres</option>
               <option value="ampliado">Ampliado: até 20 fontes e 300 mil caracteres (custo maior)</option>
             </select>
           </label>
-          <div class="budget-box" id="budget-box" title="Limite real do Worker: padrão 20 mil caracteres por arquivo e 75 mil no total; ampliado 30 mil por arquivo e 300 mil no total">
+          <div class="budget-box" id="budget-box" data-modo-api title="Limite real do Worker: padrão 20 mil caracteres por arquivo e 75 mil no total; ampliado 30 mil por arquivo e 300 mil no total">
             <div>
               <div class="budget-title" id="budget-sources">0/8 fontes anexadas</div>
               <div class="budget-chars" id="budget-chars">0 / 75.000 caracteres (est.)</div>
@@ -1659,11 +1661,11 @@
           </div>
         </div>
 
-        <div id="budget-alert" class="budget-alert hidden">
+        <div id="budget-alert" class="budget-alert hidden" data-modo-api>
           Limite de caracteres do contexto ultrapassado: o Worker escolherá os trechos mais relevantes e deixará o resto de fora. Remova uma fonte, priorize textos mais concisos ou use o contexto ampliado.
         </div>
 
-        <p id="selected-count" class="library-note" style="margin-top:0">0 fonte(s) selecionada(s) para a próxima pesquisa</p>
+        <p id="selected-count" class="library-note" style="margin-top:0" data-modo-api>0 fonte(s) selecionada(s) para a próxima pesquisa</p>
 
         <!-- Chips de filtro por coluna Kanban -->
         <div class="col-pills" id="col-pills"></div>
@@ -1674,13 +1676,13 @@
         <!-- Lista original gerenciada por public/app.js (visível no modo Lista) -->
         <div id="library-list" role="status" class="kanban-source-hidden">Carregando biblioteca...</div>
 
-        <div class="step-footer">
+        <div class="step-footer" data-modo-api>
           <button type="button" class="btn" data-go-step="2">Continuar para Nova Pesquisa →</button>
         </div>
       </section>
 
       <!-- ETAPA 2: NOVA PESQUISA -->
-      <section id="new-paper-panel" class="step-hidden" data-step-panel="2">
+      <section id="new-paper-panel" class="step-hidden" data-step-panel="2" data-modo-api>
         <form id="new-paper" class="research-studio">
           <!-- COLUNA ESQUERDA: CONTEÚDO CIENTÍFICO -->
           <div class="studio-main">
@@ -1943,6 +1945,7 @@
       const sub1 = document.getElementById('step-sub-1');
       if (selCount && sub1 && typeof MutationObserver !== 'undefined') {
         new MutationObserver(function () {
+          if (document.body.classList.contains('sem-api')) return;
           const m = (selCount.textContent || '').match(/\d+/);
           const lim = (window.SCRIPTORIUM_CONTEXT_LIMITS || {})[document.getElementById('context-size')?.value || 'padrao'];
           if (m) sub1.textContent = m[0] + '/' + (lim ? lim.sources : 8) + ' fonte(s) anexada(s)';
@@ -2480,6 +2483,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=mcp-20261125"></script>
+  <script type="module" src="/app.js?v=sem-api-20261125"></script>
 </body>
 </html>

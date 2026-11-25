@@ -2,6 +2,13 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 
 const $ = (id) => document.getElementById(id);
+// Modo com API Gemini (geração pelo servidor, chave pessoal, fichamento e testes com IA).
+// Desligado desde 25/11/2026: a escrita é feita pela IA do pesquisador via MCP.
+// Para voltar a mostrar tudo, troque para true.
+const API_MODE = false;
+document.body.classList.toggle('sem-api', !API_MODE);
+// Com a API desligada, basta a conta estar liberada para usar a biblioteca e o MCP.
+const canWork = () => API_MODE ? !!accountAccess?.research_generation_enabled : !!accountAccess && !accountAccess.legacy_backend;
 const config = window.PAPER_FIREBASE_CONFIG;
 if (!config || !config.apiKey || config.apiKey === 'SUBSTITUIR') {
   $('auth-status').textContent = 'Falta configurar public/config.js. Consulte README.md.';
@@ -339,6 +346,7 @@ function showGapReport(entry, target, decide) {
     };
     approve.addEventListener('click', () => decideNow('approve'));
     discard.addEventListener('click', () => { if (window.confirm('Descartar esta pesquisa? O diagnóstico continua no histórico.')) decideNow('discard'); });
+    if (!API_MODE) approve.classList.add('hidden');
     bar.append(approve, discard, status); box.append(bar);
   });
 }
@@ -789,7 +797,7 @@ async function loadJobs() {
       const title = document.createElement('strong'); title.textContent = entry.title; info.append(title);
       const date = document.createElement('small');
       date.textContent = `Criada em ${new Date(entry.created_at).toLocaleString('pt-BR')} • ${entry.stage || 'Aguardando'}`
-        + (entry.ai_billing === 'chave_pessoal' ? ' • tokens na sua chave Gemini' : entry.ai_billing === 'projeto' ? ' • tokens no projeto (anterior à separação)' : '');
+        + (!API_MODE ? '' : entry.ai_billing === 'chave_pessoal' ? ' • tokens na sua chave Gemini' : entry.ai_billing === 'projeto' ? ' • tokens no projeto (anterior à separação)' : '');
       info.append(date);
       const agents = agentPanel(entry.agents);
       if (agents) info.append(agents);
@@ -802,7 +810,7 @@ async function loadJobs() {
       if (entry.neon_review_requested && entry.neon_review_status === 'unavailable') {
         const warning = document.createElement('small');
         warning.className = 'scientific-warning';
-        warning.textContent = 'A revisão com Neon falhou. Ela usa a sua chave Gemini e exige o nível pago no AI Studio. O PDF principal continua disponível.';
+        warning.textContent = API_MODE ? 'A revisão com Neon falhou. Ela usa a sua chave Gemini e exige o nível pago no AI Studio. O PDF principal continua disponível.' : 'A revisão com Neon falhou. O PDF principal continua disponível.';
         info.append(warning);
       }
       if (entry.audit_status === 'unavailable') {
@@ -1169,10 +1177,12 @@ async function showReadingCard(itemId, holder) {
     if (c.opening) { box.append(el('h4', 'Abertura')); box.append(el('small', c.opening)); }
     if ((c.ocr_pages_flagged || []).length) box.append(el('p', 'Páginas que precisam de OCR: ' + c.ocr_pages_flagged.join(', '), 'editorial-alert'));
     for (const lim of c.limitations || []) box.append(el('small', lim));
-    const gen = el('button', 'Fichamento com IA (usa sua chave Gemini)'); gen.type = 'button';
-    gen.addEventListener('click', () => aiNotes(itemId, box, true));
-    box.append(gen);
-    aiNotes(itemId, box, false);
+    if (API_MODE) {
+      const gen = el('button', 'Fichamento com IA (usa sua chave Gemini)'); gen.type = 'button';
+      gen.addEventListener('click', () => aiNotes(itemId, box, true));
+      box.append(gen);
+      aiNotes(itemId, box, false);
+    }
   } catch (e) { box.textContent = e.message; }
 }
 async function runContentSearch() {
@@ -1364,7 +1374,7 @@ function updateAccountMode() {
   setAccountPanelOpen(!firstAccess && wasOpen);
   const state = $('account-state').textContent || '';
   const dot = $('account-dot');
-  const ok = !!accountAccess?.research_generation_enabled;
+  const ok = canWork();
   dot.classList.toggle('ok', ok);
   dot.classList.toggle('warn', !ok);
   $('account-button').title = 'Minha conta · ' + state;
@@ -1406,14 +1416,14 @@ async function loadAccountAccess() {
       (accountAccess.byok_ready ?
         (accountAccess.model_access?.status === 'verified' ? 'Chave Gemini verificada' : 'Verifique sua chave') :
         'Conecte sua chave Gemini');
-    $('account-state').textContent = (accountAccess.admin ? 'Administrador · ' : '') + keyState;
+    $('account-state').textContent = (accountAccess.admin ? 'Administrador · ' : '') + (API_MODE ? keyState : 'Acesso liberado');
     $('admin-invitations').classList.toggle('hidden', !accountAccess.admin);
     // Todos conectam a própria chave: os tokens de geração são de quem pesquisa.
     $('guest-credential').classList.toggle('hidden', accountAccess.model_access?.status === 'admin_vertex');
     const guestReady = !!accountAccess.byok_ready;
     const guestVerified = guestReady && accountAccess.model_access?.status === 'verified';
     const hasModels = !!accountAccess.research_generation_enabled;
-    $('workspace').classList.toggle('access-setup', !hasModels);
+    $('workspace').classList.toggle('access-setup', API_MODE && !hasModels);
     $('gemini-setup-details').open = !guestVerified;
     $('gemini-setup-title').textContent = guestReady
       ? 'Gerenciar ou trocar minha chave Gemini'
@@ -1426,8 +1436,9 @@ async function loadAccountAccess() {
       (guestVerified ? '' : (guestReady
         ? 'Sua chave foi cadastrada, mas ainda não há um modelo confirmado. Confira a chave abaixo.'
         : 'Para começar, conecte sua chave Gemini seguindo as instruções.'));
+    if (!API_MODE) $('account-message').textContent = '';
     applyModelAccess();
-    if (accountAccess.admin) { loadAccessRequests(); loadRetrievalEval(); }
+    if (accountAccess.admin) { loadAccessRequests(); if (API_MODE) loadRetrievalEval(); }
   } catch (error) {
     accountAccess = null;
     // Compatibilidade exclusiva da conta administradora já autorizada na API antiga.
@@ -1514,7 +1525,7 @@ $('copy-access-request').addEventListener('click', async () => {
 $('retry-access').addEventListener('click', async () => {
   if (!user) return;
   await loadAccountAccess();
-  if (accountAccess?.research_generation_enabled) {
+  if (canWork()) {
     await Promise.all([loadJobs(), loadLibrary(), loadCapabilities(), loadAdvisor(), loadMcp()]);
     if (refreshInterval) clearInterval(refreshInterval);
     refreshInterval = setInterval(loadJobs, 12000);
@@ -1542,7 +1553,7 @@ $('save-personal-key').addEventListener('click', async () => {
     $('toggle-personal-key').textContent = 'Mostrar';
     $('toggle-personal-key').setAttribute('aria-pressed','false');
     await loadAccountAccess();
-    if (accountAccess?.research_generation_enabled) {
+    if (canWork()) {
       await Promise.all([loadJobs(),loadLibrary(),loadCapabilities(),loadAdvisor(),loadMcp()]);
     }
     const models = saved.model_access?.models || {};
@@ -1587,7 +1598,7 @@ $('retry-api-version').addEventListener('click', async () => {
   button.disabled = true;
   try {
     await loadAccountAccess();
-    if (accountAccess?.research_generation_enabled && !accountAccess.legacy_backend) {
+    if (canWork() && (API_MODE ? !accountAccess.legacy_backend : true)) {
       await Promise.all([loadJobs(), loadLibrary(), loadCapabilities(), loadAdvisor(), loadMcp()]);
       if (refreshInterval) clearInterval(refreshInterval);
       refreshInterval = setInterval(loadJobs, 12000);
@@ -1611,7 +1622,7 @@ onAuthStateChanged(auth, async (current) => {
   if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
   if (user) {
     await loadAccountAccess();
-    if (accountAccess?.research_generation_enabled) {
+    if (canWork()) {
       await Promise.all([loadJobs(),loadLibrary(),loadCapabilities(),loadAdvisor(),loadMcp()]);
       refreshInterval = setInterval(loadJobs, 12000);
     }
