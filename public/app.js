@@ -144,12 +144,15 @@ async function loadLibrary() {
     // M13: arquivos retidos na verificação de segurança (não podem ser usados).
     const held=data.quarantined||[];const q=$('quarantine-list');
     if(q){q.replaceChildren();q.classList.toggle('hidden',!held.length);
-      if(held.length){q.append(el('strong','Arquivos retidos na verificação de segurança (não entram nas pesquisas)'));
+      if(held.length){const wrap=document.createElement('details');wrap.className='quarantine-line';
+        wrap.append(el('summary',`${held.length} arquivo(s) não puderam ser lidos e ficaram de fora. Ver motivo`));q.append(wrap);
         for(const h of held){const reasons=((h.guard||{}).findings||[]).filter(f=>f.severity==='alta').map(f=>f.detail).join(' ');
           const row=el('p',`${h.name}: ${reasons}`);const drop=el('button','Apagar');drop.type='button';
           drop.addEventListener('click',()=>deleteLibraryItem(h));
-          row.append(' ',drop);q.append(row);}
-        q.append(el('small','Verificação estática (não é antivírus). Se o arquivo for legítimo, gere um PDF novo e envie de novo.'));}}
+          row.append(' ',drop);wrap.append(row);}
+        wrap.append(el('small','Se o arquivo for legítimo, gere um PDF novo (imprimir como PDF) e envie de novo.'));}}
+    updateStart('fontes', libraryItems.length > 0);
+    if (!libraryItems.length && $('add-sources')) $('add-sources').open = true;
     const activeIds=new Set(libraryItems.map(i=>i.id));
     selectedSourceIds=new Set([...selectedSourceIds].filter(id=>activeIds.has(id)));
     updateSelectedCount();displayLibrary();
@@ -157,6 +160,12 @@ async function loadLibrary() {
 }
 
 $('refresh-library').addEventListener('click',loadLibrary);
+for (const tab of document.querySelectorAll('[data-add-tab]')) {
+  tab.addEventListener('click', () => {
+    for (const t of document.querySelectorAll('[data-add-tab]')) { const on = t === tab; t.classList.toggle('active', on); t.setAttribute('aria-selected', String(on)); }
+    for (const pane of document.querySelectorAll('[data-add-pane]')) pane.hidden = pane.dataset.addPane !== tab.dataset.addTab;
+  });
+}
 $('library-filter').addEventListener('input',displayLibrary);
 $('upload-library').addEventListener('click',async()=>{
   const file=$('library-file').files[0];
@@ -783,6 +792,24 @@ function agentPanel(states) {
   return detail;
 }
 
+// Modo sem API: cada pesquisa antiga mostra título, data e o PDF; o resto fica em "Mais arquivos".
+function compactHistoryItem(entry, info) {
+  const keep = [...info.children].slice(0, 2);
+  const rest = [...info.children].slice(2);
+  if (!rest.length) return;
+  const more = document.createElement('details'); more.className = 'more-files';
+  more.append(el('summary', 'Mais arquivos, relatórios e opções'));
+  for (const node of rest) more.append(node);
+  info.replaceChildren(...keep);
+  if (entry.status === 'completed' && (entry.files || []).includes('pdf')) {
+    const row = document.createElement('div'); row.className = 'downloads';
+    const pdf = el('button', 'Baixar PDF'); pdf.type = 'button';
+    pdf.addEventListener('click', () => download(entry.id, 'pdf'));
+    row.append(pdf); info.append(row);
+  }
+  info.append(more);
+}
+
 async function loadJobs() {
   if (!user) return;
   const area = $('research-list');
@@ -790,6 +817,10 @@ async function loadJobs() {
     const r = await request('/jobs');
     const data = await r.json();
     area.replaceChildren();
+    const historyPanel = $('history-panel');
+    if (!API_MODE) historyPanel.classList.toggle('hidden', !data.items.length);
+    else $('history-details').open = true;
+    $('history-title').textContent = API_MODE ? 'Histórico de pesquisas' : `Pesquisas anteriores (${data.items.length})`;
     if (!data.items.length) { area.textContent = 'Nenhuma pesquisa criada até o momento.'; return; }
     for (const entry of data.items) {
       const item = document.createElement('div'); item.className='item';
@@ -925,6 +956,7 @@ async function loadJobs() {
         });
         del.append(b); info.append(del);
       }
+      if (!API_MODE) compactHistoryItem(entry, info);
       const badge = document.createElement('span'); badge.className='pill'; badge.textContent=statusLabel(entry.status);
       item.append(info, badge); area.append(item);
     }
@@ -1004,28 +1036,68 @@ const MCP_STAGE_LABELS = {pendente: 'pendente', recusada: 'devolvida para corre�
 const MCP_STATUS = {preparando: 'Lendo as fontes', pronto: 'Em andamento', falhou_preparo: 'Falha na leitura das fontes',
   compilando: 'Compilando o PDF', concluido: 'PDF pronto'};
 function mcpMessage(text) { $('mcp-message').textContent = text; }
+// Comece aqui: três passos com estado. Some quando tudo foi feito.
+const startState = {fontes: false, ia: false, artigo: false};
+const startKnown = new Set();
+function updateStart(part, value) {
+  if (part) { startState[part] = value; startKnown.add(part); }
+  const strip = $('start-strip'); if (!strip || API_MODE || startKnown.size < 3) return;
+  const steps = [['start-1', startState.fontes], ['start-2', startState.ia], ['start-3', startState.artigo]];
+  const current = steps.find(([, done]) => !done);
+  for (const [id, done] of steps) {
+    const li = $(id); li.classList.toggle('done', done); li.classList.toggle('current', current && current[0] === id);
+    li.querySelector('.start-n').textContent = done ? '✓' : id.slice(-1);
+    li.querySelector('button').setAttribute('aria-label', li.querySelector('b').textContent + (done ? ': feito' : current && current[0] === id ? ': próximo passo' : ''));
+  }
+  strip.classList.toggle('hidden', !current);
+}
+function openConnect() {
+  const panel = $('account-panel');
+  if (panel.classList.contains('as-modal')) setAccountPanelOpen(true);
+  $('mcp-details').open = true;
+  $('mcp-details').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+document.querySelector('[data-start="2"]')?.addEventListener('click', openConnect);
+
+// Qual IA: mostra só os passos dela; a escolha fica neste navegador.
+const AI_KEY = 'scriptorium_minha_ia';
+function chooseAi(ai) {
+  for (const b of document.querySelectorAll('#mcp-ai-choice [data-ai]')) {
+    const on = b.dataset.ai === ai; b.classList.toggle('active', on); b.setAttribute('aria-checked', String(on));
+  }
+  for (const node of document.querySelectorAll('#mcp-details [data-ai-only]')) node.hidden = !node.dataset.aiOnly.split(' ').includes(ai);
+  try { localStorage.setItem(AI_KEY, ai); } catch (_) { /* navegador sem armazenamento */ }
+}
+for (const b of document.querySelectorAll('#mcp-ai-choice [data-ai]')) b.addEventListener('click', () => chooseAi(b.dataset.ai));
+try { chooseAi(['claude', 'chatgpt', 'gemini'].includes(localStorage.getItem(AI_KEY)) ? localStorage.getItem(AI_KEY) : 'claude'); }
+catch (_) { chooseAi('claude'); }
+
 async function loadMcp() {
   try {
     const data = await (await request('/mcp-conta/tokens')).json();
     $('mcp-details').classList.remove('hidden');
     const list = $('mcp-token-list'); list.replaceChildren();
     const active = (data.tokens || []).filter(t => !t.revoked);
-    if (!active.length) list.append(el('p', 'Nenhum token ativo. Gere um para conectar sua IA.'));
+    $('mcp-token-count').textContent = active.length;
+    if (!active.length) list.append(el('p', 'Nenhuma chave ativa.'));
     for (const t of active) {
       const row = document.createElement('div'); row.className = 'actions';
-      row.append(el('span', `${t.label} · criado em ${new Date(t.created_at).toLocaleDateString('pt-BR')}`));
-      const revoke = el('button', 'Revogar', 'btn btn-danger'); revoke.type = 'button';
+      row.append(el('span', `${t.label} · criada em ${new Date(t.created_at).toLocaleDateString('pt-BR')}`));
+      const revoke = el('button', 'Desativar', 'btn btn-danger'); revoke.type = 'button';
       revoke.addEventListener('click', async () => {
-        const ok = await confirmAction('Revogar token?', [
-          `A IA conectada com "${t.label}" perde o acesso ao Scriptorium na hora.`,
-          'Os projetos continuam guardados; para voltar, gere outro token.'], 'Revogar');
+        const ok = await confirmAction('Desativar esta chave?', [
+          `A IA conectada com "${t.label}" deixa de ver as suas fontes na hora.`,
+          'Seus artigos continuam guardados. Para conectar de novo, gere outra chave.'], 'Desativar');
         if (!ok) return;
-        try { await request('/mcp-conta/tokens/' + t.id, {method: 'DELETE'}); await loadMcp(); mcpMessage('Token revogado.'); }
+        try { await request('/mcp-conta/tokens/' + t.id, {method: 'DELETE'}); await loadMcp(); mcpMessage('Chave desativada.'); }
         catch (e) { mcpMessage(e.message); }
       });
       row.append(revoke); list.append(row);
     }
-    $('mcp-title').textContent = 'Conectar sua IA, sem API paga (MCP)' + (active.length ? ` · ${active.length} conectada(s)` : '');
+    $('mcp-title').textContent = 'Conectar sua IA' + (active.length ? ' · conectada' : '');
+    if (!active.length && !$('mcp-details').dataset.seen) { $('mcp-details').open = true; }
+    $('mcp-details').dataset.seen = '1';
+    updateStart('ia', active.length > 0);
     await loadMcpProjects();
   } catch (_) { $('mcp-details').classList.add('hidden'); /* API anterior ou conta sem acesso */ }
 }
@@ -1127,20 +1199,20 @@ function mcpReview(box, p, r) {
 }
 
 async function openMcpProject(p, holder, button) {
-  if (!holder.hidden) { holder.hidden = true; button.textContent = 'Abrir'; return; }
-  holder.hidden = false; button.textContent = 'Fechar'; holder.replaceChildren(el('p', 'Carregando...', 'subtle'));
+  if (!holder.hidden) { holder.hidden = true; button.textContent = 'Ver etapas'; button.setAttribute('aria-expanded', 'false'); return; }
+  holder.hidden = false; button.textContent = 'Fechar etapas'; button.setAttribute('aria-expanded', 'true');
+  holder.replaceChildren(el('p', 'Carregando...', 'subtle'));
   try {
     const data = await (await request(`/mcp-conta/projetos/${p.projeto}/detalhe`)).json();
     holder.replaceChildren();
-    holder.append(el('h4', 'Etapas'), mcpStepList(data.estado.etapas));
-    if (data.estado.erro) holder.append(el('p', data.estado.erro, 'warning'));
+    holder.append(mcpStepList(data.estado.etapas));
     if (data.revisao) mcpReview(holder, p, data.revisao);
-    const files = (data.estado.arquivos || []).filter(f => MCP_FILES[f]);
+    const files = (data.estado.arquivos || []).filter(f => MCP_FILES[f] && f !== 'scriptorium.pdf');
     if (files.length) {
-      holder.append(el('h4', 'Arquivos'));
+      holder.append(el('h4', 'Outros arquivos'));
       const actions = document.createElement('div'); actions.className = 'actions';
       for (const name of files) {
-        const b = el('button', MCP_FILES[name], name.endsWith('.pdf') ? 'btn' : 'btn alt'); b.type = 'button';
+        const b = el('button', MCP_FILES[name], 'btn alt'); b.type = 'button';
         b.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/arquivos/${name}`, name));
         actions.append(b);
       }
@@ -1149,31 +1221,88 @@ async function openMcpProject(p, holder, button) {
   } catch (e) { holder.replaceChildren(el('p', e.message, 'warning')); }
 }
 
+function askBox(text) {
+  const box = document.createElement('div'); box.className = 'art-ask';
+  const code = el('code', text);
+  const copy = el('button', 'Copiar pedido', 'btn alt'); copy.type = 'button';
+  copy.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(text); copy.textContent = 'Copiado'; setTimeout(() => { copy.textContent = 'Copiar pedido'; }, 2000); }
+    catch (_) { const r = document.createRange(); r.selectNodeContents(code); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+  });
+  box.append(code, copy); return box;
+}
+
+function articleCard(p) {
+  const card = document.createElement('article'); card.className = 'art-card';
+  const head = document.createElement('div'); head.className = 'mcp-row-head';
+  const info = document.createElement('div');
+  const total = (p.etapas || []).length;
+  const done = (p.etapas || []).filter(s => s.status === 'aceita').length;
+  info.append(el('strong', p.titulo || p.projeto),
+    el('p', `${MCP_TYPES[p.tipo] || 'Artigo'} · ${done} de ${total} etapas`, 'subtle'));
+  const bar = document.createElement('div'); bar.className = 'art-progress';
+  bar.setAttribute('role', 'progressbar'); bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', String(total));
+  bar.setAttribute('aria-valuenow', String(done)); bar.setAttribute('aria-label', `${done} de ${total} etapas`);
+  const fill = document.createElement('span'); fill.style.width = total ? `${Math.round(100 * done / total)}%` : '0%';
+  bar.append(fill); info.append(bar);
+  const actions = document.createElement('div'); actions.className = 'actions'; actions.style.margin = '0';
+  if ((p.arquivos || []).includes('scriptorium.pdf')) {
+    const pdf = el('button', 'Baixar PDF', 'btn'); pdf.type = 'button';
+    pdf.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/arquivos/scriptorium.pdf`, 'scriptorium.pdf'));
+    actions.append(pdf);
+  }
+  const open = el('button', 'Ver etapas', 'btn alt'); open.type = 'button'; open.setAttribute('aria-expanded', 'false');
+  const detail = document.createElement('div'); detail.className = 'mcp-detail'; detail.hidden = true;
+  open.addEventListener('click', () => openMcpProject(p, detail, open));
+  actions.append(open); head.append(info, actions); card.append(head);
+
+  const step = p.proximo_passo;
+  if (step) {
+    const next = document.createElement('div'); next.className = 'art-next';
+    next.append(el('strong', step.titulo), el('p', step.texto));
+    if (step.detalhe) next.append(el('p', step.detalhe, 'subtle'));
+    if (step.pedido) next.append(askBox(step.pedido));
+    card.append(next);
+  }
+  const refs = p.referencias_a_conferir || [];
+  if (refs.length && p.status !== 'concluido') {
+    const box = document.createElement('details'); box.className = 'art-refs';
+    box.append(el('summary', `${refs.length} referência(s) para conferir antes do PDF`));
+    box.append(el('p', 'O Scriptorium não achou estes textos em bases confiáveis, então os dados vieram só do arquivo e podem estar errados. Peça à sua IA para corrigir pelo próprio documento:', 'subtle'));
+    box.append(askBox(p.pedido_referencias));
+    const ul = document.createElement('ul');
+    for (const r of refs) ul.append(el('li', (r.titulo || r.chave) + (r.autor ? ` (${r.autor})` : '')));
+    box.append(ul); card.append(box);
+  }
+  if ((p.provas || []).length) {
+    const ul = document.createElement('ul'); ul.className = 'art-proofs'; ul.setAttribute('aria-label', 'Já conferido pelo Scriptorium');
+    for (const line of p.provas) ul.append(el('li', line));
+    card.append(ul);
+  }
+  card.append(detail);
+  return card;
+}
+
 async function loadMcpProjects() {
   const box = $('mcp-projects'); if (!box) return;
   let projects = [];
   try { projects = (await (await request('/mcp-conta/projetos')).json()).projetos || []; }
   catch (e) { box.replaceChildren(el('p', e.message, 'subtle')); return; }
   box.replaceChildren();
-  if (!projects.length) { box.append(el('p', 'Nenhum projeto ainda. Conecte sua IA em Minha conta e peça para ela criar um.', 'subtle')); return; }
-  for (const p of projects) {
-    const row = document.createElement('div'); row.className = 'mcp-row';
-    const head = document.createElement('div'); head.className = 'mcp-row-head';
-    const info = document.createElement('div');
-    const done = (p.etapas || []).filter(s => s.status === 'aceita').length;
-    info.append(el('strong', p.titulo || p.projeto),
-      el('p', `${MCP_TYPES[p.tipo] || 'Artigo'} · ${MCP_STATUS[p.status] || p.status} · ${done} de ${(p.etapas || []).length} etapas`, 'subtle'));
-    const actions = document.createElement('div'); actions.className = 'actions'; actions.style.margin = '0';
-    if ((p.arquivos || []).includes('scriptorium.pdf')) {
-      const pdf = el('button', 'PDF', 'btn'); pdf.type = 'button';
-      pdf.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/arquivos/scriptorium.pdf`, 'scriptorium.pdf'));
-      actions.append(pdf);
+  updateStart('artigo', projects.length > 0);
+  if (!projects.length) {
+    const empty = document.createElement('div'); empty.className = 'art-empty';
+    if (!startState.ia) {
+      empty.append(el('p', 'Nenhum artigo ainda. Primeiro conecte a sua IA; depois é só pedir o artigo na conversa.', 'subtle'));
+      const go = el('button', 'Conectar sua IA', 'btn'); go.type = 'button'; go.addEventListener('click', openConnect);
+      empty.append(go);
+    } else {
+      empty.append(el('p', 'Nenhum artigo ainda. Na conversa com a sua IA, peça:', 'subtle'));
+      empty.append(askBox($('mcp-first-prompt').value));
     }
-    const open = el('button', 'Abrir', 'btn alt'); open.type = 'button';
-    const detail = document.createElement('div'); detail.className = 'mcp-detail'; detail.hidden = true;
-    open.addEventListener('click', () => openMcpProject(p, detail, open));
-    actions.append(open); head.append(info, actions); row.append(head, detail); box.append(row);
+    box.append(empty); return;
   }
+  for (const p of projects) box.append(articleCard(p));
 }
 $('mcp-projects-refresh')?.addEventListener('click', () => loadMcpProjects());
 if (API_MODE && $('step-sub-3')) $('step-sub-3').textContent = 'Histórico, agentes e pareceres';
@@ -1186,7 +1315,7 @@ $('mcp-create-token')?.addEventListener('click', async () => {
       headers: {Authorization: 'Bearer ' + data.token}, timeout: 120000}}}, null, 2);
     $('mcp-new-token').classList.remove('hidden');
     $('mcp-token-label').value = '';
-    mcpMessage('Token gerado. Copie o endereço agora.');
+    mcpMessage('Chave gerada. Copie agora e siga o passo 3.');
     await loadMcp();
   } catch (e) { mcpMessage(e.message); }
 });

@@ -444,7 +444,7 @@ def project_state(store: Store, project: dict) -> dict:
     elif status == "compilando":
         action = "Compilando o PDF. Consulte de novo em um ou dois minutos."
     elif status == "concluido":
-        action = "PDF pronto: baixe no site, em Minha conta > Conectar sua IA."
+        action = "PDF pronto: baixe no site, na etapa Seus artigos."
     elif nxt:
         action = f"Próxima etapa: {nxt['titulo']} (chame proxima_etapa)."
     else:
@@ -638,7 +638,7 @@ class TokenVerifier:
 def _uid() -> str:
     token = get_access_token()
     if not token or not token.subject:
-        raise Falha("Conecte o Scriptorium com o seu token pessoal (Minha conta > Conectar sua IA).")
+        raise Falha("Conecte o Scriptorium com a sua chave de conexão (Minha conta > Conectar sua IA).")
     return token.subject
 
 

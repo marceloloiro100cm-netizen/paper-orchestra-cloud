@@ -106,3 +106,10 @@ O corpo vem de uma IA e é compilado no worker. Duas barreiras:
 - PDF escaneado sem texto não entra (o preparo avisa).
 - O texto do pesquisador vai para o provedor da IA dele, nas condições da conta dele
   (IN IFRS 16/2026, Art. 9º).
+
+## O que o estudante vê no site
+
+- **Comece aqui**: três passos com estado (fontes enviadas, IA conectada, artigo pedido). Some quando os três estão feitos.
+- **Conectar sua IA** (Minha conta): escolha da IA (Claude, ChatGPT ou Gemini), chave de conexão, os três passos só daquela IA e o primeiro pedido pronto para copiar. "Token" aparece no site como "chave de conexão".
+- **Seus artigos**: cada projeto mostra o progresso, o próximo passo em linguagem simples com o pedido pronto para copiar (inclusive o passe da conversa nova), as referências que ainda pedem conferência e o que o Scriptorium já conferiu (citações literais, revisão, verificação, kappa). A lógica fica em `api/mcp_student.py`, sem IA; as rotas `/api/mcp-conta/projetos` devolvem esses campos.
+- **Pesquisas anteriores**: as pesquisas do modo com API ficam recolhidas; cada uma mostra o PDF e o resto em "Mais arquivos, relatórios e opções".
