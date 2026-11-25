@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="2048" height="2048" role="img" aria-label="Símbolo Pena-Circuito — Scriptorium MPIE">
+  <defs>
+    <!-- Gradiente Azul Institucional MPIE -->
+    <linearGradient id="mpieBlueLeft" x1="15%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#6CB2EA"/>
+      <stop offset="52%" stop-color="#2779C9"/>
+      <stop offset="100%" stop-color="#1159A4"/>
+    </linearGradient>
+    <linearGradient id="mpieBlueRight" x1="10%" y1="12%" x2="90%" y2="88%">
+      <stop offset="0%" stop-color="#4A97DC"/>
+      <stop offset="55%" stop-color="#1968B6"/>
+      <stop offset="100%" stop-color="#0E4B8C"/>
+    </linearGradient>
+    <linearGradient id="mpieCollar" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5CA2DF"/>
+      <stop offset="50%" stop-color="#1B6EC0"/>
+      <stop offset="100%" stop-color="#0F4E91"/>
+    </linearGradient>
+    <!-- Gradiente Dourado MPIE -->
+    <linearGradient id="mpieGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FAD46B"/>
+      <stop offset="55%" stop-color="#F4B93B"/>
+      <stop offset="100%" stop-color="#DF9B1D"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Metade Esquerda da Pena (com fenda central limpa até o nó) -->
+  <path fill="url(#mpieBlueLeft)" d="
+    M 251.5 48
+    C 234 114, 186 196, 130 274
+    C 126 280, 126 287, 131 293
+    C 156 322, 174 352, 184 386
+    L 256 386
+    L 256 238
+    L 251.5 238
+    Z
+  "/>
+
+  <!-- Metade Direita da Pena -->
+  <path fill="url(#mpieBlueRight)" d="
+    M 260.5 48
+    C 278 114, 326 196, 382 274
+    C 386 280, 386 287, 381 293
+    C 356 322, 338 352, 328 386
+    L 256 386
+    L 256 238
+    L 260.5 238
+    Z
+  "/>
+
+  <!-- Circuito Dourado Interno (3 trilhas + 3 nós) -->
+  <!-- Trilha Central -->
+  <rect x="249.5" y="246" width="13" height="140" fill="url(#mpieGold)"/>
+  <circle cx="256" cy="236" r="24" fill="url(#mpieGold)"/>
+
+  <!-- Trilha Esquerda -->
+  <path fill="none" stroke="url(#mpieGold)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"
+        d="M 196 276 L 196 306 L 224 334 L 224 386"/>
+  <circle cx="196" cy="272" r="16" fill="url(#mpieGold)"/>
+
+  <!-- Trilha Direita (espelho exato) -->
+  <path fill="none" stroke="url(#mpieGold)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"
+        d="M 316 276 L 316 306 L 288 334 L 288 386"/>
+  <circle cx="316" cy="272" r="16" fill="url(#mpieGold)"/>
+
+  <!-- Base / Colarinho da Pena -->
+  <path fill="url(#mpieCollar)" d="
+    M 184 402
+    L 328 402
+    L 338 456
+    C 339 461, 335 466, 330 466
+    L 182 466
+    C 177 466, 173 461, 174 456
+    Z
+  "/>
+</svg>
