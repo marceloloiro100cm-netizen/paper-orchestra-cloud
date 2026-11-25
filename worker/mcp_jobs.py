@@ -186,10 +186,11 @@ def prepare(data: dict, *, db, bucket, owner_uid: str, cache, get_json, update, 
     update(status="running", stage="Lendo as fontes do projeto",
            started_at=datetime.now(timezone.utc).isoformat())
     fetch = lambda path: bucket.blob(path).download_as_bytes()  # noqa: E731
-    manifest, failures, ok = [], [], []
+    manifest, failures, ok, texts = [], [], [], {}
     for source in sources:
         try:
             payload, _ = derive(source, fetch, cache)
+            texts[source["id"]] = bib_integrity.first_pages_text(payload)
             path = f"library/{owner_uid}/derived/{derived_key(source)}.json"
             if not bucket.blob(path).exists():  # cache não gravou: grava aqui para a API ler
                 bucket.blob(path).upload_from_string(json.dumps(payload, ensure_ascii=False),
@@ -209,7 +210,7 @@ def prepare(data: dict, *, db, bucket, owner_uid: str, cache, get_json, update, 
             meta[source["id"]] = metadata(source, fetch, cache)
         except Exception:
             meta[source["id"]] = {}
-    entries = bib_integrity.library_entries(ok, get_json, meta)
+    entries = bib_integrity.library_entries(ok, get_json, meta, texts)
     key_of = {e["source_id"]: e["key"] for e in entries}
     for entry in manifest:
         entry["key"] = key_of.get(entry["id"])

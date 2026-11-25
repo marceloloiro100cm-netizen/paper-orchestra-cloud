@@ -36,7 +36,7 @@ PLACEHOLDER = re.compile(
     r"( de educa[cç][aã]o)?|revista de educa[cç][aã]o|revista de tecnologia|journal of education"
     r"|autor desconhecido|unknown|n/?a|s\.?\s?n\.?|xxx+|tbd)$", re.I)
 TITLE_MATCH = 0.86
-VERSION = "bib-integrity-1"
+VERSION = "bib-integrity-2"
 
 
 def fold(value: str) -> str:
@@ -139,30 +139,132 @@ def _key_for(fields: dict, used: set) -> str:
     return key
 
 
-def library_entries(sources: list[dict], get_json, pdf_meta=None) -> list[dict]:
+# Confirmação pelo próprio documento (achado do teste MCP de 25/11/2026): sem
+# DOI, a busca por título no OpenAlex aceitava registros sem autor ou de outra
+# edição (Prensky 2001 saiu como 2012, sem autor). Agora um registro só vale se
+# o título E o sobrenome de um autor aparecem nas primeiras páginas do arquivo.
+def _plain(text: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", fold(text or "")))
+
+
+def _work_surnames(work: dict) -> list[str]:
+    out = []
+    for item in work.get("authorships") or []:
+        name = ((item or {}).get("author") or {}).get("display_name") or ""
+        parts = _plain(name).split()
+        if parts:
+            out.append(parts[-1])
+    return out
+
+
+def confirmed_by_text(work: dict, text: str) -> bool:
+    """Título no texto (ou numa linha quase idêntica, ex.: "Part 1") e um sobrenome de autor."""
+    plain = " " + _plain(text) + " "
+    title = _plain(work.get("title") or "")
+    surnames = _work_surnames(work)
+    if len(title) < 12 or not surnames or not any(len(s) >= 3 and f" {s} " in plain for s in surnames):
+        return False
+    if title in plain:
+        return True
+    return any(similarity(line, title) >= TITLE_MATCH for line in (text or "").splitlines()
+               if 12 <= len(line.strip()) <= 300)
+
+
+def dois_in_text(text: str) -> list[str]:
+    found = []
+    for match in re.finditer(r"10\.\d{4,9}/[^\s\"<>,;]+", text or "", flags=re.I):
+        doi = canonical_doi(match.group(0))
+        if doi and doi not in found:
+            found.append(doi)
+    return found[:5]
+
+
+NOISE = re.compile(r"https?:|www\.|doi|issn|isbn|e-?mail|@|revista|vol\.|v\.\s*\d|n\.\s*\d|p\.\s*\d|"
+                   r"universidade|university|programa de p|faculdade|instituto|departamento|"
+                   r"recebido|aprovado|submetido|copyright|licen", re.I)
+
+
+def title_candidates(source: dict, meta: dict, text: str) -> list[str]:
+    """Consultas de título: metadado do PDF, nome do arquivo e linhas longas do início."""
+    out = []
+    if meta.get("pdf_title") and len(meta["pdf_title"]) > 15:
+        out.append(meta["pdf_title"])
+    stem = re.sub(r"\.(pdf|docx|txt)$", "", source.get("name") or "", flags=re.I)
+    stem = re.sub(r"\([^)]*\)", " ", stem)
+    if len(re.findall(r"[A-Za-zÀ-ÿ]{3,}", stem)) >= 4:
+        out.append(stem)
+    for line in (text or "").splitlines():
+        line = " ".join(line.split())
+        if 25 <= len(line) <= 220 and not NOISE.search(line) and len(line.split()) >= 4:
+            out.append(line)
+        if len(out) >= 5:
+            break
+    seen, unique = set(), []
+    for item in out:
+        key = clean_title(item)[:80]
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(item)
+    return unique[:4]
+
+
+def _plausible_author(value: str) -> bool:
+    value = (value or "").strip()
+    return bool(value) and len(value) >= 5 and " " in value and not re.search(
+        r"user|admin|microsoft|word|owner|autor|author|computer|pc\b|\d", value, re.I)
+
+
+def first_pages_text(payload: dict, pages: int = 3, limit: int = 12000) -> str:
+    """Texto das primeiras páginas de um documento derivado (capa, título, autoria, DOI)."""
+    chunks = (payload or {}).get("chunks") or []
+    early = [c.get("text", "") for c in chunks if (c.get("pages") or [1])[0] <= pages]
+    text = "\n".join(early) if early else "\n".join(c.get("text", "") for c in chunks[:12])
+    return text[:limit]
+
+
+def library_entries(sources: list[dict], get_json, pdf_meta=None, texts=None) -> list[dict]:
     """BibTeX oficial das fontes anexadas. get_json(url) -> dict (OpenAlex).
 
     1. DOI registrado na importação -> metadados do OpenAlex.
-    2. Sem DOI: título do próprio PDF -> busca no OpenAlex, aceita só com
-       título quase idêntico (>= 0,86).
-    3. Sem correspondência segura: entrada mínima com o título do arquivo e a
-       nota "metadados a conferir" (nunca dados inventados).
+    2. DOI impresso nas primeiras páginas -> OpenAlex, aceito se título e autor
+       aparecem no próprio texto.
+    3. Busca por título (metadado do PDF, nome do arquivo ou linhas do início):
+       com o texto disponível, aceita só o registro confirmado pelo documento;
+       sem texto, aceita título quase idêntico (>= 0,86) e com autoria.
+    4. Sem correspondência segura: entrada mínima com o melhor título disponível
+       e a nota "metadados a conferir" (nunca dados inventados).
+    texts: id da fonte -> texto das primeiras páginas.
     """
     used, out = set(), []
     for source in sources:
         origin = source.get("origin") or {}
         meta = (pdf_meta or {}).get(source.get("id")) or {}
+        text = (texts or {}).get(source.get("id")) or ""
         work, how = None, ""
         doi = canonical_doi(origin.get("doi") or "")
         try:
             if doi:
                 work, how = get_json("https://api.openalex.org/works/doi:" + doi), "doi"
-            elif meta.get("pdf_title") and len(meta["pdf_title"]) > 15:
-                found = get_json("https://api.openalex.org/works?per-page=3&search="
-                                 + re.sub(r"\s+", "+", clean_title(meta["pdf_title"])))
-                for candidate in (found or {}).get("results", []):
-                    if similarity(candidate.get("title") or "", meta["pdf_title"]) >= TITLE_MATCH:
-                        work, how = candidate, "titulo_do_pdf"
+            if not work and text:
+                for found in dois_in_text(text):
+                    candidate = get_json("https://api.openalex.org/works/doi:" + found)
+                    if candidate and confirmed_by_text(candidate, text):
+                        work, how = candidate, "doi_no_texto"
+                        break
+            if not work:
+                for query in title_candidates(source, meta, text):
+                    found = get_json("https://api.openalex.org/works?per-page=5&search="
+                                     + re.sub(r"\s+", "+", clean_title(query)))
+                    results = (found or {}).get("results", [])
+                    if text:
+                        ok = [c for c in results if confirmed_by_text(c, text)]
+                    else:
+                        ok = [c for c in results if c.get("authorships")
+                              and similarity(c.get("title") or "", query) >= TITLE_MATCH]
+                    if ok:
+                        ok.sort(key=lambda c: (-similarity(c.get("title") or "", query),
+                                               c.get("publication_year") or 9999))
+                        work, how = ok[0], ("texto_do_pdf" if text else "titulo_do_pdf")
                         break
         except Exception:
             work = None
@@ -170,9 +272,12 @@ def library_entries(sources: list[dict], get_json, pdf_meta=None) -> list[dict]:
             entry = entry_from_openalex(work, "")
             entry["key"] = _key_for(entry["fields"], used)
         else:
-            title = meta.get("pdf_title") or re.sub(r"\.(pdf|docx|txt)$", "", source.get("name") or "", flags=re.I)
+            stem = re.sub(r"\.(pdf|docx|txt)$", "", source.get("name") or "", flags=re.I)
+            candidates = title_candidates(source, meta, text)
+            title = meta.get("pdf_title") if len(meta.get("pdf_title") or "") > 15 else (
+                candidates[0] if candidates else stem)
             fields = {"title": title, "note": "metadados a conferir: sem correspondência segura no OpenAlex"}
-            if meta.get("author"):
+            if _plausible_author(meta.get("author")):
                 fields["author"] = meta["author"]
             entry = {"type": "misc", "key": _key_for(fields, used), "fields": fields}
             how = "arquivo"

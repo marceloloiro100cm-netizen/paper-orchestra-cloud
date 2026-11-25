@@ -43,7 +43,8 @@ ID = re.compile(r"[0-9a-f]{32}")
 INSTRUCTIONS = (
     "Scriptorium: escrita acadêmica com as fontes do pesquisador, sem API paga. Você (a IA) lê e "
     "escreve; o Scriptorium guarda as fontes, entrega trechos e confere cada entrega. Fluxo: "
-    "listar_fontes -> criar_projeto -> proxima_etapa (repetir) -> compilar. Guarde o identificador de "
+    "listar_fontes -> criar_projeto -> proxima_etapa (repetir) -> compilar. Se uma referência vier "
+    "com título, autor ou ano errados, corrija com corrigir_referencia antes de compilar. Guarde o identificador de "
     "cabeça que proxima_etapa devolver e use-o em todas as chamadas desta conversa. Quando uma etapa "
     "pedir conversa nova, entregue o PASSE ao pesquisador e pare: a etapa será feita em outra conversa."
 )
@@ -299,6 +300,42 @@ class Store:
         card = search.reading_card(item, self.payload(project, entry))
         card["chave"] = key
         return card
+
+    def correct_reference(self, project: dict, key: str, head_id: str, fix: dict) -> dict:
+        if project.get("status") in ("compilando",):
+            raise Falha("Aguarde a compilação terminar para corrigir referências.")
+        head = (project.get("heads") or {}).get(head_id or "")
+        if not head:
+            raise Falha("Cabeça desconhecida. Use o identificador recebido em proxima_etapa ou abrir_passe.")
+        refs = self.references(project)
+        entry = next((r for r in refs if r.get("key") == key), None)
+        source = next((m for m in self.manifest(project) if m.get("key") == key), None)
+        if not entry or not source:
+            raise Falha(f"Chave '{key}' não está neste projeto. Veja referencias_do_projeto.")
+        chunks = self.payload(project, source).get("chunks") or []
+        early = [c.get("text", "") for c in chunks if (c.get("pages") or [1])[0] <= 4]
+        first = "\n".join(early) if early else "\n".join(c.get("text", "") for c in chunks[:15])
+        full = "\n".join(c.get("text", "") for c in chunks)
+        fields, errors = flow.check_reference_fix(fix, first, full)
+        if errors:
+            raise Falha("Correção recusada: " + " ".join(errors))
+        before = dict(entry.get("fields") or {})
+        entry.update(type=fix.get("tipo") or "misc", fields=fields, how="corrigida_pelo_texto")
+        prefix = self.prefix(project)
+        self.bucket.blob(prefix + "/references.json").upload_from_string(
+            json.dumps(refs, ensure_ascii=False), content_type="application/json")
+        self.bucket.blob(prefix + "/references.bib").upload_from_string(
+            "".join(flow.render_reference(r) for r in refs), content_type="text/plain; charset=utf-8")
+        history = list(project.get("reference_fixes") or [])[-80:]
+        history.append({"chave": key, "em": now(), "cabeca": head.get("id"),
+                        "ia": head.get("model") or head.get("client", ""),
+                        "antes": {k: before.get(k, "") for k in ("author", "title", "year")}})
+        fields_update = {"reference_fixes": history}
+        if project.get("status") == "concluido":
+            fields_update["error"] = "Referências corrigidas depois do PDF: chame compilar de novo."
+        self.update_project(project["id"], **fields_update)
+        return {"chave": key, "corrigida": True, "tipo": entry["type"], **fields,
+                "aviso": "Chave mantida: o texto já entregue continua válido."}
 
     # ------------------------------------------------------------------ quadro
     def stage_content(self, project: dict, key: str, version: int) -> tuple[str, dict]:
@@ -657,6 +694,22 @@ def build_server(store: Store, public_url: str) -> MCPServer:
         uid = _uid()
         return await run(partial(deliver, store, uid, projeto, etapa, conteudo, cabeca, modelo_declarado,
                                  client_name(ctx)))
+
+    @server.tool()
+    async def corrigir_referencia(projeto: str, chave: str, cabeca: str, autores: list[str], titulo: str,
+                                  ano: str, tipo: Literal["article", "inproceedings", "incollection",
+                                                          "phdthesis", "mastersthesis", "book",
+                                                          "techreport", "misc"] = "article",
+                                  veiculo: str = "", doi: str = "") -> dict:
+        """Corrige autor, título, ano, tipo, veículo e DOI de uma referência do projeto, mantendo a chave.
+        Leia antes a capa ou a primeira página da fonte (ficha_da_fonte, buscar_trechos, ler_trecho).
+        O Scriptorium só aceita o que aparece no próprio documento: título e sobrenomes nas primeiras
+        páginas; ano, veículo e DOI em algum lugar do texto. Autores no formato 'Sobrenome, Nome'."""
+        uid = _uid()
+        project = await run(store.project, uid, projeto)
+        store.ready(project)
+        fix = {"autores": autores, "titulo": titulo, "ano": ano, "tipo": tipo, "veiculo": veiculo, "doi": doi}
+        return await run(partial(store.correct_reference, project, chave, cabeca, fix))
 
     @server.tool()
     async def compilar(projeto: str) -> dict:

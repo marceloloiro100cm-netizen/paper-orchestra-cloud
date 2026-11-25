@@ -480,7 +480,15 @@ def main():
             try:
                 from coverage_facets import source_metadata
                 pdf_meta = {x["id"]: source_metadata(x, fetch, derived_cache) for x in safe_sources}
-                official_bib = bib_integrity.library_entries(safe_sources, openalex_json, pdf_meta)
+                from source_materials import derive_source
+                texts = {}
+                for x in safe_sources:
+                    try:
+                        payload, _ = derive_source(x, fetch, derived_cache)
+                        texts[x["id"]] = bib_integrity.first_pages_text(payload)
+                    except Exception:
+                        pass
+                official_bib = bib_integrity.library_entries(safe_sources, openalex_json, pdf_meta, texts)
             except Exception as exc:
                 print("BibTeX oficial das fontes indisponível:", repr(exc), flush=True)
                 official_bib = []
