@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 import mcp_review as review
+import mcp_student as student
 from mcp_server import MCP_PATH, Falha, Store, mode, project_state, review_context
 
 FILES = {"scriptorium.pdf": "application/pdf", "scriptorium.tex": "text/x-tex",
@@ -50,14 +51,23 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
             raise HTTPException(404, "Token não encontrado.")
         return {"revogado": True}
 
+    def for_student(project: dict) -> dict:
+        """Estado do projeto mais a visão do estudante (próximo passo, provas, referências)."""
+        try:
+            refs = store.references(project)
+        except Exception:  # arquivo ausente ou ilegível: a visão segue sem as referências
+            refs = []
+        return {**project_state(store, project),
+                **student.view(project, mode(project), refs, project.get("concordancia"))}
+
     @router.get("/projetos")
     def list_projects(user: dict = dependency):
-        return {"projetos": [project_state(store, p) for p in store.projects(user["uid"])]}
+        return {"projetos": [for_student(p) for p in store.projects(user["uid"])]}
 
     @router.get("/projetos/{project_id}")
     def get_project(project_id: str, user: dict = dependency):
         try:
-            return project_state(store, store.project(user["uid"], project_id))
+            return for_student(store.project(user["uid"], project_id))
         except Falha:
             raise HTTPException(404, "Projeto não encontrado.") from None
 
@@ -70,7 +80,7 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
     @router.get("/projetos/{project_id}/detalhe")
     def detail(project_id: str, user: dict = dependency):
         project = owned(project_id, user)
-        out = {"estado": project_state(store, project)}
+        out = {"estado": for_student(project)}
         if mode(project) != review.MODE:
             return out
         ctx = review_context(store, project)

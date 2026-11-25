@@ -1045,6 +1045,52 @@
     .mcp-qp textarea { width: 100%; min-height: 90px; }
     .mcp-table-wrap { overflow-x: auto; }
     .mcp-table-wrap .eval-table th, .mcp-table-wrap .eval-table td { text-align: left; vertical-align: top; }
+    /* Comece aqui: três passos com estado; some quando tudo está feito. */
+    .start-strip { margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--border-main); border-radius: 14px; background: var(--bg-surface); }
+    .start-strip h2 { font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--mpie-gold-text); margin: 0 0 8px; font-family: var(--font-sans); }
+    .start-strip ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .start-strip button { width: 100%; display: flex; gap: 10px; align-items: center; text-align: left; padding: 9px 10px; border-radius: 11px; border: 1px solid var(--border-main); background: var(--bg-subtle); color: var(--text-primary); cursor: pointer; font: inherit; }
+    .start-strip button:hover { border-color: var(--mpie-blue); }
+    .start-strip .start-n { flex: 0 0 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: .85rem; background: var(--bg-surface); border: 1px solid var(--border-main); }
+    .start-strip .done .start-n { background: var(--mpie-blue); border-color: var(--mpie-blue); color: #fff; }
+    .start-strip .current button { border-color: var(--mpie-gold); background: var(--mpie-gold-soft); }
+    .start-strip b { display: block; font-size: .88rem; }
+    .start-strip small { display: block; color: var(--text-secondary); font-size: .76rem; }
+    @media (max-width: 700px) { .start-strip ol { grid-template-columns: 1fr; } }
+    /* Seus artigos: cartão com próximo passo e provas de conferência. */
+    .art-card { padding: 14px 0; border-bottom: 1px solid var(--border-main); }
+    .art-card:last-child { border-bottom: 0; }
+    .art-progress { height: 6px; border-radius: 999px; background: var(--border-soft); overflow: hidden; margin: 6px 0 0; max-width: 260px; }
+    .art-progress span { display: block; height: 100%; background: var(--mpie-blue); }
+    .art-next { margin: 10px 0 0; padding: 10px 12px; border-radius: 11px; background: var(--mpie-blue-soft); border: 1px solid var(--ok-border); }
+    .art-next strong { display: block; color: var(--mpie-blue-text); }
+    .art-next p { margin: 4px 0 0; font-size: .88rem; color: var(--text-primary); }
+    .art-ask { display: flex; gap: 8px; margin-top: 8px; align-items: stretch; flex-wrap: wrap; }
+    .art-ask code { flex: 1 1 220px; padding: 8px 10px; border-radius: 9px; background: var(--bg-surface); border: 1px solid var(--border-main); font-size: .82rem; white-space: pre-wrap; word-break: break-word; }
+    .art-proofs { list-style: none; margin: 8px 0 0; padding: 0; font-size: .85rem; color: var(--text-secondary); }
+    .art-proofs li::before { content: "✓ "; color: var(--mpie-blue); font-weight: 700; }
+    .art-refs { margin-top: 8px; }
+    .art-refs summary { cursor: pointer; color: var(--warn-text); font-size: .86rem; font-weight: 600; }
+    .art-refs ul { margin: 6px 0; padding-left: 18px; font-size: .84rem; color: var(--text-secondary); }
+    .art-empty code { display: block; margin: 8px 0; padding: 8px 10px; border-radius: 9px; background: var(--bg-subtle); white-space: pre-wrap; }
+    /* Histórico anterior recolhido; cada item mostra o essencial. */
+    .history-details > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .history-details > summary::-webkit-details-marker { display: none; }
+    .history-details > summary h2 { margin: 0; }
+    .history-details > summary::after { content: "⌄"; color: var(--text-muted); font-size: 1.2rem; }
+    .history-details[open] > summary::after { content: "⌃"; }
+    .more-files { margin-top: 6px; }
+    .more-files > summary { cursor: pointer; font-size: .84rem; color: var(--mpie-blue-text); }
+    /* Conectar sua IA em passos. */
+    .wiz-h { margin: 16px 0 6px; font-size: .95rem; }
+    .wiz-h:first-of-type { margin-top: 6px; }
+    .mini-details { margin-top: 12px; }
+    .mini-details > summary { cursor: pointer; font-size: .86rem; color: var(--mpie-blue-text); font-weight: 600; }
+    [data-ai-only][hidden] { display: none !important; }
+    .add-tabs { margin: 4px 0 12px; }
+    .add-pane[hidden], .col-pills[hidden] { display: none !important; }
+    body.sem-api .library-item label input[type=checkbox], body.sem-api .kcard-btn:not(.kcard-del) { display: none !important; }
+    .quarantine-line summary { cursor: pointer; }
     .step-hidden { display: none !important; }
     .loading { opacity: 0.7; }
 
@@ -1436,39 +1482,68 @@
         </div>
         <!-- Modo sem API: a IA do próprio pesquisador (Claude, Gemini CLI, ChatGPT...) via MCP. -->
         <details class="gemini-setup hidden" id="mcp-details">
-          <summary id="mcp-title">Conectar sua IA, sem API paga (MCP)</summary>
+          <summary id="mcp-title">Conectar sua IA</summary>
           <div class="gemini-setup-body">
-            <div class="billing-split" role="note">
-              <strong>Como funciona</strong>
-              <p>A IA que você já usa, com a sua assinatura ou plano gratuito, lê as fontes e escreve. O Scriptorium não chama modelo nenhum: guarda as fontes, entrega os trechos, confere cada etapa (chaves de referência e citações literais) e compila o PDF.</p>
-              <p>Revisão e verificação acontecem em <strong>conversas novas</strong>, abertas por um passe, de preferência em outra IA. Quem escreveu não revisa o próprio texto.</p>
-              <p>O texto vai para o provedor da sua IA, nas condições da sua conta. Não use dados inéditos ou sensíveis se a sua conta não for adequada para isso (IN IFRS 16/2026, Art. 9º).</p>
+            <p class="subtle" style="margin-top:0">A IA que você já usa (até no plano gratuito) lê as fontes e escreve. O Scriptorium guarda as fontes e confere cada etapa. Nada é cobrado aqui.</p>
+            <h4 class="wiz-h">1. Qual IA você usa?</h4>
+            <div class="segmented" role="radiogroup" aria-label="Sua IA" id="mcp-ai-choice">
+              <button type="button" class="seg-btn active" role="radio" aria-checked="true" data-ai="claude">Claude</button>
+              <button type="button" class="seg-btn" role="radio" aria-checked="false" data-ai="chatgpt">ChatGPT</button>
+              <button type="button" class="seg-btn" role="radio" aria-checked="false" data-ai="gemini">Gemini</button>
             </div>
-            <label for="mcp-token-label">Nome do token (para você reconhecer depois)</label>
+            <h4 class="wiz-h">2. Gere sua chave de conexão</h4>
+            <p class="field-hint" style="margin-top:0">É um endereço só seu, que deixa a sua IA ver as suas fontes. Aparece uma vez; se perder, gere outra.</p>
             <div class="gemini-key-row">
-              <input id="mcp-token-label" type="text" maxlength="60" placeholder="Ex.: Claude no notebook" />
-              <button class="btn" type="button" id="mcp-create-token">Gerar token</button>
+              <input id="mcp-token-label" type="text" maxlength="60" placeholder="Nome para lembrar (opcional): Claude no celular" aria-label="Nome da chave (opcional)" />
+              <button class="btn" type="button" id="mcp-create-token">Gerar chave</button>
             </div>
             <div id="mcp-new-token" class="hidden" role="status">
-              <p class="warning"><strong>Copie agora:</strong> o token não será mostrado de novo. Quem tiver este endereço acessa suas fontes e projetos por MCP; se vazar, revogue.</p>
-              <label for="mcp-url-token">Endereço com token (Claude, ChatGPT e clientes que só pedem um endereço)</label>
-              <div class="gemini-key-row">
-                <input id="mcp-url-token" type="text" readonly spellcheck="false" />
-                <button class="btn alt" type="button" data-copy="mcp-url-token">Copiar</button>
+              <p class="warning"><strong>Copie agora:</strong> a chave não aparece de novo. Não compartilhe; quem tiver o endereço vê as suas fontes.</p>
+              <div data-ai-only="claude chatgpt">
+                <label for="mcp-url-token">Seu endereço de conexão</label>
+                <div class="gemini-key-row">
+                  <input id="mcp-url-token" type="text" readonly spellcheck="false" />
+                  <button class="btn alt" type="button" data-copy="mcp-url-token">Copiar</button>
+                </div>
               </div>
-              <label for="mcp-gemini-config">Gemini CLI: trecho para o arquivo ~/.gemini/settings.json</label>
-              <textarea id="mcp-gemini-config" rows="8" readonly spellcheck="false" style="font-family:monospace;font-size:12px"></textarea>
-              <div class="actions"><button class="btn alt" type="button" data-copy="mcp-gemini-config">Copiar configuração</button></div>
+              <div data-ai-only="gemini" hidden>
+                <label for="mcp-gemini-config">Configuração para o Gemini</label>
+                <textarea id="mcp-gemini-config" rows="7" readonly spellcheck="false" style="font-family:monospace;font-size:12px"></textarea>
+                <div class="actions"><button class="btn alt" type="button" data-copy="mcp-gemini-config">Copiar configuração</button></div>
+              </div>
             </div>
-            <ol class="gemini-steps">
-              <li><strong>Claude</strong> (site, app de desktop ou celular): em Conectores, adicione um conector personalizado e cole o endereço com token. No plano gratuito cabe um conector personalizado.</li>
-              <li><strong>Gemini CLI</strong> (gratuito com login Google): cole a configuração acima no settings.json e rode <code>gemini</code>.</li>
-              <li><strong>ChatGPT</strong>: onde o modo desenvolvedor estiver disponível para o seu plano, crie um app com o endereço com token.</li>
-              <li><strong>Para começar</strong>, peça à sua IA: <em>"Use o Scriptorium: liste minhas fontes, crie um projeto sobre [tema] com as fontes [nomes] e siga as etapas."</em></li>
+            <h4 class="wiz-h">3. Cole na sua IA</h4>
+            <ol class="gemini-steps" data-ai-only="claude">
+              <li>No site ou app do Claude, abra <strong>Configurações &gt; Conectores</strong>.</li>
+              <li>Escolha <strong>Adicionar conector personalizado</strong>, dê o nome Scriptorium e cole o endereço. O plano gratuito permite um.</li>
+              <li>Numa conversa nova, confira se o Scriptorium está ligado no menu de ferramentas.</li>
             </ol>
-            <h4 style="margin:14px 0 4px">Tokens ativos</h4>
-            <div id="mcp-token-list" class="subtle" role="status"></div>
-            <p class="subtle">Os projetos escritos pela sua IA ficam na etapa <strong>Execuções e Auditorias</strong>.</p>
+            <ol class="gemini-steps" data-ai-only="chatgpt" hidden>
+              <li>No ChatGPT, abra <strong>Configurações &gt; Apps e conectores</strong> e ative o modo desenvolvedor (disponível só em alguns planos).</li>
+              <li>Crie um conector com o nome Scriptorium e cole o endereço.</li>
+              <li>Numa conversa, escolha o Scriptorium entre as ferramentas.</li>
+            </ol>
+            <ol class="gemini-steps" data-ai-only="gemini" hidden>
+              <li>No computador, instale o <strong>Gemini CLI</strong> (gratuito com a sua conta Google).</li>
+              <li>Cole a configuração no arquivo <code>~/.gemini/settings.json</code>.</li>
+              <li>No terminal, rode <code>gemini</code> e faça o pedido abaixo.</li>
+            </ol>
+            <h4 class="wiz-h">4. Faça o primeiro pedido</h4>
+            <div class="gemini-key-row">
+              <textarea id="mcp-first-prompt" rows="2" readonly aria-label="Primeiro pedido para a sua IA">Use o Scriptorium: liste minhas fontes, crie um projeto de artigo sobre [seu tema] e siga as etapas.</textarea>
+              <button class="btn alt" type="button" data-copy="mcp-first-prompt">Copiar</button>
+            </div>
+            <p class="subtle">Troque [seu tema] pelo seu tema. Depois acompanhe em <strong>Seus artigos</strong>.</p>
+            <details class="mini-details">
+              <summary>Chaves ativas (<span id="mcp-token-count">0</span>)</summary>
+              <div id="mcp-token-list" class="subtle" role="status"></div>
+            </details>
+            <details class="mini-details">
+              <summary>Como funciona e privacidade</summary>
+              <p class="subtle">A sua IA lê os trechos das fontes e escreve. O Scriptorium não chama IA nenhuma: entrega os trechos, confere cada etapa (referências e citações copiadas das fontes) e gera o PDF.</p>
+              <p class="subtle">A revisão e a verificação acontecem em <strong>conversas novas</strong>, de preferência em outra IA: quem escreveu não revisa o próprio texto.</p>
+              <p class="subtle">O texto vai para a empresa da sua IA, nas condições da sua conta. Não use dados inéditos ou sensíveis se a sua conta não for adequada para isso (IN IFRS 16/2026, Art. 9º).</p>
+            </details>
             <p class="subtle" id="mcp-message" role="status"></p>
           </div>
         </details>
@@ -1534,12 +1609,21 @@
           </details>
         </div>
       </section>
+      <!-- Comece aqui: os três passos do modo sem API, com estado. app.js esconde quando tudo está feito. -->
+      <section class="start-strip hidden" id="start-strip" data-sem-api-only aria-labelledby="start-title">
+        <h2 id="start-title">Comece aqui</h2>
+        <ol>
+          <li id="start-1"><button type="button" data-start="1" data-go-step="1"><span class="start-n" aria-hidden="true">1</span><span><b>Envie suas fontes</b><small>PDF, DOCX ou .bib, na biblioteca</small></span></button></li>
+          <li id="start-2"><button type="button" data-start="2"><span class="start-n" aria-hidden="true">2</span><span><b>Conecte sua IA</b><small>Claude, ChatGPT ou Gemini</small></span></button></li>
+          <li id="start-3"><button type="button" data-start="3" data-go-step="3"><span class="start-n" aria-hidden="true">3</span><span><b>Peça o artigo</b><small>e acompanhe em Seus artigos</small></span></button></li>
+        </ol>
+      </section>
       <!-- Navegação em 3 etapas (Estúdio Editorial) -->
       <nav class="stepper" aria-label="Etapas do fluxo de pesquisa">
         <button type="button" class="step-btn active" data-step="1">
           <span class="step-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></span>
           <span>
-            <span class="step-title">Selecionar Fontes</span>
+            <span class="step-title" data-sem-api-only>Suas fontes</span><span class="step-title" data-modo-api>Selecionar Fontes</span>
             <span class="step-sub" id="step-sub-1">Biblioteca privada</span>
           </span>
         </button>
@@ -1553,8 +1637,8 @@
         <button type="button" class="step-btn" data-step="3">
           <span class="step-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
           <span>
-            <span class="step-title">Execuções e Auditorias</span>
-            <span class="step-sub" id="step-sub-3">Projetos da sua IA e histórico</span>
+            <span class="step-title" data-sem-api-only>Seus artigos</span><span class="step-title" data-modo-api>Execuções e Auditorias</span>
+            <span class="step-sub" id="step-sub-3">Escritos pela sua IA, conferidos aqui</span>
           </span>
         </button>
       </nav>
@@ -1564,7 +1648,7 @@
         <div class="panel-header">
           <div>
             <h2>Biblioteca acadêmica permanente</h2>
-            <p class="subtle" style="margin:0">Organize seus documentos no Kanban (arraste para mudar o filtro) ou alterne para Lista.<span data-modo-api> Selecione até 8 fontes (ou 20 no contexto ampliado) para a próxima pesquisa.</span> Sua IA escolhe até 20 destas fontes para cada projeto (Minha conta &gt; Conectar sua IA).</p>
+            <p class="subtle" style="margin:0"><span data-sem-api-only>Guarde aqui os textos que a sua IA pode usar. Ela escolhe até 20 por artigo. As colunas são só para você se organizar.</span><span data-modo-api>Organize seus documentos no Kanban (arraste para mudar o filtro) ou alterne para Lista. Selecione até 8 fontes (ou 20 no contexto ampliado) para a próxima pesquisa.</span></p>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <div class="segmented" role="group" aria-label="Modo de visualização da biblioteca">
@@ -1577,8 +1661,14 @@
         </div>
 
         <!-- Gaveta retrátil de Upload (mantém o topo limpo e preserva 100% os IDs de app.js) -->
-        <details class="upload-drawer">
-          <summary><span>+ Adicionar arquivo</span><span class="subtle" aria-hidden="true">⌄</span></summary>
+        <details class="upload-drawer" id="add-sources">
+          <summary><span>+ Adicionar fontes</span><span class="subtle" aria-hidden="true">⌄</span></summary>
+          <div class="segmented add-tabs" role="tablist" aria-label="Como adicionar">
+            <button type="button" class="seg-btn active" role="tab" aria-selected="true" data-add-tab="arquivo">Arquivo</button>
+            <button type="button" class="seg-btn" role="tab" aria-selected="false" data-add-tab="zotero">Zotero</button>
+            <button type="button" class="seg-btn" role="tab" aria-selected="false" data-add-tab="doi">DOI ou link</button>
+          </div>
+          <div class="add-pane" data-add-pane="arquivo">
           <div class="library-grid">
             <div><label for="library-file">Arquivo</label><input id="library-file" type="file" accept=".pdf,.docx,.bib,.ris,.txt" /></div>
             <div>
@@ -1593,11 +1683,10 @@
             <button class="btn" type="button" id="upload-library">Guardar na biblioteca</button>
             <span id="library-message" role="status" class="subtle"></span>
           </div>
-        </details>
+          </div>
 
-        <!-- M26: importação somente leitura do Zotero (a chave não é guardada) -->
-        <details class="upload-drawer" id="zotero-drawer">
-          <summary><span>+ Importar do Zotero</span><span class="subtle" aria-hidden="true">⌄</span></summary>
+          <!-- M26: importação somente leitura do Zotero (a chave não é guardada) -->
+          <div class="add-pane" id="zotero-drawer" data-add-pane="zotero" hidden>
           <p class="field-hint">Importa só os metadados (BibTeX) de uma coleção, como um arquivo .bib da biblioteca. Use uma chave do Zotero <strong>somente leitura</strong> (zotero.org &gt; Settings &gt; Security). A chave é usada nesta importação e não fica guardada no Scriptorium.</p>
           <label for="zotero-key">Chave da API do Zotero</label>
           <input id="zotero-key" type="password" autocomplete="off" maxlength="64" placeholder="Cole a chave somente leitura"/>
@@ -1624,11 +1713,10 @@
             <button class="btn" type="button" id="zotero-import" disabled>Importar como .bib</button>
             <span id="zotero-message" role="status" class="subtle"></span>
           </div>
-        </details>
+          </div>
 
-        <!-- Importação de PDFs de acesso aberto por DOI ou link (OpenAlex, R09) -->
-        <details class="upload-drawer" id="oa-drawer">
-          <summary><span>+ Importar por DOI ou link (acesso aberto)</span><span class="subtle" aria-hidden="true">⌄</span></summary>
+          <!-- Importação de PDFs de acesso aberto por DOI ou link (OpenAlex, R09) -->
+          <div class="add-pane" id="oa-drawer" data-add-pane="doi" hidden>
           <p class="field-hint">Cole até 30 DOIs (10.xxxx/...) ou links https de PDFs abertos, um por linha. O Scriptorium busca a versão aberta no OpenAlex, confere o arquivo e guarda na biblioteca com a origem e a licença.</p>
           <label for="oa-items">DOIs ou links</label>
           <textarea id="oa-items" rows="5" placeholder="10.1590/S1517-97022013005000014&#10;https://exemplo.org/artigo.pdf"></textarea>
@@ -1639,6 +1727,7 @@
             <span id="oa-message" role="status" class="subtle"></span>
           </div>
           <div id="oa-results"></div>
+          </div>
         </details>
 
         <!-- M03/M21: busca no conteúdo dos documentos já lidos e ficha de leitura -->
@@ -1880,21 +1969,20 @@
       <section class="panel step-hidden" id="mcp-projects-panel" data-step-panel="3" data-sem-api-only>
         <div class="panel-header">
           <div>
-            <h2>Projetos da sua IA</h2>
-            <p class="subtle" style="margin:4px 0 0">Escritos pela IA conectada em Minha conta, com cada etapa conferida pelo Scriptorium.</p>
+            <h2>Seus artigos</h2>
+            <p class="subtle" style="margin:4px 0 0">Sua IA escreve na conversa; aqui você vê o que já foi conferido e o que fazer em seguida.</p>
           </div>
           <button id="mcp-projects-refresh" class="btn alt" type="button">Atualizar</button>
         </div>
         <div id="mcp-projects" role="status">Carregando...</div>
       </section>
       <section class="panel step-hidden" id="history-panel" data-step-panel="3">
-        <div class="panel-header">
-          <div>
-            <h2>Histórico de pesquisas</h2>
-          </div>
-          <button id="refresh" class="btn alt">Atualizar</button>
-        </div>
-        <div id="research-list" role="status">Carregando...</div>
+        <details class="history-details" id="history-details">
+          <summary><h2 id="history-title">Pesquisas anteriores</h2></summary>
+          <p class="subtle" data-sem-api-only>Feitas no modo antigo, com API. Ficam guardadas para você baixar.</p>
+          <div class="actions" style="justify-content:flex-end;margin-top:0"><button id="refresh" class="btn alt" type="button">Atualizar</button></div>
+          <div id="research-list" role="status">Carregando...</div>
+        </details>
       </section>
     </div>
   </main>
@@ -1995,7 +2083,7 @@
       const DEFAULT_COLS = [
         { id: 'col-1', name: 'A Triar', desc: 'Arquivos recém-enviados' },
         { id: 'col-2', name: 'Em Leitura', desc: 'Em fichamento crítico' },
-        { id: 'col-3', name: 'Pronto para Citar', desc: 'Validados para os agentes' },
+        { id: 'col-3', name: 'Pronto para Citar', desc: 'Lidos e prontos para usar' },
         { id: 'col-4', name: 'Normas & Bases', desc: 'Manuais ABNT e .bib' }
       ];
 
@@ -2023,7 +2111,7 @@
           const sc = JSON.parse(localStorage.getItem(prefKey('cols')) || 'null');
           if (Array.isArray(sc) && sc.length >= 2 &&
               sc.every(c => typeof c.id === 'string' && typeof c.name === 'string'))
-            columns = sc;
+            columns = sc.map(c => c.desc === 'Validados para os agentes' ? { ...c, desc: 'Lidos e prontos para usar' } : c);
           const sm = JSON.parse(localStorage.getItem(prefKey('items')) || '{}');
           if (sm && typeof sm === 'object' && !Array.isArray(sm)) itemColMap = sm;
           const sv = localStorage.getItem(prefKey('view'));
@@ -2140,8 +2228,10 @@
         viewKanbanBtn.classList.toggle('active', viewMode === 'kanban');
         viewListBtn.classList.toggle('active', viewMode === 'list');
 
-        // Render chips de filtro por coluna
+        // Chips de filtro por coluna: só na Lista (no Kanban as próprias colunas já mostram isso)
         colPills.replaceChildren();
+        colPills.hidden = viewMode === 'kanban';
+        if (viewMode === 'kanban') activeColFilter = 'todas';
         const lbl = document.createElement('span');
         lbl.style.cssText = 'font-size:.74rem;font-weight:600;color:var(--text-muted);margin-right:4px';
         lbl.textContent = 'Filtro por coluna:';
@@ -2274,7 +2364,7 @@
           if (!colItems.length) {
             const emp = document.createElement('div');
             emp.className = 'kanban-empty';
-            emp.textContent = `Arraste um documento para cá para aplicar o filtro "${col.name}".`;
+            emp.textContent = 'Arraste um documento para cá.';
             listWrap.appendChild(emp);
           } else {
             colItems.forEach(it => {
