@@ -1221,6 +1221,25 @@
       .gemini-key-row button { flex: 1; }
       .gemini-steps .actions .btn { flex: 1 1 100%; justify-content: center; text-align: center; }
     }
+    /* "Minha conta" como janela aberta pelo botão do cabeçalho. No primeiro acesso
+       (sem autorização ou sem chave) o painel continua na página, porque é o único passo. */
+    .account-btn { position: relative; }
+    .account-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+    .account-dot.ok { background: #2e9d5b; }
+    .account-dot.warn { background: #e0a21b; }
+    #account-close { display: none; }
+    #account-panel.as-modal { display: none; }
+    #account-panel.as-modal.open {
+      display: block; position: fixed; z-index: 70; top: 72px; right: 16px;
+      width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 88px); overflow-y: auto;
+      margin: 0; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    }
+    #account-panel.as-modal #account-close { display: inline-flex; }
+    #account-backdrop { position: fixed; inset: 0; z-index: 69; background: rgba(0, 0, 0, 0.45); }
+    @media (max-width: 640px) {
+      #account-panel.as-modal.open { top: 8px; right: 8px; left: 8px; width: auto; max-height: calc(100dvh - 16px); }
+      .account-btn .account-label { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -1253,6 +1272,12 @@
 
       <div class="header-controls">
         <div id="identity"></div>
+        <button type="button" id="account-button" class="theme-btn account-btn hidden" aria-haspopup="dialog"
+                aria-controls="account-panel" aria-expanded="false" title="Minha conta">
+          <span class="account-dot" id="account-dot" aria-hidden="true"></span>
+          <span aria-hidden="true">👤</span>
+          <span class="account-label">Minha conta</span>
+        </button>
         <button type="button" id="theme-toggle" class="theme-btn" aria-pressed="false">
           <span id="theme-icon" aria-hidden="true">🌙</span>
           <span id="theme-label">Modo Black</span>
@@ -1273,11 +1298,13 @@
     </section>
 
     <div id="workspace" class="hidden">
-      <section class="panel" id="account-panel">
+      <div id="account-backdrop" class="hidden"></div>
+      <section class="panel" id="account-panel" aria-labelledby="account-heading">
         <div class="panel-header"><div>
-          <h2>Minha conta</h2>
+          <h2 id="account-heading">Minha conta</h2>
           <p class="subtle" style="margin:0">Conecte sua inteligência artificial com segurança. O Scriptorium mostrará só os recursos disponíveis para você.</p>
-        </div><span class="pill" id="account-state">Iniciando verificação...</span></div>
+        </div><span class="pill" id="account-state">Iniciando verificação...</span>
+          <button type="button" class="btn alt" id="account-close" aria-label="Fechar minha conta" style="padding:5px 10px">✕</button></div>
         <div id="account-message" class="subtle" role="status"></div>
         <div id="legacy-api-notice" class="hidden" role="status">
           <p class="warning"><strong>Administração de pesquisadores temporariamente indisponível.</strong>
@@ -2301,6 +2328,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=in16-20261124"></script>
+  <script type="module" src="/app.js?v=conta-20261124"></script>
 </body>
 </html>
