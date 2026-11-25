@@ -1284,7 +1284,9 @@ async function loadAccountAccess() {
     const response = await request('/account/access', { signal: controller.signal });
     accountAccess = await response.json();
     $('workspace').classList.remove('access-pending', 'access-setup');
+    const noCredit = accountAccess.model_access?.billing_alert?.state === 'prepay_depleted';
     const keyState = accountAccess.model_access?.status === 'admin_vertex' ? 'IA pelo projeto (exceção)' :
+      noCredit ? 'Chave sem saldo pré-pago' :
       (accountAccess.byok_ready ?
         (accountAccess.model_access?.status === 'verified' ? 'Chave Gemini verificada' : 'Verifique sua chave') :
         'Conecte sua chave Gemini');
@@ -1304,6 +1306,7 @@ async function loadAccountAccess() {
     $('remove-personal-key').classList.toggle('hidden', !guestReady);
     $('submit').disabled = !hasModels;
     $('account-message').textContent = accountAccess.model_access?.status === 'admin_vertex' ? '' :
+      noCredit ? 'O Google recusou a última execução por falta de saldo pré-pago na sua chave (erro 402). Adicione créditos no Google AI Studio, em Faturamento; o aviso some na próxima execução que funcionar ou se você cadastrar a chave de novo.' :
       (guestVerified ? '' : (guestReady
         ? 'Sua chave foi cadastrada, mas ainda não há um modelo confirmado. Confira a chave abaixo.'
         : 'Para começar, conecte sua chave Gemini seguindo as instruções.'));
@@ -1432,7 +1435,9 @@ $('save-personal-key').addEventListener('click', async () => {
     $('key-setup-result').textContent = hasPro ?
       'Conexão concluída. Seu modelo avançado está disponível!' :
       (hasFlash ? 'Conexão concluída. Você já pode pesquisar com o modelo econômico.' :
-        'Chave cadastrada, mas o Google não liberou os modelos testados. Confira os limites da conta.');
+        (Object.values(models).includes('no_credit')
+          ? 'Chave cadastrada, mas o projeto dela está sem saldo de créditos pré-pagos (erro 402). Adicione créditos no Google AI Studio, em Faturamento, ou use uma chave de um projeto sem faturamento (nível gratuito, só com material público).'
+          : 'Chave cadastrada, mas o Google não liberou os modelos testados. Confira os limites da conta.'));
   } catch(error) {
     $('key-setup-result').textContent = 'Não foi possível salvar a chave: ' + error.message;
   } finally { button.disabled = false; }

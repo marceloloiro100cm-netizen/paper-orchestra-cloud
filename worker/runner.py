@@ -23,6 +23,7 @@ from reference_verification import verify_bibliography
 from source_materials import compose_library_context, compose_library_context_v2
 from neon_review import generate_review
 from byok import personal_agent_environment
+import billing_alert
 from run_manifest import RunManifest
 from ai_declaration import build_declaration
 from embeddings import make_embedder
@@ -104,6 +105,14 @@ def update(**fields):
 
 def now():
     return datetime.now(timezone.utc).isoformat()
+
+
+def key_worked() -> None:
+    """A chave pessoal respondeu: some o aviso de saldo esgotado, se houver."""
+    try:
+        billing_alert.clear(client, OWNER_UID, firestore.DELETE_FIELD)
+    except Exception as exc:  # aviso é auxiliar; nunca derruba a execução
+        print("Aviso de saldo não atualizado:", repr(exc), flush=True)
 
 
 def put(local: Path, remote_name: str, mime: str, record: bool = True):
@@ -216,6 +225,8 @@ def run_reading_notes(data: dict) -> None:
         ai.close()
     key = f"{namespace(notes['model'])}/{notes['parser_version']}-{notes['chunk_policy']}/{entry['sha256']}"
     cache.put(key, json.dumps(notes, ensure_ascii=False).encode("utf-8"))
+    if auth_mode == "user_gemini":
+        key_worked()
     update(status="completed", stage="Fichamento pronto", finished_at=now(), files=["reading_notes"],
            notes_usage=notes.get("usage") or {})
 
@@ -278,6 +289,7 @@ def run_retrieval_eval(data: dict) -> None:
     report["finished_at"] = now()
     bucket.blob(f"{prefix}/output/retrieval_eval.json").upload_from_string(
         json.dumps(report, ensure_ascii=False, indent=2), content_type="application/json")
+    key_worked()
     update(status="completed", stage="Teste de busca concluído", finished_at=now(), files=["retrieval_eval"],
            retrieval_eval_summary=summary(report))
 
@@ -486,6 +498,8 @@ def main():
                         logpath.write_text(contents.replace(secret, "[REDACTED]"), encoding="utf-8")
                 put(logpath, "execution.log", "text/plain; charset=utf-8")
         if returncode != 0:
+            if auth_mode == "user_gemini" and billing_alert.log_mentions_depleted(logpath):
+                raise RuntimeError(billing_alert.MESSAGE)
             raise RuntimeError(f"O pipeline terminou com código {returncode}; consulte os logs do trabalho no Cloud Run.")
         update(stage="Armazenando o manuscrito")
         pdf = output / "final_paper.pdf"
@@ -708,6 +722,8 @@ def main():
         except Exception as exc:
             print("Manifesto ou declaração indisponíveis:", repr(exc), flush=True)
         skipped = any(r.get("status") == "pulada_por_cancelamento" for r in BUDGET.records.values())
+        if auth_mode == "user_gemini":
+            key_worked()
         update(status="completed", agents=final_agents, finished_at=now(), files=files,
                stage="Concluído (etapas opcionais canceladas)" if skipped else "Concluído")
 
@@ -732,7 +748,15 @@ if __name__ == "__main__":
                 update(status="cancelled", stage="Cancelada pelo pesquisador", finished_at=now(),
                        error="")
             else:
-                update(status="failed", stage="Falha", error=str(exc)[:400], finished_at=now())
+                message = str(exc)
+                if billing_alert.prepay_depleted(message) or message == billing_alert.MESSAGE:
+                    # Erro 402 do Google: mensagem em português e selo na conta.
+                    message = billing_alert.MESSAGE
+                    try:
+                        billing_alert.mark(client, OWNER_UID, now())
+                    except Exception:
+                        pass
+                update(status="failed", stage="Falha", error=message[:400], finished_at=now())
         except Exception:
             pass
         # Manifesto também em falhas: mostra até onde a execução chegou.
