@@ -1304,6 +1304,7 @@
     @media (max-width: 640px) {
       #account-panel.as-modal.open { top: 8px; right: 8px; left: 8px; width: auto; max-height: calc(100dvh - 16px); }
       .account-btn .account-label { display: none; }
+      .guide-label { display: none; }
     }
   </style>
 </head>
@@ -1339,7 +1340,7 @@
         <div id="identity"></div>
         <a class="theme-btn" href="/guia/" style="text-decoration:none" title="Passo a passo para construir um artigo, do tema à submissão">
           <span aria-hidden="true">📘</span>
-          <span>Guia de escrita</span>
+          <span class="guide-label">Guia de escrita</span>
         </a>
         <button type="button" id="account-button" class="theme-btn account-btn hidden" aria-haspopup="dialog"
                 aria-controls="account-panel" aria-expanded="false" title="Minha conta">
@@ -1553,7 +1554,7 @@
           <span class="step-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
           <span>
             <span class="step-title">Execuções e Auditorias</span>
-            <span class="step-sub" id="step-sub-3">Histórico, agentes e pareceres</span>
+            <span class="step-sub" id="step-sub-3">Projetos da sua IA e histórico</span>
           </span>
         </button>
       </nav>
