@@ -30,7 +30,7 @@ A conta de faturamento Google Cloud que você já usa pode pagar **outro projeto
 
    Por padrão, o script solicita seu email autorizado e usa **Vertex AI com a identidade da conta de serviço do Cloud Run Job**, sem precisar de chave Gemini. Esse caminho depende da disponibilidade e cotas do modelo no novo projeto. Como alternativa, defina `AI_PROVIDER=gemini_api` junto de `PROJECT_ID`; nesse caso o script solicitará uma chave Gemini sem mostrá-la e a gravará no Secret Manager. Nunca cole chaves em chats nem no GitHub.
 
-7. Abra `https://paperorchestra-mestrado.web.app` no Android ou PC. Se necessário, autorize esse domínio na tela Authentication > Settings > Authorized domains.
+7. Abra `https://scriptoriummpie.web.app` (endereço oficial desde 24/11/2026) no Android ou PC. O antigo `https://paperorchestra-mestrado.web.app` só redireciona para ele (`hosting-redirect/`, publicado por `.github/workflows/deploy-hosting.yml`).
 8. Faça um primeiro teste com materiais reais, modelo Flash e sem gráficos. Baixe o PDF e confira os logs, referências e resultados.
 
 **Atenção:** deploy inicial normalmente precisa de permissões de Cloud Build, Artifact Registry, Cloud Run Admin, Service Account Admin, Secret Manager e IAM; organização com políticas restritivas pode precisar de ajustes. O script termina se alguma pré-condição falhar. Não foi executado na sua conta.

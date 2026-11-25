@@ -16,7 +16,7 @@ import sys
 import time
 from urllib import error, request
 
-BASE = "https://paperorchestra-mestrado.web.app"
+BASE = "https://scriptoriummpie.web.app"
 EXPECTED_ROUTES = (
     ("GET", "/api/account/access"),
     ("GET", "/api/admin/access-requests"),

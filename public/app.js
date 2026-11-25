@@ -104,7 +104,10 @@ function displayLibrary() {
         selectedSourceIds.delete(item.id);await loadLibrary();
       }catch(e){libraryMessage(e.message);archive.disabled=false}
     });
-    actions.append(down,archive);body.append(actions);line.append(body);target.append(line);
+    const remove = document.createElement('button');remove.type='button';remove.textContent='Apagar';
+    remove.className='library-delete btn-danger-text';
+    remove.addEventListener('click',()=>deleteLibraryItem(item));
+    actions.append(down,archive,remove);body.append(actions);line.append(body);target.append(line);
   }
 }
 
@@ -119,8 +122,8 @@ async function loadLibrary() {
     if(q){q.replaceChildren();q.classList.toggle('hidden',!held.length);
       if(held.length){q.append(el('strong','Arquivos retidos na verificação de segurança (não entram nas pesquisas)'));
         for(const h of held){const reasons=((h.guard||{}).findings||[]).filter(f=>f.severity==='alta').map(f=>f.detail).join(' ');
-          const row=el('p',`${h.name}: ${reasons}`);const drop=el('button','Descartar');drop.type='button';
-          drop.addEventListener('click',async()=>{drop.disabled=true;try{await request('/library/items/'+h.id+'/archive',{method:'POST'});await loadLibrary();}catch(e){libraryMessage(e.message);drop.disabled=false}});
+          const row=el('p',`${h.name}: ${reasons}`);const drop=el('button','Apagar');drop.type='button';
+          drop.addEventListener('click',()=>deleteLibraryItem(h));
           row.append(' ',drop);q.append(row);}
         q.append(el('small','Verificação estática (não é antivírus). Se o arquivo for legítimo, gere um PDF novo e envie de novo.'));}}
     const activeIds=new Set(libraryItems.map(i=>i.id));
@@ -170,6 +173,43 @@ async function download(id, kind) {
     a.href = url; a.download = `${id}_${names[kind] || 'execucao.log'}`;
     a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000);
   } catch (e) { alert(e.message); }
+}
+
+// Confirmação explícita para ações que não têm volta (apagar pesquisa ou fonte).
+function confirmAction(title, message, confirmLabel) {
+  return new Promise((resolve) => {
+    const back = document.createElement('div');
+    back.className = 'modal-backdrop';
+    back.setAttribute('role', 'alertdialog'); back.setAttribute('aria-modal', 'true');
+    const box = document.createElement('div'); box.className = 'modal-box';
+    const head = document.createElement('div'); head.className = 'modal-head';
+    const h = document.createElement('strong'); h.textContent = title; h.id = 'confirm-title';
+    back.setAttribute('aria-labelledby', 'confirm-title');
+    head.append(h);
+    const body = document.createElement('div'); body.className = 'modal-body';
+    for (const part of [].concat(message)) { const p = document.createElement('p'); p.textContent = part; p.style.margin = '0'; body.append(p); }
+    const foot = document.createElement('div'); foot.className = 'modal-foot';
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn alt'; cancel.textContent = 'Cancelar';
+    const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'btn btn-danger'; ok.textContent = confirmLabel;
+    foot.append(cancel, ok); box.append(head, body, foot); back.append(box);
+    const done = (value) => { document.removeEventListener('keydown', onKey); back.remove(); resolve(value); };
+    const onKey = (e) => { if (e.key === 'Escape') done(false); };
+    cancel.addEventListener('click', () => done(false));
+    ok.addEventListener('click', () => done(true));
+    back.addEventListener('click', (e) => { if (e.target === back) done(false); });
+    document.addEventListener('keydown', onKey);
+    document.body.append(back); cancel.focus();
+  });
+}
+
+async function deleteLibraryItem(item) {
+  const ok = await confirmAction('Apagar fonte da biblioteca?', [
+    `"${item.name}" será apagado de vez, com o arquivo original, a ficha de leitura e o fichamento guardados.`,
+    'Pesquisas antigas que usaram esta fonte continuam no histórico, mas não conseguem mais abrir a página do PDF.',
+    'Essa ação não pode ser desfeita.'], 'Apagar fonte');
+  if (!ok) return;
+  try { await request('/library/items/' + item.id, {method: 'DELETE'}); selectedSourceIds.delete(item.id); await loadLibrary(); libraryMessage('Fonte apagada.'); }
+  catch (e) { libraryMessage(e.message); }
 }
 
 // Onda 6: arquivos gerados na hora pela API (matriz revisada, CSL-JSON, ABNT).
@@ -835,6 +875,22 @@ async function loadJobs() {
           }
         }
         info.append(files);
+      }
+      // Apagar do histórico (pede confirmação; pesquisa em execução precisa ser cancelada antes).
+      if (!['queued', 'running'].includes(entry.status)) {
+        const del = document.createElement('div'); del.className = 'downloads';
+        const b = el('button', 'Apagar do histórico', 'btn-danger-text'); b.type = 'button';
+        b.addEventListener('click', async () => {
+          const ok = await confirmAction('Apagar pesquisa?', [
+            `"${entry.title}" será apagada de vez: PDF, LaTeX, relatórios, manifesto, declaração e as suas revisões.`,
+            'As fontes da biblioteca não são apagadas. Baixe antes o que quiser guardar.',
+            'Essa ação não pode ser desfeita.'], 'Apagar pesquisa');
+          if (!ok) return;
+          b.disabled = true;
+          try { await request(`/jobs/${entry.id}`, {method: 'DELETE'}); await loadJobs(); }
+          catch (e) { alert(e.message); b.disabled = false; }
+        });
+        del.append(b); info.append(del);
       }
       const badge = document.createElement('span'); badge.className='pill'; badge.textContent=statusLabel(entry.status);
       item.append(info, badge); area.append(item);

@@ -1221,6 +1221,26 @@
       .gemini-key-row button { flex: 1; }
       .gemini-steps .actions .btn { flex: 1 1 100%; justify-content: center; text-align: center; }
     }
+    /* Campo de arquivo com a identidade do site (o botão nativo era cinza e destoava). */
+    input[type="file"] {
+      width: 100%; padding: 8px; border: 1px dashed var(--border-main); border-radius: 12px;
+      background: var(--bg-subtle); color: var(--text-secondary); font: inherit; font-size: 0.86rem; cursor: pointer;
+    }
+    input[type="file"]:hover { border-color: var(--mpie-blue); }
+    input[type="file"]:focus-visible { outline: 3px solid var(--mpie-blue); outline-offset: 2px; }
+    input[type="file"]::file-selector-button {
+      margin-right: 12px; padding: 8px 14px; border: 1px solid var(--mpie-blue); border-radius: 10px;
+      background: var(--bg-surface); color: var(--mpie-blue-text); font: inherit; font-weight: 700; font-size: 0.84rem;
+      cursor: pointer; transition: background 150ms ease, color 150ms ease;
+    }
+    input[type="file"]::file-selector-button:hover { background: var(--mpie-blue); color: #FFFFFF; }
+    html[data-theme="black"] input[type="file"]::file-selector-button:hover { color: #070A0F; }
+    /* Ações que apagam: vermelho discreto, confirmação obrigatória. */
+    .btn-danger { background: #c0392b !important; border-color: #c0392b !important; color: #FFFFFF !important; }
+    .btn-danger-text, .kcard-del { color: #c0392b !important; border-color: rgba(192, 57, 43, 0.45) !important; }
+    .btn-danger-text:hover, .kcard-del:hover { background: rgba(192, 57, 43, 0.08) !important; }
+    html[data-theme="black"] .btn-danger-text, html[data-theme="black"] .kcard-del { color: #ff7a6b !important; }
+
     /* "Minha conta" como janela aberta pelo botão do cabeçalho. No primeiro acesso
        (sem autorização ou sem chave) o painel continua na página, porque é o único passo. */
     .account-btn { position: relative; }
@@ -1702,9 +1722,6 @@
 
             <!-- Governança e Disparo -->
             <div class="config-section" style="display:flex;flex-direction:column;gap:12px">
-              <div class="governance-note">
-                <strong>Rigor e execução em nuvem:</strong> o Scriptorium não comprova métricas nem citações — revise a triagem e a conferência em 3 bases antes de publicar. A tarefa roda no Cloud Run Job (você pode fechar o navegador).
-              </div>
               <button type="submit" class="btn cta-launch" id="submit">Iniciar geração no Scriptorium</button>
               <span id="submit-status" class="subtle" role="status" style="text-align:center;font-size:.8rem"></span>
             </div>
@@ -2149,7 +2166,21 @@
                 renderLibraryViews();
               });
 
-              foot.append(toggleBtn, selMove);
+              // Apagar: usa o botão da lista original (app.js pede confirmação antes).
+              const delBtn = document.createElement('button');
+              delBtn.type = 'button';
+              delBtn.className = 'kcard-btn kcard-del';
+              delBtn.title = 'Apagar fonte';
+              delBtn.setAttribute('aria-label', 'Apagar ' + it.filename);
+              delBtn.textContent = 'Apagar';
+              delBtn.addEventListener('click', () => {
+                const real = it.node && it.node.querySelector('.library-delete');
+                if (real) real.click();
+              });
+              const left2 = document.createElement('div');
+              left2.style.cssText = 'display:flex;gap:6px;align-items:center';
+              left2.append(toggleBtn, delBtn);
+              foot.append(left2, selMove);
               card.append(t, m, foot);
               listWrap.appendChild(card);
             });
@@ -2328,6 +2359,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=conta-20261124"></script>
+  <script type="module" src="/app.js?v=apagar-20261124"></script>
 </body>
 </html>

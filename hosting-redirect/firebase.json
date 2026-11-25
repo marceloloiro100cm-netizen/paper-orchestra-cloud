@@ -1,0 +1,22 @@
+{
+  "hosting": {
+    "public": "public",
+    "ignore": ["firebase.json", ".*"],
+    "redirects": [
+      {
+        "source": "**",
+        "destination": "https://scriptoriummpie.web.app/",
+        "type": 301
+      }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {"key": "Cache-Control", "value": "no-store"},
+          {"key": "X-Content-Type-Options", "value": "nosniff"}
+        ]
+      }
+    ]
+  }
+}

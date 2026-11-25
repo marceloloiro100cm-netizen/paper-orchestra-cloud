@@ -1,5 +1,7 @@
 # Novo endereço Scriptorium — scriptoriummpie.web.app
 
+> **Atualização de 24/11/2026 (noite):** `https://scriptoriummpie.web.app/` passou a ser o endereço oficial, por decisão do responsável. O endereço antigo `paperorchestra-mestrado.web.app` não recebe mais a aplicação: responde só com redirecionamento permanente (301) para o novo (`hosting-redirect/` e `.github/workflows/deploy-hosting.yml`). O login Google continua funcionando porque o Firebase atende `/__/auth/*` antes de qualquer redirecionamento. As instruções abaixo, sobre manter o endereço antigo inalterado, ficaram só como histórico.
+
 > **Nova tentativa em 24/11/2026:** O endereço anterior `scriptorium.web.app` foi recusado pelo Firebase porque pertence a outro projeto. Por solicitação do responsável, este procedimento passa a testar **`scriptoriummpie.web.app`**, nome ainda não confirmado como disponível. O endereço original continua em funcionamento, e a questão IAM BYOK da Issue #17 é independente.
 
 A implementação usa o [multisite oficial do Firebase Hosting](https://firebase.google.com/docs/hosting/multisites), **não** uma migração de projeto ou renomeação do site padrão.
