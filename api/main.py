@@ -28,6 +28,7 @@ from retrieval_eval_api import make_retrieval_eval_router
 from oa_import import make_oa_import_router
 from mcp_server import Dispatcher, Store as McpStore, build_app as build_mcp_app
 from mcp_site_api import make_mcp_site_router
+from guide_api import make_guide_router
 
 import firebase_admin
 from firebase_admin import auth
@@ -206,6 +207,8 @@ app.include_router(make_research_tools_router(db, bucket, current_user, get_rese
 app.include_router(make_library_index_router(db, bucket, current_user))
 # M11 (IN IFRS 16/2026): autorização do orientador registrada pelo pesquisador.
 app.include_router(make_advisor_router(db, current_user))
+# Guia de escrita (public/guia): estado do guia salvo na conta, sem IA.
+app.include_router(make_guide_router(bucket, current_user))
 
 
 @app.get("/api/health")
