@@ -135,7 +135,8 @@ class DeclarationTest(unittest.TestCase):
         text = build_declaration(manifest, {"plotting": "completed"})
         self.assertIn("gemini-4-neon", text)
         self.assertIn("gemini-3-pro-image-preview", text)
-        self.assertIn("redação e refinamento", text)
+        self.assertIn("(inc. VII)", text)
+        self.assertIn("(inc. XI)", text)
 
 
 if __name__ == "__main__":

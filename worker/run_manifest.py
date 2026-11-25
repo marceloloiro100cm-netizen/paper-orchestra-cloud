@@ -117,6 +117,8 @@ class RunManifest:
                 "regulation": "IN IFRS nº 16/2026 (R25)",
                 "data_policy": record.get("data_policy"),
                 "advisor_authorization": record.get("advisor_authorization"),
+                "academic_profile": record.get("academic_profile"),
+                "work_type": record.get("work_type"),
             },
             "limitations": [
                 "Modelos de linguagem não são determinísticos: repetir a execução com o mesmo manifesto pode gerar texto diferente.",

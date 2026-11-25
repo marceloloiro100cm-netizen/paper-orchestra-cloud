@@ -78,9 +78,16 @@ class DeclarationIn16Test(unittest.TestCase):
     def test_without_authorization_keeps_fields_to_fill(self):
         text = build_declaration(MANIFEST, AGENTS)
         self.assertIn("RASCUNHO", text)
-        self.assertIn("d3ba1f7224", text)
-        for article in ("Art. 3º", "Art. 4º", "Art. 7º", "Art. 9º", "| X |", "| XII |", "| III |"):
+        self.assertIn("e712908ba1", text)
+        for section in ("### 1. IDENTIFICAÇÃO DO AUTOR", "### 2. IDENTIFICAÇÃO DO TRABALHO ACADÊMICO",
+                        "### 3. REGISTRO DO USO DE IAGen — Art. 6º", "### 4. AUTORIZAÇÃO DO(A) SERVIDOR(A) — Art. 8º",
+                        "### 5. COMPROMISSO DO(A) AUTOR(A)", "responsabilidade intelectual, ética e legal integral",
+                        "Art. 5º, parágrafo único"):
+            self.assertIn(section, text)
+        for article in ("Art. 3º", "Art. 4º", "Art. 7º", "Art. 9º", "(inc. X)", "(inc. XII)", "(inc. III)"):
             self.assertIn(article, text)
+        self.assertNotIn("XX/2026", text)
+        self.assertIn("| **Matrícula** | [PREENCHER] |", text)
         self.assertIn("Nenhuma autorização estava registrada", text)
         self.assertIn("ai.google.dev/gemini-api/terms", text)
         self.assertNotIn("está em conformidade", text.lower())
@@ -90,12 +97,32 @@ class DeclarationIn16Test(unittest.TestCase):
             "advisor_authorization": {"advisor_name": "Profa. Ana", "authorized_on": "2026-08-10",
                                       "record_form": "e-mail", "scope": ["I", "II", "III", "IV", "XII"],
                                       "recorded_at": "2026-09-01"},
+            "academic_profile": {"full_name": "Marcelo Exemplo", "enrollment": "2026001", "unit": "Campus Porto Alegre",
+                                 "program": "Mestrado Profissional em Informática na Educação"},
+            "work_type": "dissertação",
             "data_policy": {"unpublished_data": True, "paid_tier_confirmed": True, "deidentified_confirmed": True,
                             "provider_training_policy": "Gemini API com chave pessoal"}}}
         text = build_declaration(manifest, AGENTS)
-        self.assertIn("Profa. Ana", text)
-        self.assertIn("fora da autorização registrada:** X", text)
+        self.assertIn("| **Servidor responsável** | Profa. Ana |", text)
+        self.assertIn("| **Matrícula** | 2026001 |", text)
+        self.assertIn("| **Natureza do trabalho acadêmico** | dissertação |", text)
+        self.assertIn("fora da autorização registrada: incisos X", text)
+        self.assertIn("| **Data** | 10/08/2026 |", text)
         self.assertIn("confirmado pelo(a) autor(a)", text)
+
+
+class AcademicProfileTest(unittest.TestCase):
+    def test_profile_saved_per_owner(self):
+        db = DB()
+        router = advisor.make_advisor_router(db, lambda: None)
+        put = endpoint(router, "/academic-profile", "PUT")
+        get = endpoint(router, "/academic-profile", "GET")
+        put(payload=advisor.AcademicProfile(full_name="Marcelo  Exemplo", enrollment="2026/001",
+                                            unit="Campus Porto Alegre", program="MPIE"), user={"uid": "u1"})
+        self.assertEqual(get(user={"uid": "u1"})["profile"]["full_name"], "Marcelo Exemplo")
+        self.assertIsNone(get(user={"uid": "u2"})["profile"])
+        with self.assertRaises(ValidationError):
+            advisor.AcademicProfile(full_name="Marcelo", enrollment="<script>")
 
 
 class ReadingNotesTest(unittest.TestCase):

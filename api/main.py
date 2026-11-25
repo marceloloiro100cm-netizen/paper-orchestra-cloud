@@ -21,8 +21,8 @@ from zotero_import import make_zotero_router
 from reviews import ReviewIn, add_review, list_reviews, reference_fingerprint
 from research_tools import make_research_tools_router
 from library_index import make_library_index_router
-from advisor import (addendum, data_policy, latest_authorization, make_advisor_router,
-                     snapshot as authorization_snapshot)
+from advisor import (WORK_TYPES, academic_profile, addendum, data_policy, latest_authorization,
+                     make_advisor_router, snapshot as authorization_snapshot)
 from reading_notes_api import make_reading_notes_router
 
 import firebase_admin
@@ -77,6 +77,8 @@ class NewResearch(BaseModel):
     preflight: bool = False
     # M11, IN IFRS 16/2026, Art. 9º: o pesquisador declara se há dados inéditos.
     unpublished_data: bool
+    # Anexo I, seção 2: natureza do trabalho acadêmico.
+    work_type: Literal[WORK_TYPES] = "artigo científico"  # type: ignore[valid-type]
     paid_tier_confirmed: bool = False
     deidentified_confirmed: bool = False
 
@@ -396,6 +398,9 @@ def create_research(payload: NewResearch, user: User):
         # vigentes no momento da criação; vão para o manifesto e a declaração.
         "data_policy": policy,
         "advisor_authorization": authorization_snapshot(latest_authorization(db, owner_uid)),
+        # Anexo I, seções 1 e 2: identificação do(a) autor(a) e natureza do trabalho.
+        "academic_profile": academic_profile(db, owner_uid),
+        "work_type": payload.work_type,
         "audit_status": "pending",
         "reference_status": "pending",
         # Etapas efetivas serão atualizadas pelo worker por evidências no disco.

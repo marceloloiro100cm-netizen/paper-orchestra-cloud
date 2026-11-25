@@ -2,13 +2,13 @@
 
 <!-- Arquivo gerado por scripts/upstreams.py render a partir de docs/upstreams.json. Não edite à mão. -->
 
-Atualizado em 2026-11-24. Implementados: 11; parciais: 16; não iniciados: 0.
+Atualizado em 2026-11-24. Implementados: 12; parciais: 15; não iniciados: 0.
 
 As ondas seguem o plano V2 (0: base segura; 1: leitura escalável; 2: busca e evidência; 3: auditoria científica; 4: pesquisa guiada; 5: ecossistema editorial).
 
 | Módulo | Nome | Prioridade | Onda | Situação | Origens | Próximo passo |
 |---|---|---|---|---|---|---|
-| M11 | Declaração institucional de uso de IA | P1 | 0 | parcial | R25 (IFRS: Instrução Normativa nº 16/2026 (IA generativa)), R01 (Projeto Scriptorium (paper-orchestra-cloud)), R47 (Gemini API: termos adicionais de serviço (uso dos dados)) | Declaração alinhada artigo por artigo ao texto da IN 16/2026 (Art. 2º a 10), com incisos do Art. 6º por etapa, autorização do orientador registrada na conta (Art. 6º e 8º, somente acréscimo) e política de dados por pesquisa (Art. 9º: dados inéditos só com chave de projeto com faturamento ativo e sem identificação de participantes). Falta conferir o modelo do Anexo I, que não estava no PDF recebido. |
+| M11 | Declaração institucional de uso de IA | P1 | 0 | implementado | R25 (IFRS: Instrução Normativa nº 16/2026 (IA generativa)), R01 (Projeto Scriptorium (paper-orchestra-cloud)), R47 (Gemini API: termos adicionais de serviço (uso dos dados)), R48 (IFRS: Guia para o uso de Inteligência Artificial Generativa no IFRS (2026)) | Declaração no modelo oficial do Anexo I (seções 1 a 5, mesmos rótulos e texto de compromisso), com identificação do autor salva na conta, natureza do trabalho por pesquisa, cada uso ligado ao inciso do Art. 6º, autorização do servidor (Art. 8º) e apêndice técnico separado (Art. 7º, 9º e rastreabilidade). Assinaturas continuam manuais. |
 | M13 | Segurança de documentos e isolamento | P1 | 0 | implementado | R27 (OWASP GenAI Security Project), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Neutralização de delimitadores e instruções embutidas no texto, e inspeção estática no upload (conteúdo ativo em PDF, inclusive em fluxos compactados e nomes ofuscados; macros, OLE, DDE e modelo externo em DOCX) com quarentena fora da biblioteca. Antivírus com assinaturas (ClamAV) descartado por decisão do responsável em 24/11/2026: reavaliar se o número de usuários crescer. |
 | M14 | Proveniência e rastreabilidade de execução | P1 | 0 | parcial | R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Manifesto por execução com versões, hashes e eventos. O motor original não expõe tokens nem prompts por chamada; custos ficam como não medidos. |
 | M15 | Orçamento, telemetria e regressão | P1 | 0 | parcial | R28 (OSV-Scanner (Google)), R29 (Dependabot (GitHub)), R40 (OSV-Scanner GitHub Action (workflows reutilizáveis)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Feito: Dependabot, OSV-Scanner, vigia de upstreams, orçamento de tempo por etapa (etapas opcionais puladas quando não cabem) e cancelamento pelo navegador, com tempos no manifesto. Falta custo em tokens por etapa, que depende do motor original informar o consumo (ver M14). |
@@ -48,7 +48,7 @@ As ondas seguem o plano V2 (0: base segura; 1: leitura escalável; 2: busca e ev
 - **M08:** `worker/evidence_matrix.py`, `api/reviews.py`, `public/app.js`, `api/research_tools.py`
 - **M09:** `worker/retrieval_context.py`, `public/app.js`, `worker/coverage_facets.py`
 - **M10:** `worker/evidence_matrix.py`
-- **M11:** `worker/ai_declaration.py`, `api/advisor.py`, `worker/run_manifest.py`, `public/app.js`
+- **M11:** `worker/ai_declaration.py`, `api/advisor.py`, `worker/run_manifest.py`, `public/app.js`, `docs/normas/IFRS-IN-16-2026-Anexo-I.pdf`
 - **M12:** `api/main.py`, `api/job_state.py`, `worker/runner.py`, `public/app.js`, `api/reviews.py`
 - **M13:** `worker/document_guard.py`, `worker/source_materials.py`, `api/library.py`, `api/upload_guard.py`
 - **M14:** `worker/run_manifest.py`
