@@ -93,8 +93,13 @@ def resolve_doi(doi: str, fetch) -> dict:
     work = json.loads(fetch(OPENALEX + "doi:" + quote(doi, safe="/"), 2_000_000, "application/json"))
     urls = []
     for loc in [work.get("best_oa_location") or {}] + list(work.get("locations") or []):
-        if loc and loc.get("pdf_url") and loc["pdf_url"] not in urls:
-            urls.append(loc["pdf_url"])
+        url = (loc or {}).get("pdf_url")
+        # Muitos repositórios (SciELO etc.) aparecem no OpenAlex com http://; tenta a
+        # mesma URL em https (o safe_get continua recusando qualquer http).
+        if url and url.startswith("http://"):
+            url = "https://" + url[len("http://"):]
+        if url and url not in urls:
+            urls.append(url)
     authors = [((a.get("author") or {}).get("display_name") or "") for a in (work.get("authorships") or [])]
     return {"title": work.get("title") or doi, "year": work.get("publication_year"), "authors": authors[:6],
             "license": (work.get("best_oa_location") or {}).get("license"), "openalex": work.get("id"),

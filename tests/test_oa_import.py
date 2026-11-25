@@ -102,5 +102,11 @@ class ImportTest(unittest.TestCase):
         self.assertNotIn("http://169.254.169.254/x", calls)
 
 
+    def test_openalex_http_pdf_is_tried_as_https(self):
+        work = {"title": "T", "best_oa_location": {"pdf_url": "http://www.scielo.br/pdf/x.pdf"}, "locations": []}
+        meta = oa_import.resolve_doi("10.1590/x", lambda *a: json.dumps(work).encode())
+        self.assertEqual(meta["pdf_urls"], ["https://www.scielo.br/pdf/x.pdf"])
+
+
 if __name__ == "__main__":
     unittest.main()
