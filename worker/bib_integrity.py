@@ -116,8 +116,10 @@ def entry_from_openalex(work: dict, key: str) -> dict:
               "year": str(work.get("publication_year") or ""), "doi": canonical_doi(work.get("doi") or "")}
     if kind == "inproceedings" and venue:
         fields["booktitle"] = venue
-    elif kind in ("phdthesis",) and venue:
-        fields["school"] = venue
+    elif kind == "phdthesis":
+        # Em teses, a "fonte" do OpenAlex costuma ser o repositório agregador, não a
+        # universidade: melhor deixar em branco para conferência do que errar.
+        pass
     elif venue:
         fields["journal"] = venue
     if biblio.get("volume"):
@@ -147,10 +149,17 @@ def _plain(text: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", fold(text or "")))
 
 
+INSTITUTION = re.compile(r"universit|universidad|department|departamento|faculdade|faculty|instituto|"
+                         r"institute|college|school|science|centro|center|library|biblioteca|repositor", re.I)
+
+
 def _work_surnames(work: dict) -> list[str]:
+    """Sobrenomes de pessoas; autoria institucional ("Department of ...") não conta."""
     out = []
     for item in work.get("authorships") or []:
         name = ((item or {}).get("author") or {}).get("display_name") or ""
+        if INSTITUTION.search(name):
+            continue
         parts = _plain(name).split()
         if parts:
             out.append(parts[-1])
@@ -162,7 +171,10 @@ def confirmed_by_text(work: dict, text: str) -> bool:
     plain = " " + _plain(text) + " "
     title = _plain(work.get("title") or "")
     surnames = _work_surnames(work)
-    if len(title) < 12 or not surnames or not any(len(s) >= 3 and f" {s} " in plain for s in surnames):
+    # Títulos genéricos ("Department of Computer Science") aparecem em qualquer texto.
+    if len(title) < 25 or len(title.split()) < 5 or not surnames:
+        return False
+    if not any(len(s) >= 3 and f" {s} " in plain for s in surnames):
         return False
     if title in plain:
         return True
@@ -273,12 +285,11 @@ def library_entries(sources: list[dict], get_json, pdf_meta=None, texts=None) ->
             entry["key"] = _key_for(entry["fields"], used)
         else:
             stem = re.sub(r"\.(pdf|docx|txt)$", "", source.get("name") or "", flags=re.I)
-            candidates = title_candidates(source, meta, text)
-            title = meta.get("pdf_title") if len(meta.get("pdf_title") or "") > 15 else (
-                candidates[0] if candidates else stem)
+            # Sem correspondência: só o título do metadado ou o nome do arquivo. Linhas do
+            # texto e o autor do metadado do PDF erravam (nome de pessoa como título,
+            # autor do arquivo no lugar do autor da obra) e ficam para corrigir_referencia.
+            title = meta.get("pdf_title") if len(meta.get("pdf_title") or "") > 15 else stem
             fields = {"title": title, "note": "metadados a conferir: sem correspondência segura no OpenAlex"}
-            if _plausible_author(meta.get("author")):
-                fields["author"] = meta["author"]
             entry = {"type": "misc", "key": _key_for(fields, used), "fields": fields}
             how = "arquivo"
         entry["source_id"], entry["how"] = source.get("id"), how

@@ -144,7 +144,15 @@ class OfficialEntriesTest(unittest.TestCase):
                                      {"u": {"author": "user", "pdf_title": ""}},
                                      {"u": "Letramento digital e o DigComp na formação docente\nThais Cilli"})
         self.assertNotIn("author", entries[0]["fields"])
-        self.assertEqual(entries[0]["fields"]["title"], "Letramento digital e o DigComp na formação docente")
+        self.assertEqual(entries[0]["fields"]["title"], "6")  # nada de linha do texto como título
+
+    def test_generic_institutional_record_is_not_confirmed(self):
+        work = {"title": "Department of Computer Science", "publication_year": 2013, "type": "article",
+                "authorships": [{"author": {"display_name": "Colorado State University. Department of Computer Science"}}]}
+        text = "Procedures for Performing Systematic Reviews\nBarbara Kitchenham\nDepartment of Computer Science"
+        entries = bi.library_entries([{"id": "k", "name": "525444systematicreviewsguide.pdf"}],
+                                     lambda url: {"results": [work]}, {}, {"k": text})
+        self.assertEqual(entries[0]["how"], "arquivo")
 
     def test_network_failure_never_invents(self):
         def boom(url):
