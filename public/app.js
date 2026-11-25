@@ -1133,7 +1133,7 @@ async function openMcpProject(p, holder, button) {
     const data = await (await request(`/mcp-conta/projetos/${p.projeto}/detalhe`)).json();
     holder.replaceChildren();
     holder.append(el('h4', 'Etapas'), mcpStepList(data.estado.etapas));
-    if (data.estado.proxima_acao) holder.append(el('p', data.estado.proxima_acao, 'subtle'));
+    if (data.estado.erro) holder.append(el('p', data.estado.erro, 'warning'));
     if (data.revisao) mcpReview(holder, p, data.revisao);
     const files = (data.estado.arquivos || []).filter(f => MCP_FILES[f]);
     if (files.length) {
