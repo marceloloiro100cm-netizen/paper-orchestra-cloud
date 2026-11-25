@@ -940,6 +940,13 @@ for (const radio of document.querySelectorAll('input[name="unpublished-data"]'))
 }
 async function loadAdvisor() {
   try {
+    const prof = (await (await request('/account/academic-profile')).json()).profile;
+    if (prof) {
+      $('profile-name').value = prof.full_name || ''; $('profile-enrollment').value = prof.enrollment || '';
+      $('profile-unit').value = prof.unit || ''; $('profile-program').value = prof.program || '';
+    }
+  } catch (_) { /* API anterior */ }
+  try {
     const data = await (await request('/account/advisor-authorization')).json();
     const scope = $('advisor-scope');
     if (!scope.querySelector('input')) {
@@ -956,9 +963,16 @@ async function loadAdvisor() {
     $('advisor-current').textContent = last
       ? `Registrada: ${last.advisor_name}, ${last.authorized_on}, por ${last.record_form}; incisos ${last.scope.join(', ')}.`
       : 'Nenhuma autorização registrada. As declarações de IA sairão com esse campo para preencher.';
-    $('advisor-title').textContent = 'Autorização do orientador para uso de IA (IN IFRS 16/2026)' + (last ? ' · registrada' : ' · pendente');
+    $('advisor-title').textContent = 'Declaração de uso de IA (IN IFRS 16/2026, Anexo I)' + (last ? ' · autorização registrada' : ' · autorização pendente');
   } catch (_) { /* API anterior: seção fica sem dados */ }
 }
+$('save-profile').addEventListener('click', async () => {
+  const body = {full_name: $('profile-name').value.trim(), enrollment: $('profile-enrollment').value.trim(),
+    unit: $('profile-unit').value.trim(), program: $('profile-program').value.trim()};
+  if (body.full_name.length < 3) { $('profile-message').textContent = 'Informe o nome completo.'; return; }
+  try { await request('/account/academic-profile', {method: 'PUT', body: JSON.stringify(body)}); $('profile-message').textContent = 'Identificação salva.'; }
+  catch (e) { $('profile-message').textContent = e.message; }
+});
 $('save-advisor').addEventListener('click', async () => {
   const scope = [...$('advisor-scope').querySelectorAll('input:checked')].map(c => c.value);
   const body = {advisor_name: $('advisor-name').value.trim(), authorized_on: $('advisor-date').value,
@@ -1074,6 +1088,7 @@ $('new-paper').addEventListener('submit', async (event) => {
       plotting:$('plotting').checked,
       neon_review:$('neon-review').checked,
       preflight:$('preflight').checked,
+      work_type: $('work-type').value,
       // M11 / IN IFRS 16/2026, Art. 9º
       unpublished_data: document.querySelector('input[name="unpublished-data"]:checked')?.value === 'sim',
       paid_tier_confirmed: $('paid-tier').checked,

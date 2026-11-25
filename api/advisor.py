@@ -1,4 +1,4 @@
-"""Autorização do orientador e política de dados por pesquisa (M11, IN IFRS 16/2026).
+"""Identificação, autorização do orientador e política de dados (M11, IN IFRS 16/2026).
 
 Origem: R25 (IFRS, Instrução Normativa nº 16/2026, texto conferido em
 24/11/2026 a partir do PDF assinado em 26/05/2026) e R47 (Termos adicionais da
@@ -47,6 +47,35 @@ ART6 = {
 }
 FORMS = ("e-mail", "ata ou registro de reunião", "SIGAA ou sistema institucional",
          "documento assinado", "plano de trabalho ou projeto aprovado", "outro")
+
+
+PROFILES = "academic_profiles"
+WORK_TYPES = ("artigo científico", "dissertação", "tese", "TCC", "relatório de pesquisa",
+              "atividade de extensão", "componente curricular", "outro")
+
+
+class AcademicProfile(BaseModel):
+    """Seção 1 do Anexo I da IN 16/2026: identificação do(a) autor(a)."""
+    full_name: str = Field(min_length=3, max_length=120)
+    enrollment: str = Field(default="", max_length=30)
+    unit: str = Field(default="", max_length=80)
+    program: str = Field(default="", max_length=120)
+
+    @field_validator("enrollment")
+    @classmethod
+    def enrollment_chars(cls, value: str) -> str:
+        value = value.strip()
+        if value and not re.fullmatch(r"[\w./-]{1,30}", value):
+            raise ValueError("Matrícula com caracteres inválidos.")
+        return value
+
+
+def academic_profile(db, owner_uid: str) -> dict | None:
+    snap = db.collection(PROFILES).document(owner_uid).get()
+    if not snap.exists:
+        return None
+    data = snap.to_dict() or {}
+    return {k: data.get(k, "") for k in ("full_name", "enrollment", "unit", "program", "updated_at")}
 
 
 class AdvisorAuthorization(BaseModel):
@@ -127,10 +156,22 @@ def addendum(authorization: dict) -> str:
 
 
 def make_advisor_router(db, verify_user: Callable):
-    router = APIRouter(prefix="/api/account/advisor-authorization", tags=["IN 16/2026"])
+    router = APIRouter(prefix="/api/account", tags=["IN 16/2026"])
     dependency = Depends(verify_user)
 
-    @router.get("")
+    @router.get("/academic-profile")
+    def get_profile(user: dict = dependency):
+        return {"profile": academic_profile(db, user["uid"]), "work_types": list(WORK_TYPES)}
+
+    @router.put("/academic-profile")
+    def save_profile(payload: AcademicProfile, user: dict = dependency):
+        record = {"owner_uid": user["uid"], "full_name": re.sub(r"\s+", " ", payload.full_name).strip(),
+                  "enrollment": payload.enrollment, "unit": payload.unit.strip(),
+                  "program": payload.program.strip(), "updated_at": datetime.now(timezone.utc).isoformat()}
+        db.collection(PROFILES).document(user["uid"]).set(record)
+        return {"profile": {k: record[k] for k in ("full_name", "enrollment", "unit", "program", "updated_at")}}
+
+    @router.get("/advisor-authorization")
     def get_authorization(user: dict = dependency):
         docs = [s.to_dict() for s in db.collection(COLLECTION).where("owner_uid", "==", user["uid"])
                 .limit(MAX_HISTORY).stream()]
@@ -138,7 +179,7 @@ def make_advisor_router(db, verify_user: Callable):
         return {"latest": snapshot(docs[-1]) if docs else None,
                 "history": [snapshot(d) for d in docs], "art6": ART6, "forms": list(FORMS)}
 
-    @router.post("", status_code=201)
+    @router.post("/advisor-authorization", status_code=201)
     def record_authorization(payload: AdvisorAuthorization, user: dict = dependency):
         existing = list(db.collection(COLLECTION).where("owner_uid", "==", user["uid"]).limit(MAX_HISTORY).stream())
         if len(existing) >= MAX_HISTORY:

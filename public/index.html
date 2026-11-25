@@ -1404,8 +1404,22 @@
         </div>
         <!-- M11: IN IFRS 16/2026, Art. 6º e 8º. Registro do pesquisador, somente acréscimo. -->
         <details class="gemini-setup" id="advisor-details">
-          <summary id="advisor-title">Autorização do orientador para uso de IA (IN IFRS 16/2026)</summary>
+          <summary id="advisor-title">Declaração de uso de IA (IN IFRS 16/2026, Anexo I)</summary>
           <div class="gemini-setup-body">
+            <p class="subtle">Estes dados preenchem a seção 1 do Anexo I em cada declaração gerada. Ficam só na sua conta.</p>
+            <label for="profile-name">Nome completo</label>
+            <input id="profile-name" type="text" maxlength="120" autocomplete="name"/>
+            <label for="profile-enrollment">Matrícula</label>
+            <input id="profile-enrollment" type="text" maxlength="30"/>
+            <label for="profile-unit">Unidade do IFRS</label>
+            <input id="profile-unit" type="text" maxlength="80" placeholder="Ex.: Campus Porto Alegre"/>
+            <label for="profile-program">Curso / Programa</label>
+            <input id="profile-program" type="text" maxlength="120" placeholder="Ex.: Mestrado Profissional em Informática na Educação"/>
+            <div class="actions">
+              <button class="btn" type="button" id="save-profile">Salvar identificação</button>
+              <span class="subtle" id="profile-message" role="status"></span>
+            </div>
+            <h4 style="margin:14px 0 4px">Autorização do(a) servidor(a) responsável (Art. 6º e 8º)</h4>
             <p class="subtle">A IN 16/2026 exige autorização do docente ou orientador, formalmente registrada (Art. 6º e 8º). Registre aqui quem autorizou, quando e como; isso entra no manifesto e na declaração de uso de IA de cada pesquisa. O documento oficial continua sendo o do seu orientador.</p>
             <p class="subtle" id="advisor-current" role="status"></p>
             <label for="advisor-name">Nome do(a) orientador(a) ou docente</label>
@@ -1716,6 +1730,15 @@
                   <span class="switch-sub">Mostra o que suas fontes cobrem e o que falta; a redação só começa depois da sua aprovação.</span>
                 </label>
                 <input id="preflight" type="checkbox">
+              </div>
+
+              <!-- M11: Anexo I, seção 2 (natureza do trabalho acadêmico) -->
+              <div class="switch-row" style="display:block">
+                <label for="work-type">Natureza do trabalho acadêmico <span class="switch-sub">Vai para a declaração de uso de IA (Anexo I da IN 16/2026).</span></label>
+                <select id="work-type">
+                  <option>artigo científico</option><option>dissertação</option><option>tese</option><option>TCC</option>
+                  <option>relatório de pesquisa</option><option>atividade de extensão</option><option>componente curricular</option><option>outro</option>
+                </select>
               </div>
 
               <!-- M11: IN IFRS 16/2026, Art. 9º (dados inéditos ou sensíveis) -->
@@ -2378,6 +2401,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=identidade-20261124"></script>
+  <script type="module" src="/app.js?v=anexo-i-20261124"></script>
 </body>
 </html>

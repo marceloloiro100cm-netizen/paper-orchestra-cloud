@@ -60,6 +60,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R45 | [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html) | normativo | sim | CC-BY-SA-4.0 | - | M13 |
 | R46 | [pdfid (Didier Stevens)](https://blog.didierstevens.com/programs/pdf-tools/) | ferramenta | sim | domínio público (declarado pelo autor) | - | M13 |
 | R47 | [Gemini API: termos adicionais de serviço (uso dos dados)](https://ai.google.dev/gemini-api/terms) | normativo | sim | termos do serviço | - | M11, M21 |
+| R48 | [IFRS: Guia para o uso de Inteligência Artificial Generativa no IFRS (2026)](https://ifrs.edu.br/documentos/instrucao-normativa-ifrs-n-16-2026/) | normativo | sim | não se aplica | - | M11 |
 
 ## Fichas
 
@@ -626,12 +627,12 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Situação da licença:** normativa institucional
 - **Licença dos pesos:** -
 - **Versão fixada:** -
-- **Versão instalada:** IN 16/2026, assinada em 26/05/2026 (SIG IFRS, código de verificação d3ba1f7224)
+- **Versão instalada:** IN 16/2026 (código d3ba1f7224) e Anexo I (Anexo nº 2/2026, código e712908ba1), ambos assinados em 26/05/2026
 - **Última versão revisada:** -
-- **Onde é usado:** worker/ai_declaration.py, api/advisor.py, worker/run_manifest.py
+- **Onde é usado:** worker/ai_declaration.py, api/advisor.py, worker/run_manifest.py, docs/normas/IFRS-IN-16-2026.pdf, docs/normas/IFRS-IN-16-2026-Anexo-I.pdf
 - **Política de atualização:** Semestral e sempre que a norma ou o anexo mudar; revisão humana do texto da declaração.
 - **Frequência de revisão:** semestral
-- **Risco:** Texto da IN conferido em 24/11/2026 a partir do PDF assinado (4 páginas). O modelo do Anexo I não estava nesse PDF e ainda não foi conferido; a declaração continua marcada como rascunho.
+- **Risco:** Texto da IN e do Anexo I conferidos em 24/11/2026 (cópias em docs/normas/). O Anexo traz "IN nº XX/2026"; a declaração usa 16/2026, número da IN que ele acompanha. Revisar se o IFRS publicar nova versão.
 - **Nota de migração:** -
 - **Resultado de benchmark:** -
 - **Rollback:** -
@@ -1139,6 +1140,29 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Frequência de revisão:** mensal
 - **Risco:** Base da regra que exige faturamento ativo para dados inéditos (IN IFRS 16/2026, Art. 9º). O Scriptorium não consegue verificar o nível da chave: depende da confirmação do pesquisador.
 - **Nota de migração:** -
+- **Resultado de benchmark:** -
+- **Rollback:** -
+- **Responsável:** marceloloiro100cm-netizen
+- **Última checagem:** 2026-11-24
+
+### R48 · IFRS: Guia para o uso de Inteligência Artificial Generativa no IFRS (2026)
+
+- **Fonte canônica:** https://ifrs.edu.br/documentos/instrucao-normativa-ifrs-n-16-2026/
+- **Versões:** -
+- **Erros e correções:** -
+- **Avisos de segurança:** -
+- **Histórico de mudanças:** -
+- **Licença (SPDX):** não se aplica
+- **Situação da licença:** guia institucional que explica a IN 16/2026 (não substitui a norma)
+- **Licença dos pesos:** -
+- **Versão fixada:** -
+- **Versão instalada:** -
+- **Última versão revisada:** -
+- **Onde é usado:** worker/ai_declaration.py
+- **Política de atualização:** Semestral e sempre que a IN mudar: conferir o passo a passo do Anexo I (seção 4.1 do Guia) e as listas 'pode' e 'nunca'.
+- **Frequência de revisão:** semestral
+- **Risco:** -
+- **Nota de migração:** Recebido do responsável em 24/11/2026 (13 páginas). Seção 4.1 define o preenchimento do Anexo I: identificação, trabalho, cada uso com ferramenta e versão, finalidade, etapa e conteúdo; autorização do servidor; compromisso. Seção 7 reforça que dados sensíveis não vão para IA que possa treinar com eles.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen

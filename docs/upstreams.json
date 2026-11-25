@@ -567,7 +567,7 @@
       "release_url": "https://ifrs.edu.br/wp-content/uploads/2026/05/Anexo-IN-IAGen.pdf",
       "license_spdx": "não se aplica",
       "license_status": "normativa institucional",
-      "installed_version": "IN 16/2026, assinada em 26/05/2026 (SIG IFRS, código de verificação d3ba1f7224)",
+      "installed_version": "IN 16/2026 (código d3ba1f7224) e Anexo I (Anexo nº 2/2026, código e712908ba1), ambos assinados em 26/05/2026",
       "adopted": true,
       "modules": [
         "M11",
@@ -576,11 +576,13 @@
       "used_in": [
         "worker/ai_declaration.py",
         "api/advisor.py",
-        "worker/run_manifest.py"
+        "worker/run_manifest.py",
+        "docs/normas/IFRS-IN-16-2026.pdf",
+        "docs/normas/IFRS-IN-16-2026-Anexo-I.pdf"
       ],
       "update_policy": "Semestral e sempre que a norma ou o anexo mudar; revisão humana do texto da declaração.",
       "review_frequency": "semestral",
-      "risk": "Texto da IN conferido em 24/11/2026 a partir do PDF assinado (4 páginas). O modelo do Anexo I não estava nesse PDF e ainda não foi conferido; a declaração continua marcada como rascunho.",
+      "risk": "Texto da IN e do Anexo I conferidos em 24/11/2026 (cópias em docs/normas/). O Anexo traz \"IN nº XX/2026\"; a declaração usa 16/2026, número da IN que ele acompanha. Revisar se o IFRS publicar nova versão.",
       "owner": "marceloloiro100cm-netizen",
       "last_checked": "2026-11-24"
     },
@@ -1121,6 +1123,26 @@
       "owner": "marceloloiro100cm-netizen",
       "last_checked": "2026-11-24",
       "risk": "Base da regra que exige faturamento ativo para dados inéditos (IN IFRS 16/2026, Art. 9º). O Scriptorium não consegue verificar o nível da chave: depende da confirmação do pesquisador."
+    },
+    {
+      "id": "R48",
+      "name": "IFRS: Guia para o uso de Inteligência Artificial Generativa no IFRS (2026)",
+      "kind": "normativo",
+      "canonical_url": "https://ifrs.edu.br/documentos/instrucao-normativa-ifrs-n-16-2026/",
+      "license_spdx": "não se aplica",
+      "license_status": "guia institucional que explica a IN 16/2026 (não substitui a norma)",
+      "adopted": true,
+      "modules": [
+        "M11"
+      ],
+      "used_in": [
+        "worker/ai_declaration.py"
+      ],
+      "update_policy": "Semestral e sempre que a IN mudar: conferir o passo a passo do Anexo I (seção 4.1 do Guia) e as listas 'pode' e 'nunca'.",
+      "review_frequency": "semestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24",
+      "migration_note": "Recebido do responsável em 24/11/2026 (13 páginas). Seção 4.1 define o preenchimento do Anexo I: identificação, trabalho, cada uso com ferramenta e versão, finalidade, etapa e conteúdo; autorização do servidor; compromisso. Seção 7 reforça que dados sensíveis não vão para IA que possa treinar com eles."
     }
   ],
   "modules": [
@@ -1357,19 +1379,21 @@
       "upstreams": [
         "R25",
         "R01",
-        "R47"
+        "R47",
+        "R48"
       ],
       "depends_on": [
         "M14"
       ],
-      "status": "parcial",
+      "status": "implementado",
       "files": [
         "worker/ai_declaration.py",
         "api/advisor.py",
         "worker/run_manifest.py",
-        "public/app.js"
+        "public/app.js",
+        "docs/normas/IFRS-IN-16-2026-Anexo-I.pdf"
       ],
-      "next_step": "Declaração alinhada artigo por artigo ao texto da IN 16/2026 (Art. 2º a 10), com incisos do Art. 6º por etapa, autorização do orientador registrada na conta (Art. 6º e 8º, somente acréscimo) e política de dados por pesquisa (Art. 9º: dados inéditos só com chave de projeto com faturamento ativo e sem identificação de participantes). Falta conferir o modelo do Anexo I, que não estava no PDF recebido."
+      "next_step": "Declaração no modelo oficial do Anexo I (seções 1 a 5, mesmos rótulos e texto de compromisso), com identificação do autor salva na conta, natureza do trabalho por pesquisa, cada uso ligado ao inciso do Art. 6º, autorização do servidor (Art. 8º) e apêndice técnico separado (Art. 7º, 9º e rastreabilidade). Assinaturas continuam manuais."
     },
     {
       "id": "M12",
