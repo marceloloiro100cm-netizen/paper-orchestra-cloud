@@ -45,6 +45,13 @@ def slug(text: str, limit: int = 60) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:limit] or "documento"
 
 
+def abstract(work: dict) -> str:
+    """Resumo reconstruído do índice invertido do OpenAlex (metadado público)."""
+    index = work.get("abstract_inverted_index") or {}
+    words = sorted((pos, word) for word, positions in index.items() for pos in positions)
+    return " ".join(word for _, word in words)[:2500]
+
+
 def pdf_urls(work: dict) -> list[str]:
     urls = []
     for loc in [work.get("best_oa_location") or {}] + list(work.get("locations") or []):
@@ -116,6 +123,7 @@ def main() -> int:
                         "venue": source.get("display_name"), "type": work.get("type"),
                         "language": work.get("language"), "cited_by": work.get("cited_by_count"),
                         "license": best.get("license"), "pdf_url": url, "pages": len(pages),
+                        "abstract": abstract(work), "landing_page": best.get("landing_page_url"),
                         "sha256": hashlib.sha256(data).hexdigest(),
                     })
                     got += 1
@@ -124,6 +132,9 @@ def main() -> int:
                 time.sleep(0.3)
     (args.out / "candidatos.json").write_text(json.dumps(kept, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Total: {len(kept)} PDFs", flush=True)
+    # Só metadados (sem texto dos PDFs) no log, para a seleção e as consultas.
+    for item in kept:
+        print("CANDIDATO " + json.dumps(item, ensure_ascii=False), flush=True)
     return 0
 
 
