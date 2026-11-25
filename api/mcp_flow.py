@@ -74,6 +74,8 @@ COMMON_RULES = (
     "- Use somente as fontes do projeto. Para ler, chame buscar_trechos e ler_trecho.\n"
     "- Cite apenas com as chaves de referencias_do_projeto; nunca invente autor, ano, título ou página.\n"
     "- Quando as fontes não sustentarem algo, diga isso no texto em vez de completar de memória.\n"
+    "- Referência marcada a_conferir ou com título, autor ou ano errados: corrija com corrigir_referencia, "
+    "lendo a capa da fonte.\n"
     "- Entregue o resultado chamando entregar_etapa. Se a entrega voltar com erros, corrija e entregue de novo.\n"
 )
 
@@ -404,6 +406,75 @@ def validate(stage_key: str, content: str, *, bib_keys: set[str], chunks_for_key
     raise ValueError("Etapa desconhecida")
 
 
+# ------------------------------------------------------------------ referências
+REF_TYPES = {"article": "journal", "inproceedings": "booktitle", "incollection": "booktitle",
+             "phdthesis": "school", "mastersthesis": "school", "book": "publisher",
+             "techreport": "institution", "misc": "howpublished"}
+REF_ORDER = ("author", "title", "journal", "booktitle", "school", "institution", "publisher",
+             "howpublished", "year", "volume", "number", "pages", "doi", "note")
+
+
+def _has_word(word: str, plain: str) -> bool:
+    return len(word) >= 3 and f" {word} " in f" {plain} "
+
+
+def check_reference_fix(fix: dict, first_text: str, full_text: str) -> tuple[dict, list[str]]:
+    """Confere uma correção de referência proposta pela IA no próprio texto da fonte.
+
+    Título e sobrenomes precisam estar nas primeiras páginas; ano, veículo e DOI,
+    em algum lugar do documento. Nada que o documento não mostre entra.
+    """
+    errors = []
+    first, full = normalize(first_text), normalize(full_text)
+    for name, value in fix.items():
+        values = value if isinstance(value, list) else [value]
+        if any(re.search(r"[{}\\@]", str(v or "")) for v in values):
+            errors.append(f"{name}: não use chaves, barra invertida nem @.")
+    kind = fix.get("tipo") or "misc"
+    if kind not in REF_TYPES:
+        errors.append("tipo inválido. Use: " + ", ".join(REF_TYPES))
+    title = " ".join(str(fix.get("titulo") or "").split())
+    if len(normalize(title)) < 10:
+        errors.append("Informe o título completo (mínimo de 10 caracteres).")
+    elif normalize(title) not in first:
+        errors.append("O título não aparece nas primeiras páginas da fonte. Copie-o como está no documento.")
+    authors = [" ".join(str(a).split()) for a in (fix.get("autores") or []) if str(a).strip()]
+    if not authors:
+        errors.append("Informe ao menos um autor no formato 'Sobrenome, Nome'.")
+    for author in authors[:20]:
+        last = normalize(author.split(",")[0]).split()
+        if not last or not _has_word(last[-1], first):
+            errors.append(f"O sobrenome de '{author}' não aparece nas primeiras páginas da fonte.")
+    year = str(fix.get("ano") or "").strip()
+    if not re.fullmatch(r"(1[5-9]|20)\d{2}", year):
+        errors.append("Ano inválido.")
+    elif not _has_word(year, full) and year not in full.split():
+        errors.append(f"O ano {year} não aparece no documento.")
+    venue = " ".join(str(fix.get("veiculo") or "").split())
+    if venue and normalize(venue) not in full:
+        errors.append("O veículo (revista, evento, instituição ou editora) não aparece no documento. "
+                      "Escreva-o como está impresso, ou deixe em branco.")
+    doi = str(fix.get("doi") or "").strip().lower()
+    if doi and (not re.fullmatch(r"10\.\d{4,9}/\S+", doi) or normalize(doi) not in full):
+        errors.append("O DOI não aparece no documento. Deixe em branco se a fonte não o imprime.")
+    if errors:
+        return {}, errors
+    fields = {"author": " and ".join(authors[:20]), "title": title, "year": year}
+    if venue:
+        fields[REF_TYPES[kind]] = venue
+    if doi:
+        fields["doi"] = doi
+    return fields, []
+
+
+def render_reference(entry: dict) -> str:
+    fields = entry["fields"]
+    names = [k for k in REF_ORDER if fields.get(k)] + sorted(
+        k for k in fields if k not in REF_ORDER and fields.get(k))
+    body = ",\n".join(f"  {k} = {{{fields[k]}}}" for k in names)
+    return f"@{entry['type']}{{{entry['key']},\n{body}\n}}\n"
+
+
 # ------------------------------------------------------------------ material
 def _clip(text: str, limit: int) -> str:
     text = text or ""
@@ -426,7 +497,8 @@ def material(stage_key: str, project: dict, board: dict, references: list[dict])
     """O que cada cabeça recebe. board: etapa -> {"content", "validation"}."""
     template = TEMPLATES.get(project.get("template"), TEMPLATES["abnt-artigo"])
     refs = [{"chave": r["key"], "fonte": r.get("source_id"), "titulo": (r.get("fields") or {}).get("title", ""),
-             "ano": (r.get("fields") or {}).get("year", "")} for r in references]
+             "ano": (r.get("fields") or {}).get("year", ""),
+             **({"a_conferir": True} if r.get("how") == "arquivo" else {})} for r in references]
     base = {
         "projeto": project["id"], "titulo": project.get("title", ""), "pergunta": project.get("question", ""),
         "idioma": project.get("language", "pt-BR"), "modelo": template["nome"],

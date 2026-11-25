@@ -190,6 +190,20 @@ class FlowLogicTest(unittest.TestCase):
         self.assertFalse(report["ok"])
         self.assertIn("inventada2020", " ".join(report["erros"]))
 
+    def test_reference_fix_must_match_the_document(self):
+        first = "Eles já nascem sabendo! Desmistificando o conceito de nativos digitais\nMagda Pischetola e Bruna Heinsfeld"
+        full = first + "\nRENOTE V. 16 Nº 1, julho, 2018. DOI 10.22456/1679-1916.85929"
+        fix = {"autores": ["Pischetola, Magda", "Heinsfeld, Bruna Damiana"],
+               "titulo": "Eles já nascem sabendo! Desmistificando o conceito de nativos digitais",
+               "ano": "2018", "tipo": "article", "veiculo": "RENOTE", "doi": "10.22456/1679-1916.85929"}
+        fields, errors = flow.check_reference_fix(fix, first, full)
+        self.assertEqual(errors, [])
+        self.assertEqual(fields["journal"], "RENOTE")
+        for bad in ({"autores": ["Inventado, Autor"]}, {"titulo": "Um título que não está no documento"},
+                    {"ano": "2012"}, {"veiculo": "Revista X"}, {"doi": "10.1234/falso"}, {"titulo": "a}b{c" * 4}):
+            _, errors = flow.check_reference_fix({**fix, **bad}, first, full)
+            self.assertTrue(errors, bad)
+
     def test_reviewer_head_rules(self):
         writer = {"id": "cab_w", "kind": "redatora", "model": "Claude Opus 5.5"}
         reviewer = {"id": "cab_r", "kind": "revisora", "stage": "revisao", "model": "Gemini 3 Pro"}
@@ -354,6 +368,29 @@ class McpServerTest(unittest.TestCase):
         self.assertEqual(self.jobs[-1][2], "mcp_compile")
         state = self.run_calls([("estado_do_projeto", {"projeto": pid})])[0][1]
         self.assertEqual([s["status"] for s in state["etapas"]], ["aceita"] * 6)
+
+    def test_reference_fix_tool_keeps_key_and_rewrites_bib(self):
+        [(e1, step)] = self.run_calls([("proxima_etapa", {"projeto": self.pid, "modelo_declarado": "Claude"})])
+        key = self.keys[0]
+        path = self.manifest[0]["derived"]
+        payload = json.loads(self.bucket.objects[path])
+        payload["chunks"][-1]["text"] += " Publicado em 2024."
+        self.bucket.objects[path] = json.dumps(payload).encode()
+        ok, bad = self.run_calls([
+            ("corrigir_referencia", {"projeto": self.pid, "chave": key, "cabeca": step["cabeca"],
+                                     "autores": ["Gamificação, X"], "titulo": "A gamificação aumentou o engajamento",
+                                     "ano": "2024", "tipo": "article"}),
+            ("corrigir_referencia", {"projeto": self.pid, "chave": key, "cabeca": step["cabeca"],
+                                     "autores": ["Silva, Ana"], "titulo": "Título inventado pela IA",
+                                     "ano": "2024", "tipo": "article"}),
+        ])
+        self.assertFalse(ok[0], ok[1])
+        self.assertTrue(bad[0])
+        bib = self.bucket.objects[f"mcp/{UID}/{self.pid}/references.bib"].decode()
+        self.assertIn("@article{" + key, bib)
+        self.assertIn("A gamificação aumentou o engajamento", bib)
+        project = self.db.collection("mcp_projects").document(self.pid).get().to_dict()
+        self.assertEqual(project["reference_fixes"][0]["chave"], key)
 
     def test_other_users_project_is_invisible(self):
         other = self.store.create_token("o" * 28, "outra@example.org", "Outra")["token"]

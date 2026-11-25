@@ -101,6 +101,51 @@ class OfficialEntriesTest(unittest.TestCase):
         block = bi.bibtex_block(entries)
         self.assertIn("use EXATAMENTE a chave", block)
 
+    def test_text_confirmation_rejects_authorless_reprint(self):
+        """Achado do teste MCP: Prensky 2001 saía como 2012, sem autor."""
+        text = ("Digital Natives, Digital Immigrants\nBy Marc Prensky\nFrom On the Horizon (MCB University "
+                "Press, Vol. 9 No. 5, October 2001)\nIt is amazing to me how in all the hoopla...")
+        results = {"results": [
+            {"title": "Digital Natives, Digital Immigrants", "publication_year": 2012, "type": "book-chapter",
+             "authorships": []},
+            {"title": "Digital Natives, Digital Immigrants Part 1", "publication_year": 2001, "type": "article",
+             "authorships": [{"author": {"display_name": "Marc Prensky"}}],
+             "primary_location": {"source": {"display_name": "On the Horizon"}}}]}
+        entries = bi.library_entries([{"id": "p", "name": "Prensky2001-DigitalNativesDigitalImmigrants.pdf"}],
+                                     lambda url: results, {}, {"p": text})
+        self.assertEqual(entries[0]["how"], "texto_do_pdf")
+        self.assertEqual(entries[0]["fields"]["year"], "2001")
+        self.assertEqual(entries[0]["key"], "fonte_prensky2001")
+
+    def test_doi_printed_in_text_needs_confirmation(self):
+        own = {"title": "Ambientes virtuais de aprendizagem no ensino médio", "publication_year": 2021,
+               "type": "article", "authorships": [{"author": {"display_name": "Claudinete de Jesus da Silva"}}]}
+        cited = {"title": "Outro artigo citado", "publication_year": 2015, "type": "article",
+                 "authorships": [{"author": {"display_name": "Fulano Beltrano"}}]}
+        text = ("AMBIENTES VIRTUAIS DE APRENDIZAGEM NO ENSINO MÉDIO\nClaudinete de Jesus da Silva\n"
+                "DOI: 10.47820/recima21.v2i1.452\nVer também doi.org/10.9999/citado.1")
+        def get_json(url):
+            if url.endswith("10.47820/recima21.v2i1.452"):
+                return own
+            if url.endswith("10.9999/citado.1"):
+                return cited
+            return {"results": []}
+        entries = bi.library_entries([{"id": "r", "name": "452.pdf"}], get_json, {}, {"r": text})
+        self.assertEqual(entries[0]["how"], "doi_no_texto")
+        self.assertEqual(entries[0]["fields"]["year"], "2021")
+        # Um DOI citado no texto não vira a referência da fonte.
+        entries = bi.library_entries([{"id": "r", "name": "452.pdf"}],
+                                     lambda url: cited if "citado" in url else {"results": []}, {},
+                                     {"r": "Texto qualquer\ndoi.org/10.9999/citado.1"})
+        self.assertEqual(entries[0]["how"], "arquivo")
+
+    def test_fallback_skips_fake_authors(self):
+        entries = bi.library_entries([{"id": "u", "name": "6.pdf"}], lambda url: {"results": []},
+                                     {"u": {"author": "user", "pdf_title": ""}},
+                                     {"u": "Letramento digital e o DigComp na formação docente\nThais Cilli"})
+        self.assertNotIn("author", entries[0]["fields"])
+        self.assertEqual(entries[0]["fields"]["title"], "Letramento digital e o DigComp na formação docente")
+
     def test_network_failure_never_invents(self):
         def boom(url):
             raise TimeoutError()
