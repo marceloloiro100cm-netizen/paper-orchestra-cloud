@@ -507,6 +507,9 @@ def main():
         if not pdf.exists():
             matches = list(output.rglob("final_paper.pdf"))
             if not matches:
+                # O motor engole o erro 402 e termina com código 0: o log é a única pista.
+                if auth_mode == "user_gemini" and billing_alert.log_mentions_depleted(logpath):
+                    raise RuntimeError(billing_alert.MESSAGE)
                 raise FileNotFoundError("O motor concluiu sem gerar final_paper.pdf")
             pdf = matches[0]
         put(pdf, "final_paper.pdf", "application/pdf")
