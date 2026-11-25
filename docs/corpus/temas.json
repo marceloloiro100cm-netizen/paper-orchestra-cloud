@@ -1,0 +1,19 @@
+{
+  "tese": "Entre a assistência e a autoria: contribuições de um ambiente de inteligência artificial generativa para a formação científica crítica na Educação Profissional e Tecnológica",
+  "temas": [
+    {"id": "T1", "nome": "Pesquisa como princípio pedagógico na EPT",
+     "buscas": ["pesquisa como princípio pedagógico", "pesquisa como princípio educativo educação profissional", "research as pedagogical principle vocational education"]},
+    {"id": "T2", "nome": "Formação humana integral",
+     "buscas": ["formação humana integral ensino médio integrado", "formação omnilateral educação profissional e tecnológica"]},
+    {"id": "T3", "nome": "Letramento científico, leitura crítica e argumentação",
+     "buscas": ["alfabetização científica", "letramento científico ensino", "argumentação científica sala de aula", "leitura crítica textos científicos"]},
+    {"id": "T4", "nome": "Mediação tecnológica",
+     "buscas": ["mediação tecnológica educação", "tecnologias digitais educação profissional e tecnológica"]},
+    {"id": "T5", "nome": "Autonomia, autoria e integridade acadêmica",
+     "buscas": ["autonomia intelectual estudante pesquisa", "academic integrity generative artificial intelligence", "autoria escrita acadêmica inteligência artificial"]},
+    {"id": "T6", "nome": "Letramento em inteligência artificial e IA generativa na educação",
+     "buscas": ["AI literacy", "generative artificial intelligence education", "ChatGPT higher education", "inteligência artificial generativa educação"]},
+    {"id": "T7", "nome": "Iniciação científica na educação básica e na EPT",
+     "buscas": ["iniciação científica ensino médio", "iniciação científica educação profissional"]}
+  ]
+}
