@@ -11,7 +11,12 @@ exportação com format=bibtex, e /keys/<chave> informa o userID da chave.
 Decisões de segurança:
 - a chave Zotero é usada só durante a requisição e NUNCA é guardada (nem no
   Firestore, nem no Secret Manager, nem em logs); cada importação a pede de novo;
-- somente leitura e somente metadados (BibTeX); anexos não são baixados;
+- somente leitura; por padrão só metadados (BibTeX). Anexos PDF só com
+  consentimento explícito em cada importação (attachments_consent), passam pela
+  inspeção de upload (M13) e nunca seguem redirecionamento com a chave;
+- importação incremental: guarda só o número de versão da biblioteca Zotero
+  (Last-Modified-Version) por conta e coleção, nunca a chave; a próxima
+  importação pede apenas o que mudou desde essa versão (parâmetro since);
 - o resultado vira um item .bib comum da biblioteca, com a origem registrada,
   sem sobrescrever nada do acervo local.
 """
@@ -22,7 +27,7 @@ from datetime import datetime, timezone
 from typing import Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, SecretStr
@@ -47,24 +52,58 @@ class ZoteroKey(BaseModel):
         return key
 
 
+MAX_ATTACHMENTS = 20
+SYNC = "zotero_sync"
+USER_AGENT = "Scriptorium/1 (paper-orchestra-cloud)"
+
+
 class ZoteroImport(ZoteroKey):
     collection_key: str | None = Field(default=None, max_length=8)
     max_items: int = Field(default=MAX_ITEMS, ge=1, le=MAX_ITEMS)
+    # Só o que mudou desde a última importação desta coleção (versão guardada, chave não).
+    incremental: bool = False
+    # Anexos PDF: somente com consentimento explícito nesta importação.
+    attachments_consent: bool = False
+    max_attachments: int = Field(default=10, ge=0, le=MAX_ATTACHMENTS)
 
 
-def zotero_get(path: str, key: str, *, transport=None) -> tuple[int, dict, bytes]:
+class _NoRedirect(HTTPRedirectHandler):
+    """Nunca segue redirecionamento com o cabeçalho da chave (evita vazar para outro host)."""
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+_OPENER = build_opener(_NoRedirect)
+
+
+def zotero_get(path: str, key: str, *, transport=None, max_bytes: int = MAX_BYTES[".bib"] + 1
+               ) -> tuple[int, dict, bytes]:
     """GET na API do Zotero. Nunca inclui a chave em mensagens de erro."""
     if transport is not None:
         return transport(path, key)
     request = Request(API + path, headers={"Zotero-API-Key": key, "Zotero-API-Version": "3",
-                                           "User-Agent": "Scriptorium/1 (paper-orchestra-cloud)"})
+                                           "User-Agent": USER_AGENT})
     try:
-        with urlopen(request, timeout=TIMEOUT) as response:
-            return response.status, dict(response.headers), response.read(MAX_BYTES[".bib"] + 1)
+        with _OPENER.open(request, timeout=TIMEOUT) as response:
+            return response.status, dict(response.headers), response.read(max_bytes)
     except HTTPError as exc:
-        return exc.code, {}, b""
+        return exc.code, dict(exc.headers or {}), b""
     except (URLError, TimeoutError, OSError):
         return 0, {}, b""
+
+
+def fetch_public(url: str, *, transport=None, max_bytes: int = MAX_BYTES[".pdf"] + 1) -> bytes | None:
+    """Baixa o arquivo do endereço assinado devolvido pelo Zotero, SEM a chave."""
+    if not url.startswith("https://"):
+        return None
+    if transport is not None:
+        status, _, body = transport(url, None)
+        return body if status == 200 else None
+    try:
+        with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=TIMEOUT * 2) as response:
+            return response.read(max_bytes) if response.status == 200 else None
+    except (HTTPError, URLError, TimeoutError, OSError):
+        return None
 
 
 def _check(status: int) -> None:
@@ -112,18 +151,27 @@ def list_collections(key: str, transport=None) -> list[dict]:
     return items
 
 
-def export_bibtex(key: str, collection_key: str | None, max_items: int,
-                  transport=None) -> tuple[str, str, int]:
-    user_id = user_id_for(key, transport)
+def _items_base(user_id: str, collection_key: str | None) -> str:
     if collection_key and not COLLECTION_KEY.fullmatch(collection_key):
         raise HTTPException(422, "Identificador de coleção inválido.")
-    base = f"/users/{user_id}" + (f"/collections/{collection_key}" if collection_key else "") + "/items/top"
-    parts, start, total = [], 0, None
+    return f"/users/{user_id}" + (f"/collections/{collection_key}" if collection_key else "") + "/items/top"
+
+
+def export_bibtex(key: str, collection_key: str | None, max_items: int,
+                  transport=None, since: int | None = None, user_id: str | None = None
+                  ) -> tuple[str, str, int, int | None]:
+    """BibTeX dos itens (só os alterados depois de `since`) e a versão atual da biblioteca."""
+    user_id = user_id or user_id_for(key, transport)
+    base = _items_base(user_id, collection_key)
+    extra = f"&since={int(since)}" if since is not None else ""
+    parts, start, total, version = [], 0, None, None
     while start < max_items:
         limit = min(PAGE, max_items - start)
-        status, headers, body = zotero_get(f"{base}?format=bibtex&limit={limit}&start={start}",
+        status, headers, body = zotero_get(f"{base}?format=bibtex&limit={limit}&start={start}{extra}",
                                            key, transport=transport)
         _check(status)
+        if version is None and str(headers.get("Last-Modified-Version", "")).isdigit():
+            version = int(headers["Last-Modified-Version"])
         text = body.decode("utf-8", errors="replace").strip()
         if text:
             parts.append(text)
@@ -131,11 +179,65 @@ def export_bibtex(key: str, collection_key: str | None, max_items: int,
         start += limit
         if not text or start >= total:
             break
-    bib = "\n\n".join(parts) + "\n"
+    bib = "\n\n".join(parts) + "\n" if parts else ""
     if len(bib.encode("utf-8")) > MAX_BYTES[".bib"]:
         raise HTTPException(413, "A coleção excede o limite de 2 MB para BibTeX. Importe uma coleção menor.")
     count = len(re.findall(r"^@\w+\s*[{(]", bib, re.MULTILINE))
-    return bib, user_id, count
+    return bib, user_id, count, version
+
+
+def deleted_since(key: str, user_id: str, since: int, transport=None) -> int:
+    """Quantos itens foram apagados no Zotero desde a versão `since` (só informativo)."""
+    import json
+    status, _, body = zotero_get(f"/users/{user_id}/deleted?since={int(since)}", key, transport=transport)
+    if status != 200:
+        return 0
+    try:
+        return len(json.loads(body.decode("utf-8") or "{}").get("items") or [])
+    except (ValueError, AttributeError):
+        return 0
+
+
+def pdf_attachments(key: str, user_id: str, collection_key: str | None, max_items: int,
+                    limit: int, transport=None) -> list[dict]:
+    """Anexos PDF guardados no Zotero (imported_file/imported_url) dos itens principais."""
+    import json
+    base = _items_base(user_id, collection_key)
+    status, _, body = zotero_get(f"{base}?format=keys&limit={min(max_items, PAGE)}", key, transport=transport)
+    _check(status)
+    found = []
+    for parent in body.decode("utf-8", errors="replace").split():
+        if len(found) >= limit:
+            break
+        if not COLLECTION_KEY.fullmatch(parent):
+            continue
+        status, _, raw = zotero_get(f"/users/{user_id}/items/{parent}/children", key, transport=transport)
+        if status != 200:
+            continue
+        try:
+            children = json.loads(raw.decode("utf-8") or "[]")
+        except ValueError:
+            continue
+        for child in children:
+            data = child.get("data") or {}
+            if (data.get("itemType") == "attachment" and data.get("contentType") == "application/pdf"
+                    and data.get("linkMode") in ("imported_file", "imported_url")
+                    and COLLECTION_KEY.fullmatch(str(child.get("key", "")))):
+                found.append({"key": child["key"], "parent": parent,
+                              "filename": str(data.get("filename") or data.get("title") or "anexo.pdf")[:100]})
+                break  # um PDF por item principal
+    return found
+
+
+def download_attachment(key: str, user_id: str, attachment_key: str, transport=None) -> bytes | None:
+    status, headers, body = zotero_get(f"/users/{user_id}/items/{attachment_key}/file", key,
+                                       transport=transport, max_bytes=MAX_BYTES[".pdf"] + 1)
+    if status == 200:
+        return body
+    location = headers.get("Location") or headers.get("location")
+    if status in (301, 302, 303, 307, 308) and location:
+        return fetch_public(location, transport=transport)
+    return None
 
 
 def make_zotero_router(db, bucket, verify_user: Callable, transport=None):
@@ -149,17 +251,65 @@ def make_zotero_router(db, bucket, verify_user: Callable, transport=None):
     @router.post("/import", status_code=201)
     def import_collection(payload: ZoteroImport, user: dict = dependency):
         key = payload.value()
-        bib, user_id, count = export_bibtex(key, payload.collection_key, payload.max_items, transport)
-        if count == 0:
-            raise HTTPException(422, "Nenhum item com metadados encontrado nessa coleção.")
-        now = datetime.now(timezone.utc)
+        uid = user["uid"]
+        user_id = user_id_for(key, transport)
         label = payload.collection_key or "biblioteca inteira"
-        document = save_library_item(
-            db, bucket, user["uid"], f"Zotero {label} {now:%Y-%m-%d}.bib", ".bib", bib.encode("utf-8"),
-            "Zotero", f"Importado do Zotero ({count} itens, coleção {label}) em {now:%d/%m/%Y}. Somente metadados.",
-            origin={"provider": "zotero", "upstream_id": "R21", "zotero_user_id": user_id,
-                    "collection_key": payload.collection_key, "items": count,
-                    "imported_at": now.isoformat(), "attachments": "not_imported"})
-        return {"item": exposed(document), "items_imported": count}
+        sync_ref = db.collection(SYNC).document(f"{uid}_{user_id}_{payload.collection_key or 'all'}")
+        sync = sync_ref.get()
+        since = None
+        if payload.incremental and sync.exists:
+            since = (sync.to_dict() or {}).get("last_version")
+        bib, user_id, count, version = export_bibtex(key, payload.collection_key, payload.max_items,
+                                                     transport, since=since, user_id=user_id)
+        deleted = deleted_since(key, user_id, since, transport) if since is not None else 0
+        now = datetime.now(timezone.utc)
+        result = {"items_imported": count, "incremental": since is not None, "since_version": since,
+                  "library_version": version, "deleted_in_zotero": deleted}
+        if count == 0 and since is None:
+            raise HTTPException(422, "Nenhum item com metadados encontrado nessa coleção.")
+        if count:
+            suffix = f" desde v{since}" if since is not None else ""
+            document = save_library_item(
+                db, bucket, uid, f"Zotero {label}{suffix} {now:%Y-%m-%d}.bib", ".bib", bib.encode("utf-8"),
+                "Zotero", (f"Importado do Zotero ({count} itens, coleção {label}"
+                           + (f", alterados desde a versão {since}" if since is not None else "")
+                           + f") em {now:%d/%m/%Y}."),
+                origin={"provider": "zotero", "upstream_id": "R21", "zotero_user_id": user_id,
+                        "collection_key": payload.collection_key, "items": count,
+                        "imported_at": now.isoformat(), "since_version": since,
+                        "library_version": version,
+                        "attachments": "consented" if payload.attachments_consent else "not_imported"})
+            result["item"] = exposed(document)
+        else:
+            result["up_to_date"] = True
+        # Anexos PDF só com consentimento explícito nesta importação.
+        attachments = {"imported": 0, "quarantined": 0, "skipped": 0}
+        if payload.attachments_consent and payload.max_attachments:
+            for att in pdf_attachments(key, user_id, payload.collection_key, payload.max_items,
+                                       payload.max_attachments, transport):
+                data = download_attachment(key, user_id, att["key"], transport)
+                if not data or len(data) > MAX_BYTES[".pdf"]:
+                    attachments["skipped"] += 1
+                    continue
+                name = re.sub(r"[^A-Za-z0-9À-ÿ_.,() \-]", "_", att["filename"])
+                name = name if name.lower().endswith(".pdf") else name + ".pdf"
+                try:
+                    save_library_item(db, bucket, uid, name, ".pdf", data, "Zotero",
+                                      f"Anexo PDF do item Zotero {att['parent']} (importado com consentimento).",
+                                      origin={"provider": "zotero", "upstream_id": "R21",
+                                              "zotero_user_id": user_id, "attachment_key": att["key"],
+                                              "parent_item": att["parent"], "imported_at": now.isoformat(),
+                                              "consent": True})
+                    attachments["imported"] += 1
+                except HTTPException as error:
+                    # Quarentena (M13), limite da biblioteca ou arquivo inválido.
+                    attachments["quarantined" if "quarentena" in str(error.detail) else "skipped"] += 1
+        result["attachments"] = attachments
+        if version is not None:
+            # Só o número da versão; a chave do Zotero nunca é guardada.
+            sync_ref.set({"owner_uid": uid, "zotero_user_id": user_id,
+                          "collection_key": payload.collection_key, "last_version": version,
+                          "updated_at": now.isoformat()})
+        return result
 
     return router

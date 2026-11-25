@@ -269,7 +269,7 @@ class ZoteroTest(unittest.TestCase):
 
     def test_export_paginates_top_items_in_bibtex(self):
         transport = ZoteroTransport(total=150)
-        text, user_id, count = zi.export_bibtex(KEY, "ABCD2345", 500, transport=transport)
+        text, user_id, count, _version = zi.export_bibtex(KEY, "ABCD2345", 500, transport=transport)
         self.assertEqual((user_id, count), ("4321", 150))
         pages = [c for c in transport.calls if "/items/top" in c]
         self.assertEqual(len(pages), 2)

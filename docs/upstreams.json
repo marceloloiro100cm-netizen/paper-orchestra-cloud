@@ -151,7 +151,8 @@
       "owner": "marceloloiro100cm-netizen",
       "last_checked": "2026-11-24",
       "used_in": [
-        "worker/lexical_index.py"
+        "worker/lexical_index.py",
+        "api/library_index.py"
       ],
       "installed_version": "SQLite embutido no Python da imagem python:3.11-slim (módulo sqlite3)"
     },
@@ -197,7 +198,8 @@
       ],
       "used_in": [
         "worker/reference_verification.py",
-        "worker/editorial_status.py"
+        "worker/editorial_status.py",
+        "worker/editorial_recheck.py"
       ],
       "update_policy": "Mensal e antes de cada release: campos, filtros, cotas e etiqueta (polite pool).",
       "review_frequency": "mensal",
@@ -261,7 +263,8 @@
         "M07"
       ],
       "used_in": [
-        "worker/editorial_status.py"
+        "worker/editorial_status.py",
+        "worker/editorial_recheck.py"
       ],
       "update_policy": "Mensal. O CSV completo (gitlab.com/crossref/retraction-watch-data) ainda não é sincronizado.",
       "review_frequency": "mensal",
@@ -306,7 +309,8 @@
       "owner": "marceloloiro100cm-netizen",
       "last_checked": "2026-11-24",
       "used_in": [
-        "worker/gap_report.py"
+        "worker/gap_report.py",
+        "worker/coverage_facets.py"
       ],
       "migration_note": "Referência de desenho do diagnóstico pré-pesquisa (M16); nenhum código copiado."
     },
@@ -444,7 +448,8 @@
       "owner": "marceloloiro100cm-netizen",
       "last_checked": "2026-11-24",
       "used_in": [
-        "worker/source_quality.py"
+        "worker/source_quality.py",
+        "worker/manual_reviews.py"
       ],
       "migration_note": "DOIs SciELO (prefixo 10.1590/) são registrados na Crossref e já passam pela conferência normal (orientação oficial da SciELO sobre DOI). Para obras sem DOI: link de busca para conferência manual, sem raspagem."
     },
@@ -464,7 +469,8 @@
       "owner": "marceloloiro100cm-netizen",
       "last_checked": "2026-11-24",
       "used_in": [
-        "worker/source_quality.py"
+        "worker/source_quality.py",
+        "worker/manual_reviews.py"
       ],
       "migration_note": "Só link para a página inicial, para conferência manual pelo título; nenhuma API presumida."
     },
@@ -487,7 +493,7 @@
         "api/zotero_import.py"
       ],
       "installed_version": "Web API v3 (cabeçalho Zotero-API-Version: 3)",
-      "migration_note": "Conferido em 24/11/2026: base https://api.zotero.org, cabeçalho Zotero-API-Key, limit máx. 100, Total-Results, /items/top, format=bibtex, /keys/<chave> com userID. A chave nunca é guardada."
+      "migration_note": "Conferido em 24/11/2026: base https://api.zotero.org, cabeçalho Zotero-API-Key, limit máx. 100, Total-Results, /items/top, format=bibtex, /keys/<chave> com userID. A chave nunca é guardada. Onda 6 (24/11/2026): importação incremental com since e Last-Modified-Version (guarda só o número da versão em zotero_sync), contagem de apagados em /deleted, e anexos PDF só com consentimento (format=keys, /items/{key}/children, /items/{key}/file sem seguir redirecionamento com a chave)."
     },
     {
       "id": "R22",
@@ -518,14 +524,18 @@
       ],
       "license_spdx": "MIT",
       "license_status": "confirmada pela API do GitHub (vigia de 24/11/2026)",
-      "adopted": false,
+      "adopted": true,
       "modules": [
         "M27"
       ],
       "update_policy": "Mensal: releases e issues.",
       "review_frequency": "mensal",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "used_in": [
+        "api/csl_export.py"
+      ],
+      "migration_note": "Referência do mapeamento BibTeX -> CSL-JSON em api/csl_export.py; nenhum código copiado e nenhuma dependência JS instalada."
     },
     {
       "id": "R24",
@@ -536,14 +546,18 @@
       "track": "commits",
       "license_spdx": "CC-BY-SA-3.0",
       "license_status": "a conferir: licença por estilo",
-      "adopted": false,
+      "adopted": true,
       "modules": [
         "M27"
       ],
       "update_policy": "Commit fixado; novos estilos passam por testes de snapshot.",
       "review_frequency": "semestral",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "used_in": [
+        "api/csl_export.py"
+      ],
+      "migration_note": "Esquema CSL-JSON e estilo ABNT (associacao-brasileira-de-normas-tecnicas) como referência; nenhum arquivo .csl copiado (licença por estilo a conferir antes de embutir um)."
     },
     {
       "id": "R25",
@@ -597,7 +611,8 @@
         "M13"
       ],
       "used_in": [
-        "worker/document_guard.py"
+        "worker/document_guard.py",
+        "api/upload_guard.py"
       ],
       "update_policy": "Mensal; CVEs críticos imediatamente.",
       "review_frequency": "mensal",
@@ -852,13 +867,18 @@
         "worker/structured_extract.py",
         "worker/source_materials.py",
         "worker/scientific_audit.py",
-        "worker/neon_review.py"
+        "worker/neon_review.py",
+        "api/pdf_render.py",
+        "api/research_tools.py",
+        "api/requirements.txt",
+        "worker/coverage_facets.py"
       ],
       "update_policy": "Faixa fixada em worker/requirements.txt (antes vinha sem versão do PaperOrchestra); Dependabot semanal; testes de extração de PDF no CI.",
       "review_frequency": "mensal",
       "risk": "AGPL: o serviço é acessível pela rede. O código do projeto é público, o que ajuda, mas a conformidade precisa ser conferida.",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24"
+      "last_checked": "2026-11-24",
+      "migration_note": "Desde 24/11/2026 também na API (M02, página com trecho destacado): a API é serviço de rede, então a AGPL-3.0 (seção 13) pede o código-fonte disponível aos usuários; o repositório é público e o rodapé do site mostra o link."
     },
     {
       "id": "R38",
@@ -877,7 +897,8 @@
       "used_in": [
         "worker/Dockerfile",
         "worker/templates/abnt-artigo",
-        "worker/templates/abnt-dissertacao"
+        "worker/templates/abnt-dissertacao",
+        "api/csl_export.py"
       ],
       "update_policy": "Semestral, junto com a revisão das NBR 6022, 10520 e 6023.",
       "review_frequency": "semestral",
@@ -1034,6 +1055,48 @@
       "risk": "Envia trechos das fontes ao Google (autorizado pelo responsável em 24/11/2026). Convidados usam a própria chave; nunca o projeto do administrador.",
       "owner": "marceloloiro100cm-netizen",
       "last_checked": "2026-11-24"
+    },
+    {
+      "id": "R45",
+      "name": "OWASP File Upload Cheat Sheet",
+      "kind": "normativo",
+      "canonical_url": "https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html",
+      "license_spdx": "CC-BY-SA-4.0",
+      "license_status": "guia de segurança; texto sob CC BY-SA 4.0, nenhum código copiado",
+      "adopted": true,
+      "modules": [
+        "M13"
+      ],
+      "used_in": [
+        "api/upload_guard.py",
+        "api/library.py"
+      ],
+      "update_policy": "Semestral: revisar a lista de verificações de upload.",
+      "review_frequency": "semestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24",
+      "migration_note": "Base das verificações de assinatura, tamanho, conteúdo ativo e armazenamento isolado (quarentena fora de library/)."
+    },
+    {
+      "id": "R46",
+      "name": "pdfid (Didier Stevens)",
+      "kind": "ferramenta",
+      "canonical_url": "https://blog.didierstevens.com/programs/pdf-tools/",
+      "github": "DidierStevens/DidierStevensSuite",
+      "license_spdx": "domínio público (declarado pelo autor)",
+      "license_status": "referência de desenho; nenhum código copiado",
+      "adopted": true,
+      "modules": [
+        "M13"
+      ],
+      "used_in": [
+        "api/upload_guard.py"
+      ],
+      "update_policy": "Semestral: comparar a lista de palavras-chave de risco em PDF.",
+      "review_frequency": "semestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-24",
+      "migration_note": "Ideia de contar nomes de risco (/JavaScript, /Launch, /EmbeddedFile etc.), inclusive ofuscados com #xx; a inspeção também abre fluxos FlateDecode com limite de descompressão."
     }
   ],
   "modules": [
@@ -1069,11 +1132,14 @@
       "depends_on": [
         "M01"
       ],
-      "status": "parcial",
-      "next_step": "Cada bloco e trecho guarda página e bbox normalizada; DOCX/TXT ficam sem coordenadas. Falta o visualizador que abre o PDF na área do trecho.",
+      "status": "implementado",
+      "next_step": "Cada trecho guarda página e bbox; \"Ver na página do PDF\" abre a página renderizada no servidor (PyMuPDF) com as áreas do trecho destacadas, buscando o trecho no relatório da própria pesquisa (sem coordenadas vindas do navegador). DOCX e TXT continuam sem coordenadas, por natureza.",
       "files": [
         "worker/structured_extract.py",
-        "worker/chunking.py"
+        "worker/chunking.py",
+        "api/research_tools.py",
+        "api/pdf_render.py",
+        "public/app.js"
       ]
     },
     {
@@ -1090,12 +1156,13 @@
       "depends_on": [
         "M01"
       ],
-      "status": "parcial",
-      "next_step": "Trechos com cache privado por SHA-256 + versões no GCS; índice FTS5 montado por execução. Falta índice vetorial (FAISS, R05) e índice persistente por conta.",
+      "status": "implementado",
+      "next_step": "Trechos e vetores em cache privado por SHA-256 e índice FTS5 persistente por conta (library/{uid}/index), refeito só quando a biblioteca muda; busca no conteúdo na interface. FAISS (R05) fica para quando a busca vetorial na biblioteca inteira for necessária: hoje NumPy é exato e equivalente ao IndexFlatIP.",
       "files": [
         "worker/chunking.py",
         "worker/lexical_index.py",
-        "worker/source_materials.py"
+        "worker/source_materials.py",
+        "api/library_index.py"
       ]
     },
     {
@@ -1182,12 +1249,14 @@
       "depends_on": [
         "M06"
       ],
-      "status": "parcial",
+      "status": "implementado",
       "files": [
         "worker/editorial_status.py",
-        "worker/reference_verification.py"
+        "worker/reference_verification.py",
+        "worker/editorial_recheck.py",
+        "api/research_tools.py"
       ],
-      "next_step": "Implementado via Crossref (inclui Retraction Watch) e reforçado pelo sinal is_retracted do OpenAlex no escudo (M06). Falta reavaliar ao reabrir um manuscrito antigo."
+      "next_step": "Crossref (inclui Retraction Watch) na geração, sinal is_retracted do OpenAlex no escudo e reavaliação sob demanda de pesquisas antigas (modo editorial_recheck do worker, sem IA), com antes e depois. Sincronizar o CSV completo do Retraction Watch continua opcional."
     },
     {
       "id": "M08",
@@ -1204,12 +1273,13 @@
         "M05",
         "M06"
       ],
-      "status": "parcial",
-      "next_step": "Matriz com trechos candidatos e revisão humana registrada por afirmação (somente acréscimo, histórico preservado). A classificação automática apoia/contradiz existe no M22 (experimental). Falta exportar as revisões junto com o CSV.",
+      "status": "implementado",
+      "next_step": "Matriz com trechos candidatos, revisão humana somente acréscimo e exportação CSV com a decisão mais recente de cada afirmação. A classificação automática apoia/contradiz segue no M22 (experimental).",
       "files": [
         "worker/evidence_matrix.py",
         "api/reviews.py",
-        "public/app.js"
+        "public/app.js",
+        "api/research_tools.py"
       ]
     },
     {
@@ -1226,11 +1296,12 @@
         "M03",
         "M04"
       ],
-      "status": "parcial",
-      "next_step": "Relatório de cobertura por fonte (trechos totais, correspondências e selecionados) visível na interface. Falta agregar por autor, época e tema.",
+      "status": "implementado",
+      "next_step": "Cobertura por fonte e agrupada por autor (metadado do PDF), época (ano da primeira página ou do arquivo, rotulado) e tema (perguntas e subtópicos da ideia), visível em \"Cobertura das fontes\".",
       "files": [
         "worker/retrieval_context.py",
-        "public/app.js"
+        "public/app.js",
+        "worker/coverage_facets.py"
       ]
     },
     {
@@ -1311,9 +1382,10 @@
       "files": [
         "worker/document_guard.py",
         "worker/source_materials.py",
-        "api/library.py"
+        "api/library.py",
+        "api/upload_guard.py"
       ],
-      "next_step": "Feito: neutralização de delimitadores, remoção de caracteres invisíveis e sinais de instrução embutida. Falta varredura de malware no upload e quarentena."
+      "next_step": "Feito: neutralização de delimitadores e instruções embutidas no texto, e inspeção estática no upload (conteúdo ativo em PDF, inclusive em fluxos compactados e nomes ofuscados; macros, OLE, DDE e modelo externo em DOCX) com quarentena fora da biblioteca. Falta antivírus com assinaturas (ex.: ClamAV), se o volume justificar."
     },
     {
       "id": "M14",
@@ -1354,9 +1426,12 @@
         ".github/workflows/osv-scanner-pr.yml",
         ".github/workflows/osv-scanner-scheduled.yml",
         ".github/workflows/watch-upstreams.yml",
-        "scripts/upstreams.py"
+        "scripts/upstreams.py",
+        "worker/stage_budget.py",
+        "worker/runner.py",
+        "api/research_tools.py"
       ],
-      "next_step": "Feito: Dependabot, OSV-Scanner e vigia de upstreams. Falta orçamento por etapa e cancelamento de Job pelo navegador."
+      "next_step": "Feito: Dependabot, OSV-Scanner, vigia de upstreams, orçamento de tempo por etapa (etapas opcionais puladas quando não cabem) e cancelamento pelo navegador, com tempos no manifesto. Falta custo em tokens por etapa, que depende do motor original informar o consumo (ver M14)."
     },
     {
       "id": "M16",
@@ -1481,10 +1556,12 @@
         "M14"
       ],
       "status": "parcial",
-      "next_step": "Primeira camada (parsing e trechos por SHA-256 + versões) implementada. Falta cache de fichamentos por modelo e política.",
+      "next_step": "Cache por SHA-256 de parsing, trechos, vetores e metadados, e ficha de leitura sem IA (estrutura, termos, abertura, OCR) por documento. Falta fichamento por modelo de linguagem, que gastaria a chave do pesquisador e depende de decisão do responsável.",
       "files": [
         "worker/source_materials.py",
-        "worker/runner.py"
+        "worker/runner.py",
+        "api/library_index.py",
+        "worker/coverage_facets.py"
       ]
     },
     {
@@ -1546,12 +1623,13 @@
       "depends_on": [
         "M06"
       ],
-      "status": "parcial",
-      "next_step": "Links de conferência manual e registro do resultado da conferência por referência (confirmada ou incorreta). Falta usar o resultado humano na próxima execução.",
+      "status": "implementado",
+      "next_step": "Links de conferência manual e decisão humana registrada com DOI e título normalizados; a pesquisa seguinte do mesmo pesquisador mostra essa decisão ao lado da conferência automática, sem substituí-la.",
       "files": [
         "worker/source_quality.py",
         "api/reviews.py",
-        "public/app.js"
+        "public/app.js",
+        "worker/manual_reviews.py"
       ]
     },
     {
@@ -1569,11 +1647,11 @@
         "M09",
         "M12"
       ],
-      "status": "parcial",
+      "status": "implementado",
       "files": [
         "worker/neon_review.py"
       ],
-      "next_step": "A revisão crítica opcional da V1 existe; falta acesso restrito à matriz de evidências (M08)."
+      "next_step": "O parecer Neon recebe só um recorte da matriz de evidências (até 25 afirmações e 2 trechos curtos cada), nunca o texto integral das fontes, e registra esse limite no próprio parecer."
     },
     {
       "id": "M26",
@@ -1590,8 +1668,8 @@
         "M13",
         "M14"
       ],
-      "status": "parcial",
-      "next_step": "Importação somente leitura de coleções do Zotero como .bib, com origem registrada e sem guardar a chave. Falta sincronização incremental (versões/ETag) e importação de anexos com consentimento.",
+      "status": "implementado",
+      "next_step": "Importação somente leitura como .bib, incremental (versão do Zotero guardada, chave nunca) e anexos PDF só com consentimento, passando pela verificação de upload (M13).",
       "files": [
         "api/zotero_import.py",
         "api/library.py",
@@ -1615,12 +1693,13 @@
         "M11",
         "M24"
       ],
-      "status": "parcial",
+      "status": "implementado",
       "files": [
         "worker/templates/abnt-artigo",
-        "worker/templates/abnt-dissertacao"
+        "worker/templates/abnt-dissertacao",
+        "api/csl_export.py"
       ],
-      "next_step": "Templates ABNT (abnTeX2) existem; falta exportação CSL e testes de estilo."
+      "next_step": "Templates ABNT (abnTeX2) no LaTeX e exportação das referências da pesquisa em CSL-JSON e em lista ABNT (NBR 6023:2018), com testes de snapshot. Outros estilos CSL arbitrários exigiriam um processador citeproc."
     }
   ]
 }

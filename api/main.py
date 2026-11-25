@@ -2,6 +2,7 @@
 
 As chaves Gemini ficam somente no Cloud Run Job (Secret Manager); não entram aqui.
 """
+import json
 import os
 import re
 import uuid
@@ -17,7 +18,9 @@ from access_requests import (request_access, pending_access_requests,
 from job_state import (ACTIVE_STATUSES, StateConflict, claim_active_slot, reconcile,
                        transition)
 from zotero_import import make_zotero_router
-from reviews import ReviewIn, add_review, list_reviews
+from reviews import ReviewIn, add_review, list_reviews, reference_fingerprint
+from research_tools import make_research_tools_router
+from library_index import make_library_index_router
 
 import firebase_admin
 from firebase_admin import auth
@@ -163,11 +166,21 @@ def serializable(record: dict) -> dict:
         "shield_counts": record.get("shield_counts"),
         "audit_findings": record.get("audit_findings"),
         "error": record.get("error", ""),
+        # M15: cancelamento pedido; M07: reavaliação editorial.
+        "cancel_requested": bool(record.get("cancel_requested")),
+        "editorial_recheck": record.get("editorial_recheck"),
         "created_at": record.get("created_at", ""),
         "finished_at": record.get("finished_at", ""),
         "files": record.get("files", []),
         "sources": [{k: entry.get(k) for k in ("id", "name", "format", "sha256")} for entry in record.get("sources", [])],
     }
+
+
+# Onda 6 do plano V2: cancelamento (M15), reavaliação editorial (M07), página do
+# PDF com o trecho (M02), matriz revisada (M08) e exportação CSL/ABNT (M27).
+app.include_router(make_research_tools_router(db, bucket, current_user, get_research, start_job))
+# M03/M21: busca na biblioteca inteira e ficha de leitura por documento.
+app.include_router(make_library_index_router(db, bucket, current_user))
 
 
 @app.get("/api/health")
@@ -453,7 +466,19 @@ def create_review(job_id: str, payload: ReviewIn, user: User):
     record = get_research(job_id, user)
     if record.get("status") != "completed":
         raise HTTPException(status_code=409, detail="Revisões só para pesquisas concluídas.")
-    return add_review(db, job_id, user["uid"], payload)
+    extra = None
+    if payload.target_type == "reference":
+        # M24: guarda DOI e título junto da decisão, para a próxima pesquisa reconhecer a obra.
+        try:
+            blob = bucket.blob(f"research/{user['uid']}/{job_id}/output/reference_verification.json")
+            report = json.loads(blob.download_as_bytes().decode("utf-8"))
+            ref = next((i.get("reference") or {} for i in report.get("items", [])
+                        if (i.get("reference") or {}).get("key") == payload.target_id), None)
+            if ref:
+                extra = {"reference_fingerprint": reference_fingerprint(ref)}
+        except Exception:
+            extra = None
+    return add_review(db, job_id, user["uid"], payload, extra)
 
 
 @app.get("/api/jobs/{job_id}/reviews")

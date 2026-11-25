@@ -6,3 +6,6 @@ google-cloud-storage>=2.18,<4
 google-cloud-run>=0.11,<1
 pydantic>=2.5,<3
 google-cloud-secret-manager>=2.20,<3
+# M02: renderiza a página do PDF com o trecho destacado. Origem: R37 (AGPL-3.0;
+# o código do Scriptorium é público e o site exibe o link do repositório).
+PyMuPDF>=2.1,<3

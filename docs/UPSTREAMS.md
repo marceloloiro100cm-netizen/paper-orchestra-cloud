@@ -35,8 +35,8 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R20 | [BRAPCI](https://brapci.inf.br/) | api | sim | a conferir | - | M24 |
 | R21 | [Zotero Web API v3](https://www.zotero.org/support/dev/web_api/v3/start) | api | sim | termos do serviço | - | M26 |
 | R22 | [Better BibTeX for Zotero](https://github.com/retorquere/zotero-better-bibtex) | biblioteca | não | MIT | - | M26 |
-| R23 | [Citation.js](https://github.com/citation-js/citation-js) | biblioteca | não | MIT | - | M27 |
-| R24 | [CSL Styles](https://github.com/citation-style-language/styles) | biblioteca | não | CC-BY-SA-3.0 | - | M27 |
+| R23 | [Citation.js](https://github.com/citation-js/citation-js) | biblioteca | sim | MIT | - | M27 |
+| R24 | [CSL Styles](https://github.com/citation-style-language/styles) | biblioteca | sim | CC-BY-SA-3.0 | - | M27 |
 | R25 | [IFRS: Instrução Normativa nº 16/2026 (IA generativa)](https://ifrs.edu.br/documentos/instrucao-normativa-ifrs-n-16-2026/) | normativo | sim | não se aplica | - | M11, M12 |
 | R26 | [PRISMA 2020](https://www.prisma-statement.org/prisma-2020-checklist) | normativo | não | não se aplica | - | M09, M16 |
 | R27 | [OWASP GenAI Security Project](https://genai.owasp.org/) | normativo | sim | não se aplica | - | M13 |
@@ -57,6 +57,8 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R42 | [Imagem base python:3.11-slim (Docker Official Images)](https://hub.docker.com/_/python) | ferramenta | sim | PSF-2.0 | python:3.11-slim (tag móvel, sem digest) | V1 |
 | R43 | [NumPy](https://github.com/numpy/numpy) | biblioteca | sim | BSD-3-Clause | >=1.26,<3 | M03, M04, M08 |
 | R44 | [Gemini Embedding (gemini-embedding-001)](https://ai.google.dev/api/embeddings) | api | sim | termos do serviço | gemini-embedding-001, 768 dimensões (SCRIPTORIUM_EMBEDDING_MODEL / _DIMENSIONS) | M04, M08 |
+| R45 | [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html) | normativo | sim | CC-BY-SA-4.0 | - | M13 |
+| R46 | [pdfid (Didier Stevens)](https://blog.didierstevens.com/programs/pdf-tools/) | ferramenta | sim | domínio público (declarado pelo autor) | - | M13 |
 
 ## Fichas
 
@@ -188,7 +190,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** SQLite embutido no Python da imagem python:3.11-slim (módulo sqlite3)
 - **Última versão revisada:** -
-- **Onde é usado:** worker/lexical_index.py
+- **Onde é usado:** worker/lexical_index.py, api/library_index.py
 - **Política de atualização:** Acompanhar o release log do SQLite e a versão empacotada no Python da imagem.
 - **Frequência de revisão:** mensal
 - **Risco:** -
@@ -234,7 +236,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** worker/reference_verification.py, worker/editorial_status.py
+- **Onde é usado:** worker/reference_verification.py, worker/editorial_status.py, worker/editorial_recheck.py
 - **Política de atualização:** Mensal e antes de cada release: campos, filtros, cotas e etiqueta (polite pool).
 - **Frequência de revisão:** mensal
 - **Risco:** Indisponibilidade vira 'inconclusivo', nunca 'inexistente'.
@@ -303,7 +305,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** worker/editorial_status.py
+- **Onde é usado:** worker/editorial_status.py, worker/editorial_recheck.py
 - **Política de atualização:** Mensal. O CSV completo (gitlab.com/crossref/retraction-watch-data) ainda não é sincronizado.
 - **Frequência de revisão:** mensal
 - **Risco:** Ausência de aviso nas bases não prova que a obra nunca foi retratada.
@@ -349,7 +351,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** worker/gap_report.py
+- **Onde é usado:** worker/gap_report.py, worker/coverage_facets.py
 - **Política de atualização:** Revisitar a cada semestre.
 - **Frequência de revisão:** semestral
 - **Risco:** -
@@ -487,7 +489,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** worker/source_quality.py
+- **Onde é usado:** worker/source_quality.py, worker/manual_reviews.py
 - **Política de atualização:** Mensal: termos e endpoints oficiais.
 - **Frequência de revisão:** mensal
 - **Risco:** -
@@ -510,7 +512,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** worker/source_quality.py
+- **Onde é usado:** worker/source_quality.py, worker/manual_reviews.py
 - **Política de atualização:** Mensal: site e políticas; sem scraping agressivo.
 - **Frequência de revisão:** mensal
 - **Risco:** -
@@ -537,7 +539,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Política de atualização:** Mensal: documentação e anúncios; credenciais só no Secret Manager.
 - **Frequência de revisão:** mensal
 - **Risco:** -
-- **Nota de migração:** Conferido em 24/11/2026: base https://api.zotero.org, cabeçalho Zotero-API-Key, limit máx. 100, Total-Results, /items/top, format=bibtex, /keys/<chave> com userID. A chave nunca é guardada.
+- **Nota de migração:** Conferido em 24/11/2026: base https://api.zotero.org, cabeçalho Zotero-API-Key, limit máx. 100, Total-Results, /items/top, format=bibtex, /keys/<chave> com userID. A chave nunca é guardada. Onda 6 (24/11/2026): importação incremental com since e Last-Modified-Version (guarda só o número da versão em zotero_sync), contagem de apagados em /deleted, e anexos PDF só com consentimento (format=keys, /items/{key}/children, /items/{key}/file sem seguir redirecionamento com a chave).
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -579,11 +581,11 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** -
+- **Onde é usado:** api/csl_export.py
 - **Política de atualização:** Mensal: releases e issues.
 - **Frequência de revisão:** mensal
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** Referência do mapeamento BibTeX -> CSL-JSON em api/csl_export.py; nenhum código copiado e nenhuma dependência JS instalada.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -602,11 +604,11 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** -
+- **Onde é usado:** api/csl_export.py
 - **Política de atualização:** Commit fixado; novos estilos passam por testes de snapshot.
 - **Frequência de revisão:** semestral
 - **Risco:** -
-- **Nota de migração:** -
+- **Nota de migração:** Esquema CSL-JSON e estilo ABNT (associacao-brasileira-de-normas-tecnicas) como referência; nenhum arquivo .csl copiado (licença por estilo a conferir antes de embutir um).
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -671,7 +673,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** worker/document_guard.py
+- **Onde é usado:** worker/document_guard.py, api/upload_guard.py
 - **Política de atualização:** Mensal; CVEs críticos imediatamente.
 - **Frequência de revisão:** mensal
 - **Risco:** -
@@ -901,11 +903,11 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** >=2.1,<3
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** worker/requirements.txt, worker/structured_extract.py, worker/source_materials.py, worker/scientific_audit.py, worker/neon_review.py
+- **Onde é usado:** worker/requirements.txt, worker/structured_extract.py, worker/source_materials.py, worker/scientific_audit.py, worker/neon_review.py, api/pdf_render.py, api/research_tools.py, api/requirements.txt, worker/coverage_facets.py
 - **Política de atualização:** Faixa fixada em worker/requirements.txt (antes vinha sem versão do PaperOrchestra); Dependabot semanal; testes de extração de PDF no CI.
 - **Frequência de revisão:** mensal
 - **Risco:** AGPL: o serviço é acessível pela rede. O código do projeto é público, o que ajuda, mas a conformidade precisa ser conferida.
-- **Nota de migração:** -
+- **Nota de migração:** Desde 24/11/2026 também na API (M02, página com trecho destacado): a API é serviço de rede, então a AGPL-3.0 (seção 13) pede o código-fonte disponível aos usuários; o repositório é público e o rodapé do site mostra o link.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
@@ -924,7 +926,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** versão do pacote Debian texlive-publishers da imagem python:3.11-slim
 - **Versão instalada:** 1.9.7 (pacote Debian texlive-publishers)
 - **Última versão revisada:** 2018-11-24-v1.9.7-ctan
-- **Onde é usado:** worker/Dockerfile, worker/templates/abnt-artigo, worker/templates/abnt-dissertacao
+- **Onde é usado:** worker/Dockerfile, worker/templates/abnt-artigo, worker/templates/abnt-dissertacao, api/csl_export.py
 - **Política de atualização:** Semestral, junto com a revisão das NBR 6022, 10520 e 6023.
 - **Frequência de revisão:** semestral
 - **Risco:** -
@@ -1067,6 +1069,52 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Frequência de revisão:** mensal
 - **Risco:** Envia trechos das fontes ao Google (autorizado pelo responsável em 24/11/2026). Convidados usam a própria chave; nunca o projeto do administrador.
 - **Nota de migração:** -
+- **Resultado de benchmark:** -
+- **Rollback:** -
+- **Responsável:** marceloloiro100cm-netizen
+- **Última checagem:** 2026-11-24
+
+### R45 · OWASP File Upload Cheat Sheet
+
+- **Fonte canônica:** https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html
+- **Versões:** -
+- **Erros e correções:** -
+- **Avisos de segurança:** -
+- **Histórico de mudanças:** -
+- **Licença (SPDX):** CC-BY-SA-4.0
+- **Situação da licença:** guia de segurança; texto sob CC BY-SA 4.0, nenhum código copiado
+- **Licença dos pesos:** -
+- **Versão fixada:** -
+- **Versão instalada:** -
+- **Última versão revisada:** -
+- **Onde é usado:** api/upload_guard.py, api/library.py
+- **Política de atualização:** Semestral: revisar a lista de verificações de upload.
+- **Frequência de revisão:** semestral
+- **Risco:** -
+- **Nota de migração:** Base das verificações de assinatura, tamanho, conteúdo ativo e armazenamento isolado (quarentena fora de library/).
+- **Resultado de benchmark:** -
+- **Rollback:** -
+- **Responsável:** marceloloiro100cm-netizen
+- **Última checagem:** 2026-11-24
+
+### R46 · pdfid (Didier Stevens)
+
+- **Fonte canônica:** https://blog.didierstevens.com/programs/pdf-tools/
+- **Versões:** https://github.com/DidierStevens/DidierStevensSuite/releases
+- **Erros e correções:** https://github.com/DidierStevens/DidierStevensSuite/issues
+- **Avisos de segurança:** https://github.com/DidierStevens/DidierStevensSuite/security/advisories
+- **Histórico de mudanças:** -
+- **Licença (SPDX):** domínio público (declarado pelo autor)
+- **Situação da licença:** referência de desenho; nenhum código copiado
+- **Licença dos pesos:** -
+- **Versão fixada:** -
+- **Versão instalada:** -
+- **Última versão revisada:** -
+- **Onde é usado:** api/upload_guard.py
+- **Política de atualização:** Semestral: comparar a lista de palavras-chave de risco em PDF.
+- **Frequência de revisão:** semestral
+- **Risco:** -
+- **Nota de migração:** Ideia de contar nomes de risco (/JavaScript, /Launch, /EmbeddedFile etc.), inclusive ofuscados com #xx; a inspeção também abre fluxos FlateDecode com limite de descompressão.
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen

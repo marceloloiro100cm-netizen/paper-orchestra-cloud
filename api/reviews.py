@@ -11,6 +11,7 @@ A leitura mostra a decisão mais recente por item e o histórico completo.
 from __future__ import annotations
 
 import re
+import unicodedata
 import uuid
 from datetime import datetime, timezone
 from typing import Literal
@@ -43,7 +44,20 @@ class ReviewIn(BaseModel):
         return value
 
 
-def add_review(db, job_id: str, owner_uid: str, payload: ReviewIn) -> dict:
+def reference_fingerprint(reference: dict) -> dict:
+    """M24: DOI e título normalizados, para reconhecer a obra em pesquisas futuras.
+
+    Igual a worker/manual_reviews.fingerprint (teste garante as duas iguais).
+    """
+    text = unicodedata.normalize("NFKD", reference.get("title", "") or "")
+    text = "".join(c for c in text if not unicodedata.combining(c)).lower()
+    text = re.sub(r"[{}\\]", "", text)
+    doi = (reference.get("doi", "") or "").strip().lower()
+    doi = re.sub(r"^(https?://(dx\.)?doi\.org/|doi:)", "", doi)
+    return {"doi": doi, "title_norm": re.sub(r"[^a-z0-9]+", " ", text).strip()[:300]}
+
+
+def add_review(db, job_id: str, owner_uid: str, payload: ReviewIn, extra: dict | None = None) -> dict:
     if payload.decision not in DECISIONS[payload.target_type]:
         raise HTTPException(422, "Decisão inválida para este tipo de item.")
     existing = list(db.collection(COLLECTION).where("job_id", "==", job_id).limit(MAX_REVIEWS_PER_JOB).stream())
@@ -54,6 +68,7 @@ def add_review(db, job_id: str, owner_uid: str, payload: ReviewIn) -> dict:
         "target_type": payload.target_type, "target_id": payload.target_id,
         "decision": payload.decision, "note": payload.note.strip(),
         "at": datetime.now(timezone.utc).isoformat(),
+        **(extra or {}),
     }
     db.collection(COLLECTION).document(review["id"]).create(review)
     return review

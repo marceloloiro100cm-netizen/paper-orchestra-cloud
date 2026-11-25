@@ -1422,11 +1422,41 @@
           </div>
           <label for="zotero-collection">Coleção</label>
           <select id="zotero-collection" disabled><option value="">Biblioteca inteira (até 500 itens)</option></select>
+          <div class="switch-row">
+            <label for="zotero-incremental">
+              Só o que mudou desde a última importação
+              <span class="switch-sub">Usa o número de versão do Zotero guardado da importação anterior desta coleção (a chave continua sem ser guardada).</span>
+            </label>
+            <input id="zotero-incremental" type="checkbox">
+          </div>
+          <div class="switch-row">
+            <label for="zotero-attachments">
+              Também importar os PDFs anexados (até 10)
+              <span class="switch-sub">Autorizo baixar do Zotero os PDFs guardados nesses itens para a minha biblioteca. Cada arquivo passa pela verificação de segurança.</span>
+            </label>
+            <input id="zotero-attachments" type="checkbox">
+          </div>
           <div class="actions">
             <button class="btn" type="button" id="zotero-import" disabled>Importar como .bib</button>
             <span id="zotero-message" role="status" class="subtle"></span>
           </div>
         </details>
+
+        <!-- M03/M21: busca no conteúdo dos documentos já lidos e ficha de leitura -->
+        <details class="upload-drawer" id="content-search-drawer">
+          <summary><span>Buscar no conteúdo da biblioteca</span><span class="subtle" aria-hidden="true">⌄</span></summary>
+          <p class="field-hint">Procura palavras dentro dos documentos que já foram lidos numa pesquisa ou diagnóstico (o índice fica salvo na sua conta). Cada resultado abre a ficha de leitura do documento.</p>
+          <label for="content-search">Palavras</label>
+          <input id="content-search" type="search" maxlength="200" placeholder="Ex.: sala de aula invertida avaliação"/>
+          <div class="actions">
+            <button class="btn" type="button" id="content-search-run">Buscar</button>
+            <span id="content-search-message" role="status" class="subtle"></span>
+          </div>
+          <div id="content-search-results"></div>
+        </details>
+
+        <!-- M13: arquivos retidos na verificação de segurança -->
+        <div id="quarantine-list" class="budget-alert hidden" role="status"></div>
 
         <!-- Toolbar de busca, filtro de formato e medidor de espaço de leitura (75.000 chars) -->
         <div class="lib-toolbar">
@@ -1657,7 +1687,7 @@
     </div>
   </div>
 
-    <footer>Scriptorium MPIE • Projeto acadêmico independente baseado no PaperOrchestra • Revise referências e resultados antes de divulgar.</footer>
+    <footer>Scriptorium MPIE • Projeto acadêmico independente baseado no PaperOrchestra • Revise referências e resultados antes de divulgar. • <a href="https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud" target="_blank" rel="noopener">Código-fonte</a></footer>
 
   <!-- Camada exclusivamente visual (Modo Black + navegação entre as 3 etapas, sem tocar no core) -->
   <script>
@@ -2239,6 +2269,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=responsive-fluid-20261124-2"></script>
+  <script type="module" src="/app.js?v=onda6-20261124"></script>
 </body>
 </html>
