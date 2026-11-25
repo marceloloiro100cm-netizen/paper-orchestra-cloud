@@ -1,0 +1,92 @@
+name: Corpus de referência e avaliação (gate G2)
+
+# coletar: busca no OpenAlex PDFs de acesso aberto por tema (docs/corpus/temas.json)
+#          e guarda PDFs, textos e metadados como artefato temporário (1 dia).
+# avaliar: baixa os PDFs listados em docs/corpus/selecao.json (confere SHA-256),
+#          roda scripts/eval_corpus.py com docs/corpus/consultas.jsonl e, se pedido,
+#          o reranker bge (M20) e a comparação com o Docling (M01).
+# Os PDFs nunca vão para o repositório; só metadados, consultas e resultados.
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        type: choice
+        options: [coletar, avaliar]
+        default: coletar
+      reranker:
+        type: boolean
+        default: false
+      docling:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  coletar:
+    if: inputs.modo == 'coletar'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install -q "PyMuPDF>=2.1,<3"
+      - run: python scripts/corpus_build.py --out /tmp/corpus-build --per-query 25 --keep-per-query 4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corpus-candidatos
+          path: /tmp/corpus-build
+          retention-days: 1
+
+  avaliar:
+    if: inputs.modo == 'avaliar'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install -q "PyMuPDF>=2.1,<3" "numpy>=1.26,<3"
+      - name: Baixar a seleção e conferir SHA-256
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, pathlib, urllib.request
+          out = pathlib.Path("/tmp/corpus"); out.mkdir()
+          ua = "Scriptorium-corpus/1 (https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud)"
+          ok = 0
+          for item in json.load(open("docs/corpus/selecao.json"))["documentos"]:
+              try:
+                  data = urllib.request.urlopen(urllib.request.Request(item["pdf_url"], headers={"User-Agent": ua}), timeout=60).read()
+              except Exception as e:
+                  print("falhou", item["file"], e); continue
+              if hashlib.sha256(data).hexdigest() != item["sha256"]:
+                  print("SHA diferente (arquivo mudou na origem):", item["file"])
+              (out / item["file"]).write_bytes(data); ok += 1
+          print("baixados:", ok)
+          PY
+      - name: Avaliação (M04, M19, M10/M16)
+        run: python scripts/eval_corpus.py --corpus /tmp/corpus --queries docs/corpus/consultas.jsonl --output /tmp/resultado.json
+      - name: Reranker bge (M20)
+        if: inputs.reranker
+        continue-on-error: true
+        run: |
+          pip install -q FlagEmbedding
+          python scripts/eval_corpus.py --corpus /tmp/corpus --queries docs/corpus/consultas.jsonl --reranker bge --output /tmp/resultado-bge.json
+      - name: Docling (M01)
+        if: inputs.docling
+        continue-on-error: true
+        run: |
+          pip install -q docling
+          python scripts/compare_docling.py --corpus /tmp/corpus --limit 12 --output /tmp/docling.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: resultados-avaliacao
+          path: |
+            /tmp/resultado*.json
+            /tmp/docling.json
+          retention-days: 7
