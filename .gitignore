@@ -11,3 +11,6 @@ node_modules/
 *.zip
 run_outputs/
 raw_materials/
+
+# Normas institucionais públicas (fonte da declaração de uso de IA, M11)
+!docs/normas/*.pdf
