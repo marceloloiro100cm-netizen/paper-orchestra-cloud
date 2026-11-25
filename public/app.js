@@ -1018,6 +1018,28 @@ async function aiNotes(itemId, box, start) {
   } catch (e) { area.textContent = e.message; }
 }
 
+// Importação de PDFs de acesso aberto por DOI ou link.
+$('oa-import').addEventListener('click', async () => {
+  const items = $('oa-items').value.split(/\n+/).map(x => x.trim()).filter(Boolean);
+  if (!items.length) { $('oa-message').textContent = 'Cole ao menos um DOI ou link.'; return; }
+  if (items.length > 30) { $('oa-message').textContent = 'Máximo de 30 por vez.'; return; }
+  const btn = $('oa-import'); btn.disabled = true; $('oa-results').replaceChildren();
+  $('oa-message').textContent = `Importando ${items.length} item(ns); pode levar alguns minutos...`;
+  try {
+    const data = await (await request('/library/import-open-access', {method: 'POST',
+      body: JSON.stringify({items, collection: $('oa-collection').value || 'Acesso aberto'})})).json();
+    const c = data.counts || {};
+    $('oa-message').textContent = `Importados: ${c.importado || 0} · já existiam: ${c.ja_existia || 0} · sem PDF aberto: ${c.sem_pdf_aberto || 0} · retidos: ${c.retido || 0} · falharam: ${c.falhou || 0}`;
+    const labels = {importado: '✓ importado', ja_existia: 'já estava na biblioteca', sem_pdf_aberto: 'sem PDF aberto', retido: '⚠ retido na verificação', falhou: '⚠ falhou'};
+    for (const r of data.results || []) {
+      $('oa-results').append(el('small', `${labels[r.status] || r.status}: ${r.library_item ? r.library_item.name : r.item}${r.reason ? ' (' + r.reason + ')' : ''}`));
+      $('oa-results').append(document.createElement('br'));
+    }
+    await loadLibrary();
+  } catch (e) { $('oa-message').textContent = e.message; }
+  finally { btn.disabled = false; }
+});
+
 // M03/M21: busca no conteúdo já lido e ficha de leitura de cada documento.
 async function showReadingCard(itemId, holder) {
   const old = holder.querySelector('.reading-card');

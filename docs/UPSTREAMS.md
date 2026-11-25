@@ -261,7 +261,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Versão fixada:** -
 - **Versão instalada:** -
 - **Última versão revisada:** -
-- **Onde é usado:** worker/reference_verification.py, worker/source_quality.py
+- **Onde é usado:** worker/reference_verification.py, worker/source_quality.py, api/oa_import.py, scripts/corpus_build.py
 - **Política de atualização:** Mensal: documentação, changelog e exigência de chave (OPENALEX_API_KEY).
 - **Frequência de revisão:** mensal
 - **Risco:** -
