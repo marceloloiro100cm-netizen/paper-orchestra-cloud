@@ -74,7 +74,8 @@ jobs:
           for attempt in 1 2 3 4 5 6; do
             location="$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' "https://paperorchestra-mestrado.web.app/?r=${GITHUB_SHA}" || true)"
             echo "Tentativa ${attempt}: ${location}"
-            if [[ "$location" == "301 https://scriptoriummpie.web.app/" ]]; then
+            # O Firebase preserva o parâmetro da URL no destino (?r=...).
+            if [[ "$location" == "301 https://scriptoriummpie.web.app/"* ]]; then
               echo "Endereço antigo redireciona para o oficial."
               exit 0
             fi
