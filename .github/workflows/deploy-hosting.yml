@@ -1,14 +1,20 @@
-name: Atualizar site Firebase Hosting
+name: Endereço antigo redireciona para scriptoriummpie.web.app
 
+# Desde 24/11/2026 o endereço oficial é https://scriptoriummpie.web.app/ (decisão do
+# responsável). O site padrão do projeto (paperorchestra-mestrado.web.app) deixa de
+# receber a aplicação: fica só com um redirecionamento permanente (301) para o novo
+# endereço, para favoritos e links antigos. O site novo é publicado por
+# deploy-scriptorium-alias.yml.
+#
+# O login Google não é afetado: o Firebase Hosting atende /__/auth/* antes de
+# qualquer redirecionamento (namespace reservado), e o authDomain continua
+# paperorchestra-mestrado.firebaseapp.com.
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - public/config.js
-      - public/app.js
-      - public/index.html
-      - firebase.json
+      - hosting-redirect/**
+      - .github/workflows/deploy-hosting.yml
   workflow_dispatch:
 
 permissions:
@@ -20,23 +26,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publicar-site:
-    name: Atualizar apenas o site (sem rebuild da API)
+  redirecionar:
+    name: Publicar só o redirecionamento no endereço antigo
     if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Obter código
         uses: actions/checkout@v7
 
-      - name: Conferir configuração e projeto
-        shell: bash
+      - name: Conferir configuração do redirecionamento
         run: |
-          set -euo pipefail
-          test -f public/config.js
-          grep -q 'projectId: "paperorchestra-mestrado"' public/config.js
-          ! grep -q 'SUBSTITUIR' public/config.js
-          node --check public/config.js
+          python3 - <<'PY'
+          import json
+          cfg = json.load(open("hosting-redirect/firebase.json"))["hosting"]
+          assert "site" not in cfg, "Este workflow publica só no site padrão (endereço antigo)."
+          assert cfg["redirects"][0]["destination"] == "https://scriptoriummpie.web.app/"
+          assert "rewrites" not in cfg
+          print("Redirecionamento conferido.")
+          PY
 
       - name: Autenticar no Google Cloud (OIDC)
         uses: google-github-actions/auth@v3
@@ -55,30 +63,22 @@ jobs:
       - name: Instalar Firebase CLI
         run: npm install --global firebase-tools@latest
 
-      - name: Publicar somente Hosting
+      - name: Publicar o redirecionamento no site padrão
+        working-directory: hosting-redirect
         run: firebase deploy --only hosting --project paperorchestra-mestrado --non-interactive
 
-      - name: Confirmar versão pública
+      - name: Confirmar o redirecionamento
         shell: bash
         run: |
           set -euo pipefail
           for attempt in 1 2 3 4 5 6; do
-            curl --fail --silent --show-error --max-time 15 \
-              -o /tmp/live-paper-config.js \
-              "https://paperorchestra-mestrado.web.app/config.js?revision=${GITHUB_SHA}" || true
-            curl --fail --silent --show-error --max-time 15 \
-              -o /tmp/live-paper-app.js \
-              "https://paperorchestra-mestrado.web.app/app.js?revision=${GITHUB_SHA}" || true
-            curl --fail --silent --show-error --max-time 15 \
-              -o /tmp/live-paper-index.html \
-              "https://paperorchestra-mestrado.web.app/index.html?revision=${GITHUB_SHA}" || true
-            if cmp -s public/config.js /tmp/live-paper-config.js \
-              && cmp -s public/app.js /tmp/live-paper-app.js \
-              && cmp -s public/index.html /tmp/live-paper-index.html; then
-              echo "Firebase Hosting atualizado; HTML, app.js e config.js confirmados."
+            location="$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' "https://paperorchestra-mestrado.web.app/?r=${GITHUB_SHA}" || true)"
+            echo "Tentativa ${attempt}: ${location}"
+            if [[ "$location" == "301 https://scriptoriummpie.web.app/" ]]; then
+              echo "Endereço antigo redireciona para o oficial."
               exit 0
             fi
             sleep 5
           done
-          echo "A nova versão não pôde ser confirmada no Hosting." >&2
+          echo "O redirecionamento não foi confirmado." >&2
           exit 1

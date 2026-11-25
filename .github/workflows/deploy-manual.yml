@@ -74,7 +74,7 @@ jobs:
           set -euo pipefail
           curl --fail --silent --show-error --retry 5 --retry-delay 5 \
             --output /tmp/paper-health.json \
-            https://paperorchestra-mestrado.web.app/api/health
+            https://scriptoriummpie.web.app/api/health
           python -c "import json; data=json.load(open('/tmp/paper-health.json')); assert data.get('ok') is True, data"
           echo "API respondeu corretamente pelo Firebase Hosting."
 

@@ -66,6 +66,9 @@ class Ref:
         assert self.path not in self.store
         self.store[self.path] = dict(value)
 
+    def delete(self):
+        self.store.pop(self.path, None)
+
 
 class Query:
     def __init__(self, store, name, conds=()):
@@ -584,6 +587,46 @@ class ZoteroIncrementalTest(unittest.TestCase):
         self.assertTrue(downloads and all(k is None for _, k in downloads))
         statuses = sorted(v["status"] for (name, _), v in db.store.items() if name == "library_items")
         self.assertEqual(statuses.count("quarantined"), 1)
+
+
+class DeleteTest(unittest.TestCase):
+    def test_delete_research_removes_files_and_reviews_but_not_while_running(self):
+        db, bucket, router, _ = research_setup()
+        bucket.objects[f"research/u1/{JOB}/output/final_paper.pdf"] = b"%PDF"
+        bucket.objects[f"research/u1/{JOB}/input/idea_sparse.md"] = b"ideia"
+        bucket.objects["research/u1/outra/output/final_paper.pdf"] = b"%PDF"
+        db.store[("research_reviews", "r1")] = {"id": "r1", "job_id": JOB, "owner_uid": "u1"}
+        delete = endpoint(router, "/api/jobs/{job_id}", "DELETE")
+        with self.assertRaises(HTTPException):
+            delete(job_id=JOB, user={"uid": "intruso"})
+        result = delete(job_id=JOB, user={"uid": "u1"})
+        self.assertEqual(result["files_removed"], 2)
+        self.assertNotIn(("research_jobs", JOB), db.store)
+        self.assertNotIn(("research_reviews", "r1"), db.store)
+        self.assertIn("research/u1/outra/output/final_paper.pdf", bucket.objects)
+        db2, _, router2, _ = research_setup(status="running")
+        with self.assertRaises(HTTPException) as ctx:
+            endpoint(router2, "/api/jobs/{job_id}", "DELETE")(job_id=JOB, user={"uid": "u1"})
+        self.assertEqual(ctx.exception.status_code, 409)
+
+    def test_delete_source_keeps_derived_shared_with_another_item(self):
+        db, bucket = DB(), Bucket()
+        sha = "a" * 64
+        for item_id in ("1" * 32, "2" * 32):
+            db.store[("library_items", item_id)] = {"id": item_id, "owner_uid": "u1", "status": "active",
+                                                    "sha256": sha, "object_path": f"library/u1/{item_id}/original.pdf"}
+            bucket.objects[f"library/u1/{item_id}/original.pdf"] = b"%PDF"
+        derived = f"library/u1/derived/pymupdf-structured-1/section-paragraph-1/{sha}.json"
+        bucket.objects[derived] = b"{}"
+        delete = endpoint(library.make_library_router(db, bucket, lambda: None), "/items/{item_id}", "DELETE")
+        first = delete(item_id="1" * 32, user={"uid": "u1"})
+        self.assertEqual(first["derived_removed"], 0)  # o outro item tem o mesmo conteúdo
+        self.assertNotIn(f"library/u1/{'1' * 32}/original.pdf", bucket.objects)
+        second = delete(item_id="2" * 32, user={"uid": "u1"})
+        self.assertEqual(second["derived_removed"], 1)
+        self.assertNotIn(derived, bucket.objects)
+        with self.assertRaises(HTTPException):
+            delete(item_id="2" * 32, user={"uid": "u1"})
 
 
 if __name__ == "__main__":

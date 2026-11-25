@@ -114,6 +114,29 @@ def make_research_tools_router(db, bucket, verify_user: Callable, get_research: 
         db.collection("research_jobs").document(job_id).update(fields)
         return {"id": job_id, "status": record.get("status"), "cancel_requested": True}
 
+    @router.delete("/{job_id}")
+    def delete_research(job_id: str, user: dict = dependency):
+        """Apaga de vez uma pesquisa do histórico (a interface pede confirmação antes).
+
+        Remove o registro, os arquivos (entradas, PDF, LaTeX, relatórios, manifesto)
+        e as revisões humanas dela. As fontes da biblioteca não são apagadas.
+        Pesquisa em execução precisa ser cancelada antes.
+        """
+        record = get_research(job_id, user)
+        if record.get("status") in ACTIVE_STATUSES:
+            raise HTTPException(409, "Cancele a pesquisa e espere ela parar antes de apagar.")
+        uid = user["uid"]
+        removed = 0
+        for blob in bucket.list_blobs(prefix=f"research/{uid}/{job_id}/"):
+            blob.delete()
+            removed += 1
+        reviews = db.collection("research_reviews").where("job_id", "==", job_id).limit(2000).stream()
+        for snap in reviews:
+            if (snap.to_dict() or {}).get("owner_uid") == uid:
+                db.collection("research_reviews").document(snap.to_dict()["id"]).delete()
+        db.collection("research_jobs").document(job_id).delete()
+        return {"id": job_id, "deleted": True, "files_removed": removed}
+
     @router.post("/{job_id}/editorial-recheck", status_code=202)
     def editorial_recheck(job_id: str, user: dict = dependency):
         """M07: reconsulta retratações e avisos das referências com DOI. Sem IA."""

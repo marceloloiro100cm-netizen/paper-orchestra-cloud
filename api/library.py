@@ -195,6 +195,32 @@ def make_library_router(db, bucket, verify_user: Callable):
                      "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
         )
 
+    @router.delete("/items/{item_id}")
+    def delete_file(item_id: str, user: dict = dependencies):
+        """Apaga de vez uma fonte (a interface pede confirmação antes).
+
+        Remove o original, o registro e os dados derivados (trechos, vetores,
+        metadados e fichamentos) quando nenhuma outra fonte da conta tem o mesmo
+        conteúdo. Pesquisas antigas continuam no histórico com nome e SHA-256 da
+        fonte, mas não conseguem mais abrir a página do PDF original.
+        """
+        uid = user["uid"]
+        item = owned(item_id, user)
+        original = bucket.blob(item["object_path"])
+        if original.exists():
+            original.delete()
+        sha = item.get("sha256") or ""
+        others = [s.to_dict() for s in collection.where("owner_uid", "==", uid).limit(MAX_ITEMS_PER_OWNER + 50).stream()]
+        shared = any(o.get("id") != item_id and o.get("sha256") == sha for o in others)
+        derived_removed = 0
+        if sha and not shared and re.fullmatch(r"[0-9a-f]{64}", sha):
+            for blob in bucket.list_blobs(prefix=f"library/{uid}/derived/"):
+                if blob.name.endswith(f"/{sha}.json"):
+                    blob.delete()
+                    derived_removed += 1
+        collection.document(item_id).delete()
+        return {"id": item_id, "deleted": True, "derived_removed": derived_removed}
+
     @router.post("/items/{item_id}/archive")
     def archive_file(item_id: str, user: dict = dependencies):
         item = owned(item_id, user)
