@@ -1851,6 +1851,10 @@ $('retry-api-version').addEventListener('click', async () => {
 
 onAuthStateChanged(auth, async (current) => {
   user=current;
+  // Guia de escrita: mesma conta do site; com login, a aba do guia substitui o botão do cabeçalho.
+  window.ScriptoriumConta?.definir(current);
+  document.body.classList.toggle('guest', !current);
+  $('guide-button')?.classList.toggle('hidden', !!current);
   window.dispatchEvent(new CustomEvent('scriptorium:library-user-changed', {
     detail: { uid: current?.uid || null }
   }));

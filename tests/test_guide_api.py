@@ -83,9 +83,11 @@ class GuideRoutesTest(unittest.TestCase):
 
 
 class GuidePageTest(unittest.TestCase):
-    """Conferências estáticas da página do guia (identidade e textos)."""
+    """Conferências estáticas do guia integrado ao site (public/guia/guia.js)."""
 
-    page = (Path(__file__).resolve().parents[1] / "public" / "guia" / "index.html").read_text(encoding="utf-8")
+    base = Path(__file__).resolve().parents[1] / "public"
+    page = (base / "guia" / "guia.js").read_text(encoding="utf-8")
+    site = (base / "index.html").read_text(encoding="utf-8")
 
     def test_sem_travessao_e_sem_prototipo(self):
         self.assertNotIn("—", self.page)
@@ -95,10 +97,22 @@ class GuidePageTest(unittest.TestCase):
         for color in ("#22664d", "#ae3e35", "#9adbbb", "#ff9b91", "#78c9a7"):
             self.assertNotIn(color, self.page)
 
-    def test_modo_artigo_e_nuvem(self):
+    def test_componente_integrado(self):
         self.assertIn("tipo:'artigo'", self.page)
-        self.assertIn("/guia/nuvem.js", self.page)
-        self.assertIn("window.GuiaApp", self.page)
+        self.assertIn("attachShadow", self.page)
+        self.assertIn("window.ScriptoriumGuia", self.page)
+        for global_dom in ("document.getElementById", "document.addEventListener", "window.GuiaNuvem"):
+            self.assertNotIn(global_dom, self.page)
+
+    def test_site_tem_a_aba_e_o_painel(self):
+        self.assertIn('data-step="4"', self.site)
+        self.assertIn('id="guia-host"', self.site)
+        self.assertIn("/guia/guia.js", self.site)
+        self.assertIn("ScriptoriumConta", self.site)
+
+    def test_endereco_antigo_redireciona(self):
+        old = (self.base / "guia" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("/#guia", old)
 
 
 if __name__ == "__main__":

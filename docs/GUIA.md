@@ -1,6 +1,6 @@
 # Guia de escrita
 
-Página `/guia/` do site: um passo a passo em oito etapas para estudantes que ficam perdidos na construção de um artigo. Vem do protótipo "Pesquisa Guiada v2" (M1 a M12 da disciplina), adaptado para produção.
+Aba **Guia de escrita** do site (endereço `/#guia`; o antigo `/guia/` redireciona para lá): um passo a passo em oito etapas para estudantes que ficam perdidos na construção de um artigo. Vem do protótipo "Pesquisa Guiada v2" (M1 a M12 da disciplina), adaptado para produção.
 
 ## O que a pessoa encontra
 
@@ -10,10 +10,17 @@ Página `/guia/` do site: um passo a passo em oito etapas para estudantes que fi
 - Em cada etapa: Entender (explicação, entregável, papel possível da IA, perguntas-guia), Preencher (campos com exemplo) e Conferir (critérios de autoverificação).
 - Cadeia de coerência, conferência de relações (regras simples, sem IA), versões recuperáveis, dicionário, exemplos, exportações (artigo, resumo para a orientação, memorial) e backup JSON.
 
+## Integração com o site
+
+- O guia é um componente (`public/guia/guia.js`) montado dentro da página principal, em Shadow DOM: o CSS dele não vaza para o site e vice-versa. Usa as cores, fontes e o Modo Black do site (variáveis CSS herdadas).
+- É a quarta aba do site (Suas fontes, Seus artigos, Guia de escrita) e carrega só na primeira visita à aba. Quem não entrou abre pelo botão do cabeçalho ou pelo convite do painel de login.
+- O login é o do site: `index.html` define `window.ScriptoriumConta` e `app.js` avisa a cada entrada ou saída. O guia não tem login próprio.
+- `public/guia/index.html` só redireciona para `/#guia`.
+
 ## Onde os dados ficam
 
 - Sem login: só no navegador (`localStorage`, chave `scriptorium_pesquisa_guiada_v2_independente`).
-- Com login no Scriptorium (conta autorizada): `public/guia/nuvem.js` salva o estado na conta 1,5 s depois de cada alteração.
+- Com login no Scriptorium (conta autorizada): o guia salva o estado na conta 1,5 s depois de cada alteração.
   - `GET /api/guia/estado` devolve o estado guardado.
   - `PUT /api/guia/estado?base=<changedAt>` grava; responde 409 se outro dispositivo salvou depois de `base`. Nesse caso o guia abre a versão da conta e guarda a deste navegador em Versões.
   - Arquivos no bucket: `guia/{uid}/estado.json` e uma cópia por dia em `guia/{uid}/historico/AAAA-MM-DD.json`. Limite de 3 MB.
@@ -21,7 +28,7 @@ Página `/guia/` do site: um passo a passo em oito etapas para estudantes que fi
 
 ## Arquivos
 
-- `public/guia/index.html`: a página (um arquivo, script clássico). Gerada a partir do protótipo com estas mudanças: modo artigo, ponte `window.GuiaApp` para a nuvem, identidade azul e dourado (sem verde e vermelho), sem travessões e sem textos de "protótipo".
-- `public/guia/nuvem.js`: login Google e sincronização.
+- `public/guia/guia.js`: o guia inteiro (CSS, marcação e código), gerado a partir do protótipo Pesquisa Guiada v2 com modo artigo, identidade azul e dourado e sem travessões.
+- `public/guia/index.html`: redireciona o endereço antigo.
 - `api/guide_api.py`: rotas `/api/guia/estado`.
-- `tests/test_guide_api.py`: rotas (no CI) e conferências estáticas da página.
+- `tests/test_guide_api.py`: rotas (no CI) e conferências estáticas do componente e da aba.
