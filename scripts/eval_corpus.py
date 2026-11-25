@@ -116,6 +116,22 @@ def main() -> int:
     negatives = [q for q in all_q if q.get("negative")]
     report = {"queries": len(queries), "negative_queries": len(negatives), "variants": {}}
     default_target, default_max = chunking.TARGET_CHARS, chunking.MAX_CHARS
+    # Rótulos "contains" vêm dos resumos do OpenAlex; se a frase não aparece em
+    # nenhum trecho do arquivo (hifenização, resumo diferente do PDF), o rótulo
+    # passa a valer para o documento inteiro, e isso fica registrado.
+    base_chunks, base_names = ev.load_corpus(args.corpus)
+    files = set(base_names.values())
+    fallback, missing_files = [], set()
+    for q in queries:
+        for label in q["relevant"]:
+            if label["file"] not in files:
+                missing_files.add(label["file"])
+            elif "contains" in label and not any(ev.is_relevant(c, label, base_names) for c in base_chunks):
+                fallback.append({"q": q["id"], "file": label["file"], "contains": label.pop("contains")})
+        q["relevant"] = [lab for lab in q["relevant"] if lab["file"] in files]
+    queries = [q for q in queries if q["relevant"]]
+    report["queries"] = len(queries)
+    report["labels"] = {"contains_fallback_to_file": fallback, "files_missing_from_corpus": sorted(missing_files)}
     reranker = None
     if args.reranker:
         from reranker import make_reranker
