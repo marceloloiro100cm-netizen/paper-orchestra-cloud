@@ -173,7 +173,7 @@ gcloud run jobs update paper-orchestra-worker --region=southamerica-east1 \
   --project=paperorchestra-mestrado --update-env-vars=SCRIPTORIUM_V2_RETRIEVAL=true
 ```
 
-Para voltar ao comportamento anterior, use `SCRIPTORIUM_V2_RETRIEVAL=false`. O manifesto de cada execução registra qual estratégia foi usada.
+**Ligada em produção em 24/11/2026** (decisão do responsável): o valor fica em `V2_FLAGS`, no `.github/workflows/deploy-services.yml`, e é reaplicado a cada deploy. Para voltar ao comportamento anterior, use `SCRIPTORIUM_V2_RETRIEVAL=false` ali. O manifesto de cada execução registra qual estratégia foi usada.
 
 ### Onda 2 do plano V2: busca híbrida, citações e evidências (24/11/2026)
 
