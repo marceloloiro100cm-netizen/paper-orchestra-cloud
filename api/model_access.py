@@ -44,6 +44,8 @@ def _query_google(url: str, api_key: str, payload: dict | None = None) -> tuple[
 def classify_probe_status(status_code: int) -> str:
     if status_code == 200:
         return "supported"
+    if status_code == 402:
+        return "no_credit"  # Plano pré-pago sem saldo (worker/billing_alert.py).
     if status_code == 429:
         return "limited"  # Não confundir limite temporário com falta de plano.
     if status_code in (400, 401, 403, 404):
@@ -100,6 +102,10 @@ def account_model_access(db, uid: str) -> dict:
         "models": {m: statuses.get(m, "unknown") for m in SUPPORTED_MODELS},
         "verified_models": permitted,
         "checked_at": profile.get("checked_at", ""),
+        # Marcado pelo worker quando o Google recusa por falta de saldo pré-pago
+        # (worker/billing_alert.py); some ao recadastrar a chave ou ao concluir
+        # uma execução com IA.
+        "billing_alert": doc.get("billing_alert") if isinstance(doc.get("billing_alert"), dict) else None,
     }
 
 
