@@ -1,0 +1,199 @@
+{
+ "summary": {
+  "docling_version": "2.152.0",
+  "documents": 12,
+  "converted": 12,
+  "tables_found_by_docling": 9,
+  "docs_with_tables": 2,
+  "avg_seconds": {
+   "pymupdf": 0.16,
+   "docling": 31.2
+  },
+  "headings_total": {
+   "pymupdf": 197,
+   "docling": 188
+  }
+ },
+ "documents": [
+  {
+   "file": "T1_castaman2021_a-pesquisa-como-principio-pedagogico-no-.pdf",
+   "pymupdf": {
+    "headings": 8,
+    "chars": 52550,
+    "seconds": 0.12
+   },
+   "docling": {
+    "headings": 10,
+    "tables": 0,
+    "chars": 53017,
+    "seconds": 53.4,
+    "error": null
+   }
+  },
+  {
+   "file": "T1_mossin2025_reflections-on-artificial-intelligence-i.pdf",
+   "pymupdf": {
+    "headings": 15,
+    "chars": 78991,
+    "seconds": 0.09
+   },
+   "docling": {
+    "headings": 21,
+    "tables": 0,
+    "chars": 78933,
+    "seconds": 24.5,
+    "error": null
+   }
+  },
+  {
+   "file": "T1_oliveira2024_a-pesquisa-como-principio-pedagogico-a-f.pdf",
+   "pymupdf": {
+    "headings": 16,
+    "chars": 36078,
+    "seconds": 0.24
+   },
+   "docling": {
+    "headings": 25,
+    "tables": 0,
+    "chars": 36964,
+    "seconds": 34.2,
+    "error": null
+   }
+  },
+  {
+   "file": "T1_pasqualli2019_a-pesquisa-como-principio-educativo-no-c.pdf",
+   "pymupdf": {
+    "headings": 16,
+    "chars": 41387,
+    "seconds": 0.05
+   },
+   "docling": {
+    "headings": 14,
+    "tables": 0,
+    "chars": 41972,
+    "seconds": 21.6,
+    "error": null
+   }
+  },
+  {
+   "file": "T1_valer2019_a-pesquisa-como-principio-pedagogico-e-s.pdf",
+   "pymupdf": {
+    "headings": 55,
+    "chars": 83713,
+    "seconds": 0.12
+   },
+   "docling": {
+    "headings": 15,
+    "tables": 5,
+    "chars": 83112,
+    "seconds": 55.4,
+    "error": null
+   }
+  },
+  {
+   "file": "T2_borges2025_educacao-profissional-e-tecnologica-e-os.pdf",
+   "pymupdf": {
+    "headings": 31,
+    "chars": 67970,
+    "seconds": 0.06
+   },
+   "docling": {
+    "headings": 21,
+    "tables": 0,
+    "chars": 68071,
+    "seconds": 18.6,
+    "error": null
+   }
+  },
+  {
+   "file": "T2_moura2013_ensino-medio-integrado-subsuncao-aos-int.pdf",
+   "pymupdf": {
+    "headings": 2,
+    "chars": 54678,
+    "seconds": 0.09
+   },
+   "docling": {
+    "headings": 9,
+    "tables": 4,
+    "chars": 53173,
+    "seconds": 26.1,
+    "error": null
+   }
+  },
+  {
+   "file": "T2_silva2015_ensino-medio-integrado-e-praticas-pedago.pdf",
+   "pymupdf": {
+    "headings": 9,
+    "chars": 27857,
+    "seconds": 0.03
+   },
+   "docling": {
+    "headings": 9,
+    "tables": 0,
+    "chars": 27799,
+    "seconds": 10.2,
+    "error": null
+   }
+  },
+  {
+   "file": "T2_silva2024_o-letramento-cientifico-e-a-formacao-omn.pdf",
+   "pymupdf": {
+    "headings": 12,
+    "chars": 37879,
+    "seconds": 0.25
+   },
+   "docling": {
+    "headings": 10,
+    "tables": 0,
+    "chars": 38497,
+    "seconds": 44.2,
+    "error": null
+   }
+  },
+  {
+   "file": "T3_cabral2021_alfabetizacao-cientifica-e-letramento-ci.pdf",
+   "pymupdf": {
+    "headings": 11,
+    "chars": 46896,
+    "seconds": 0.05
+   },
+   "docling": {
+    "headings": 9,
+    "tables": 0,
+    "chars": 47191,
+    "seconds": 21.0,
+    "error": null
+   }
+  },
+  {
+   "file": "T3_oliveira2015_curso-de-extensao-de-leitura-critica-de-.pdf",
+   "pymupdf": {
+    "headings": 11,
+    "chars": 48729,
+    "seconds": 0.15
+   },
+   "docling": {
+    "headings": 32,
+    "tables": 0,
+    "chars": 59886,
+    "seconds": 42.7,
+    "error": null
+   }
+  },
+  {
+   "file": "T3_oliveira2017_diario-de-bordo-uma-ferramenta-metodolog.pdf",
+   "pymupdf": {
+    "headings": 11,
+    "chars": 40143,
+    "seconds": 0.68
+   },
+   "docling": {
+    "headings": 13,
+    "tables": 0,
+    "chars": 40456,
+    "seconds": 23.0,
+    "error": null
+   }
+  }
+ ]
+}
