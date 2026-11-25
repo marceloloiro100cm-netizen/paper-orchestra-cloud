@@ -82,6 +82,12 @@ jobs:
         run: |
           pip install -q docling
           python scripts/compare_docling.py --corpus /tmp/corpus --limit 12 --output /tmp/docling.json
+      - name: Mostrar resultados no log (sem texto dos PDFs)
+        if: always()
+        run: |
+          for f in /tmp/resultado.json /tmp/resultado-bge.json /tmp/docling.json; do
+            if [ -f "$f" ]; then echo "RESULTADO_JSON $f"; python3 -c "import json,sys; print(json.dumps(json.load(open('$f')), ensure_ascii=False))"; fi
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
