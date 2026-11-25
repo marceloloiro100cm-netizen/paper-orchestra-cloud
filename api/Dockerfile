@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # tests/test_container_modules.py impede que isso volte a acontecer.
 COPY *.py /app/
 ENV PORT=8080
-CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "exec uvicorn main:application --host 0.0.0.0 --port ${PORT}"]

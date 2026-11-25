@@ -233,6 +233,21 @@ def run_reading_notes(data: dict) -> None:
            notes_usage=notes.get("usage") or {})
 
 
+def run_mcp(data: dict) -> None:
+    """Modo sem API (MCP): preparo das fontes ou compilação do PDF, sem modelo de linguagem."""
+    import mcp_jobs
+    if data["mode"] == "mcp_prepare":
+        from coverage_facets import source_metadata
+        from source_materials import derive_source
+        mcp_jobs.prepare(data, db=client, bucket=bucket, owner_uid=OWNER_UID, cache=DerivedCache(),
+                         get_json=openalex_json, update=update, derive=derive_source,
+                         metadata=source_metadata)
+        return
+    with tempfile.TemporaryDirectory(prefix="mcp_tex_") as tmp:
+        mcp_jobs.compile_project(data, db=client, bucket=bucket, owner_uid=OWNER_UID, update=update,
+                                 workdir=Path(tmp))
+
+
 def run_retrieval_eval(data: dict) -> None:
     """M04 (gate G2): busca lexical, vetorial e híbrida no corpus de referência.
 
@@ -352,6 +367,10 @@ def main():
     if data.get("mode") == "reading_notes":
         # M21: fichamento sob demanda de um documento da biblioteca.
         run_reading_notes(data)
+        return
+    if data.get("mode") in ("mcp_prepare", "mcp_compile"):
+        # Modo sem API: a IA do pesquisador escreve via MCP; aqui só leitura e compilação.
+        run_mcp(data)
         return
     # M15: cancelada ainda na fila? Não inicia nada.
     BUDGET.check_cancel()

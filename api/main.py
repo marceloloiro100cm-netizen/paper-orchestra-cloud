@@ -26,6 +26,8 @@ from advisor import (WORK_TYPES, academic_profile, addendum, data_policy, latest
 from reading_notes_api import make_reading_notes_router
 from retrieval_eval_api import make_retrieval_eval_router
 from oa_import import make_oa_import_router
+from mcp_server import Dispatcher, Store as McpStore, build_app as build_mcp_app
+from mcp_site_api import make_mcp_site_router
 
 import firebase_admin
 from firebase_admin import auth
@@ -46,6 +48,8 @@ BYOK_ENABLED = os.getenv("BYOK_ENABLED", "false").lower() == "true"
 # sempre na chave Gemini pessoal de quem gera, inclusive o administrador.
 # Só com esta variável em "true" o administrador volta a usar o Vertex do projeto.
 PROJECT_AI = os.getenv("SCRIPTORIUM_ALLOW_PROJECT_AI", "false").lower() == "true"
+# Endereço público do site (Firebase Hosting); o MCP fica em PUBLIC_URL + /api/mcp.
+PUBLIC_URL = os.getenv("PUBLIC_URL", "https://scriptoriummpie.web.app")
 
 
 def uses_project_ai(access: dict) -> bool:
@@ -123,7 +127,7 @@ app.include_router(make_oa_import_router(db, bucket, current_user))
 
 AWAITING_SOURCES = "awaiting_source_approval"
 # Execuções à parte: não aparecem na lista de pesquisas nem ocupam a vaga de pesquisa.
-SIDE_MODES = {"reading_notes", "retrieval_eval"}
+SIDE_MODES = {"reading_notes", "retrieval_eval", "mcp_prepare", "mcp_compile"}
 
 
 class CheckpointDecision(BaseModel):
@@ -605,3 +609,16 @@ app.include_router(make_reading_notes_router(db, bucket, current_user, get_acces
 app.include_router(make_retrieval_eval_router(
     db, bucket, current_user, lambda user: is_admin(user, ALLOWED_EMAILS),
     lambda user: BYOK_ENABLED and get_access(db, user, ALLOWED_EMAILS).get("byok_ready", False), start_job))
+
+
+# Modo sem API (MCP): a IA do próprio pesquisador escreve; o Scriptorium guarda
+# as fontes, confere cada etapa e compila. Nenhuma chamada de modelo aqui.
+def allowed_identity(identity: dict) -> bool:
+    return is_admin(identity, ALLOWED_EMAILS) or (
+        BYOK_ENABLED and get_access(db, identity, ALLOWED_EMAILS)["allowed"])
+
+
+mcp_store = McpStore(db, bucket, start_job, allowed_identity)
+app.include_router(make_mcp_site_router(mcp_store, current_user, PUBLIC_URL))
+# Ponto de entrada do uvicorn: /api/mcp vai para o servidor MCP; o resto, para a API.
+application = Dispatcher(app, build_mcp_app(mcp_store, PUBLIC_URL))

@@ -1405,6 +1405,46 @@
             </div>
           </details>
         </div>
+        <!-- Modo sem API: a IA do próprio pesquisador (Claude, Gemini CLI, ChatGPT...) via MCP. -->
+        <details class="gemini-setup hidden" id="mcp-details">
+          <summary id="mcp-title">Conectar sua IA, sem API paga (MCP)</summary>
+          <div class="gemini-setup-body">
+            <div class="billing-split" role="note">
+              <strong>Como funciona</strong>
+              <p>A IA que você já usa, com a sua assinatura ou plano gratuito, lê as fontes e escreve. O Scriptorium não chama modelo nenhum: guarda as fontes, entrega os trechos, confere cada etapa (chaves de referência e citações literais) e compila o PDF.</p>
+              <p>Revisão e verificação acontecem em <strong>conversas novas</strong>, abertas por um passe, de preferência em outra IA. Quem escreveu não revisa o próprio texto.</p>
+              <p>O texto vai para o provedor da sua IA, nas condições da sua conta. Não use dados inéditos ou sensíveis se a sua conta não for adequada para isso (IN IFRS 16/2026, Art. 9º).</p>
+            </div>
+            <label for="mcp-token-label">Nome do token (para você reconhecer depois)</label>
+            <div class="gemini-key-row">
+              <input id="mcp-token-label" type="text" maxlength="60" placeholder="Ex.: Claude no notebook" />
+              <button class="btn" type="button" id="mcp-create-token">Gerar token</button>
+            </div>
+            <div id="mcp-new-token" class="hidden" role="status">
+              <p class="warning"><strong>Copie agora:</strong> o token não será mostrado de novo. Quem tiver este endereço acessa suas fontes e projetos por MCP; se vazar, revogue.</p>
+              <label for="mcp-url-token">Endereço com token (Claude, ChatGPT e clientes que só pedem um endereço)</label>
+              <div class="gemini-key-row">
+                <input id="mcp-url-token" type="text" readonly spellcheck="false" />
+                <button class="btn alt" type="button" data-copy="mcp-url-token">Copiar</button>
+              </div>
+              <label for="mcp-gemini-config">Gemini CLI: trecho para o arquivo ~/.gemini/settings.json</label>
+              <textarea id="mcp-gemini-config" rows="8" readonly spellcheck="false" style="font-family:monospace;font-size:12px"></textarea>
+              <div class="actions"><button class="btn alt" type="button" data-copy="mcp-gemini-config">Copiar configuração</button></div>
+            </div>
+            <ol class="gemini-steps">
+              <li><strong>Claude</strong> (site, app de desktop ou celular): em Conectores, adicione um conector personalizado e cole o endereço com token. No plano gratuito cabe um conector personalizado.</li>
+              <li><strong>Gemini CLI</strong> (gratuito com login Google): cole a configuração acima no settings.json e rode <code>gemini</code>.</li>
+              <li><strong>ChatGPT</strong>: onde o modo desenvolvedor estiver disponível para o seu plano, crie um app com o endereço com token.</li>
+              <li><strong>Para começar</strong>, peça à sua IA: <em>"Use o Scriptorium: liste minhas fontes, crie um projeto sobre [tema] com as fontes [nomes] e siga as etapas."</em></li>
+            </ol>
+            <h4 style="margin:14px 0 4px">Tokens ativos</h4>
+            <div id="mcp-token-list" class="subtle" role="status"></div>
+            <h4 style="margin:14px 0 4px">Projetos escritos pela sua IA</h4>
+            <div class="actions"><button class="btn alt" type="button" id="mcp-refresh">Atualizar</button></div>
+            <div id="mcp-project-list" class="subtle" role="status"></div>
+            <p class="subtle" id="mcp-message" role="status"></p>
+          </div>
+        </details>
         <!-- M11: IN IFRS 16/2026, Art. 6º e 8º. Registro do pesquisador, somente acréscimo. -->
         <details class="gemini-setup" id="advisor-details">
           <summary id="advisor-title">Declaração de uso de IA (IN IFRS 16/2026, Anexo I)</summary>
@@ -2440,6 +2480,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=contexto-20261125"></script>
+  <script type="module" src="/app.js?v=mcp-20261125"></script>
 </body>
 </html>
