@@ -1543,6 +1543,21 @@
           </div>
         </details>
 
+        <!-- Importação de PDFs de acesso aberto por DOI ou link (OpenAlex, R09) -->
+        <details class="upload-drawer" id="oa-drawer">
+          <summary><span>+ Importar por DOI ou link (acesso aberto)</span><span class="subtle" aria-hidden="true">⌄</span></summary>
+          <p class="field-hint">Cole até 30 DOIs (10.xxxx/...) ou links https de PDFs abertos, um por linha. O Scriptorium busca a versão aberta no OpenAlex, confere o arquivo e guarda na biblioteca com a origem e a licença.</p>
+          <label for="oa-items">DOIs ou links</label>
+          <textarea id="oa-items" rows="5" placeholder="10.1590/S1517-97022013005000014&#10;https://exemplo.org/artigo.pdf"></textarea>
+          <label for="oa-collection">Coleção</label>
+          <input id="oa-collection" type="text" maxlength="60" value="Acesso aberto"/>
+          <div class="actions">
+            <button class="btn" type="button" id="oa-import">Importar</button>
+            <span id="oa-message" role="status" class="subtle"></span>
+          </div>
+          <div id="oa-results"></div>
+        </details>
+
         <!-- M03/M21: busca no conteúdo dos documentos já lidos e ficha de leitura -->
         <details class="upload-drawer" id="content-search-drawer">
           <summary><span>Buscar no conteúdo da biblioteca</span><span class="subtle" aria-hidden="true">⌄</span></summary>
@@ -2401,6 +2416,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=anexo-i-20261124"></script>
+  <script type="module" src="/app.js?v=oa-20261125"></script>
 </body>
 </html>

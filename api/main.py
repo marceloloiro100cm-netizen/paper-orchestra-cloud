@@ -24,6 +24,7 @@ from library_index import make_library_index_router
 from advisor import (WORK_TYPES, academic_profile, addendum, data_policy, latest_authorization,
                      make_advisor_router, snapshot as authorization_snapshot)
 from reading_notes_api import make_reading_notes_router
+from oa_import import make_oa_import_router
 
 import firebase_admin
 from firebase_admin import auth
@@ -114,6 +115,8 @@ IdentifiedUser = Annotated[dict, Depends(identified_user)]
 app.include_router(make_library_router(db, bucket, current_user))
 # M26: importação somente leitura do Zotero (a chave nunca é guardada).
 app.include_router(make_zotero_router(db, bucket, current_user))
+# PDFs de acesso aberto por DOI ou link (OpenAlex, R09), com proteção contra SSRF.
+app.include_router(make_oa_import_router(db, bucket, current_user))
 
 AWAITING_SOURCES = "awaiting_source_approval"
 
