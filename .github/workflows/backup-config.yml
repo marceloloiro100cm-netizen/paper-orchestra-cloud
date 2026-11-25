@@ -1,0 +1,77 @@
+name: Backup — diagnóstico e configuração (Firestore e retenção)
+
+# Item 4 da finalização da V1 (25/11/2026).
+# diagnosticar: só lê. Mostra versionamento e ciclo de vida do bucket de backup
+#               e as programações de backup do Firestore (se houver permissão).
+# aplicar:      SÓ com autorização do responsável. No bucket de backup:
+#               liga o versionamento e uma regra que apaga versões antigas
+#               90 dias depois de substituídas ou apagadas. Com isso o backup
+#               semanal passa a espelhar exclusões (o que você apaga no site
+#               some do backup em até 90 dias, mas pode ser recuperado nesse
+#               prazo). Também tenta criar o backup semanal do Firestore
+#               (retenção de 14 semanas); se faltar permissão, mostra o caminho
+#               pelo Console. Nenhuma permissão IAM é alterada por este workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        type: choice
+        options: [diagnosticar, aplicar]
+        default: diagnosticar
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT: paperorchestra-mestrado
+  BACKUP_BUCKET: gs://paperorchestra-mestrado-paper-backups
+  RETENCAO_DIAS: "90"
+
+jobs:
+  backup:
+    if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/201655574048/locations/global/workloadIdentityPools/github-actions/providers/github-actions
+          service_account: paper-orchestra-deployer@paperorchestra-mestrado.iam.gserviceaccount.com
+          project_id: paperorchestra-mestrado
+      - uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: paperorchestra-mestrado
+      - name: Diagnóstico (somente leitura)
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "== Bucket de backup"
+          gcloud storage buckets describe "$BACKUP_BUCKET" \
+            --format="json(versioning_enabled,lifecycle_config,retention_policy,soft_delete_policy)" \
+            || echo "Sem permissão para ler a configuração do bucket."
+          echo "== Programações de backup do Firestore"
+          gcloud firestore backups schedules list --database="(default)" --project="$PROJECT" \
+            || echo "Sem permissão para listar (precisa de datastore.backupSchedules.list)."
+      - name: Aplicar (versionamento, retenção e backup do Firestore)
+        if: inputs.modo == 'aplicar'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/lifecycle.json <<JSON
+          {"rule": [{"action": {"type": "Delete"},
+                     "condition": {"isLive": false, "daysSinceNoncurrentTime": ${RETENCAO_DIAS}}}]}
+          JSON
+          gcloud storage buckets update "$BACKUP_BUCKET" --versioning --lifecycle-file=/tmp/lifecycle.json
+          gcloud storage buckets describe "$BACKUP_BUCKET" --format="json(versioning_enabled,lifecycle_config)"
+          if gcloud firestore backups schedules list --database="(default)" --project="$PROJECT" \
+               --format="value(name)" 2>/dev/null | grep -q .; then
+            echo "Firestore: já existe programação de backup; nada a criar."
+          elif gcloud firestore backups schedules create --database="(default)" --project="$PROJECT" \
+                 --recurrence=weekly --day-of-week=SUN --retention=14w; then
+            echo "Firestore: backup semanal criado (retenção de 14 semanas)."
+          else
+            echo "::warning::Sem permissão para criar o backup do Firestore pelo publicador automático."
+            echo "Crie pelo Console: Firestore > Recuperação de desastres > Criar programação de backup,"
+            echo "banco (default), semanal aos domingos, retenção de 14 semanas."
+          fi

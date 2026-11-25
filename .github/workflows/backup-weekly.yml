@@ -38,6 +38,15 @@ jobs:
           set -euo pipefail
           SOURCE="gs://paperorchestra-mestrado-paper-storage"
           DEST="gs://paperorchestra-mestrado-paper-backups"
-          # Sem --delete: nunca remover objetos anteriores do destino.
-          gcloud storage rsync --recursive "$SOURCE" "$DEST"
-          echo "Backup incremental concluído; originais mantidos."
+          # Só espelha exclusões quando o bucket de backup tem versionamento
+          # e a regra de 90 dias (workflow "Backup — diagnóstico e configuração").
+          # Assim, o que foi apagado no site vira versão antiga, recuperável por
+          # 90 dias, e depois some. Sem versionamento, nada é removido do destino.
+          VERSIONING="$(gcloud storage buckets describe "$DEST" --format='value(versioning_enabled)' 2>/dev/null || true)"
+          if [ "$VERSIONING" = "True" ]; then
+            gcloud storage rsync --recursive --delete-unmatched-destination-objects "$SOURCE" "$DEST"
+            echo "Backup concluído; exclusões espelhadas como versões antigas (90 dias)."
+          else
+            gcloud storage rsync --recursive "$SOURCE" "$DEST"
+            echo "Backup incremental concluído; originais mantidos (versionamento desligado)."
+          fi
