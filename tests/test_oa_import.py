@@ -73,5 +73,34 @@ class ImportTest(unittest.TestCase):
         self.assertTrue(item["name"].startswith("Moura 2013 Ensino médio integrado"))
 
 
+    def test_follows_pdf_declared_by_article_page(self):
+        pdf = b"%PDF-1.7 artigo da pagina"
+        pages = {
+            "https://anais.org/article/view/7/9": b'<meta name="citation_pdf_url" content="https://anais.org/article/download/7/9/1">',
+            "https://anais.org/article/download/7/9/1": pdf,
+            "https://loop.org/a": b'<meta name="citation_pdf_url" content="https://loop.org/b">',
+            "https://loop.org/b": b'<meta name="citation_pdf_url" content="https://loop.org/c">',
+            "https://loop.org/c": b'<meta name="citation_pdf_url" content="https://loop.org/d">',
+            "https://loop.org/d": pdf,
+            "https://interno.org/a": b'<meta name="citation_pdf_url" content="http://169.254.169.254/x">',
+        }
+        calls = []
+
+        def fetch(url, limit, accept):
+            calls.append(url)
+            return pages[url]
+
+        saved = []
+        out = oa_import.import_one("https://anais.org/article/view/7/9", fetch,
+                                   lambda name, data, origin: saved.append(origin) or {"id": "x", "name": name})
+        self.assertEqual(saved[0]["source_url"], "https://anais.org/article/download/7/9/1")
+        self.assertEqual(out["status"], "importado")
+        # No máximo dois saltos a partir de páginas; nunca segue http (só https).
+        self.assertEqual(oa_import.import_one("https://loop.org/a", fetch, lambda *a: {})["status"], "falhou")
+        self.assertNotIn("https://loop.org/d", calls)
+        self.assertEqual(oa_import.import_one("https://interno.org/a", fetch, lambda *a: {})["status"], "falhou")
+        self.assertNotIn("http://169.254.169.254/x", calls)
+
+
 if __name__ == "__main__":
     unittest.main()

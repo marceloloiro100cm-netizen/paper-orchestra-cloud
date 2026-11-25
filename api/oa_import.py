@@ -101,6 +101,31 @@ def resolve_doi(doi: str, fetch) -> dict:
             "is_oa": (work.get("open_access") or {}).get("is_oa"), "pdf_urls": urls}
 
 
+_META_PDF = re.compile(
+    r"""<meta[^>]+name=["']citation_pdf_url["'][^>]+content=["']([^"']+)["']"""
+    r"""|<meta[^>]+content=["']([^"']+)["'][^>]+name=["']citation_pdf_url["']""", re.IGNORECASE)
+# OJS 3: a página do leitor aponta para ".../article/download/<artigo>/<arquivo>[/<id>]".
+_OJS_DOWNLOAD = re.compile(r"""href=["'](https://[^"']+/article/download/\d+/\d+(?:/\d+)?)["']""", re.IGNORECASE)
+
+
+def pdf_links_in_page(html: bytes, base: str) -> list[str]:
+    """Links de PDF declarados na página de apresentação (Highwire/OJS/DSpace/SciELO).
+
+    Só https; cada link ainda passa pelo safe_get (mesmas proteções contra SSRF).
+    """
+    text = html[:400_000].decode("utf-8", errors="replace")
+    found = []
+    for match in _META_PDF.finditer(text):
+        found.append(urljoin(base, (match.group(1) or match.group(2)).replace("&amp;", "&")))
+    for match in _OJS_DOWNLOAD.finditer(text):
+        found.append(match.group(1).replace("&amp;", "&"))
+    out = []
+    for url in found:
+        if url.startswith("https://") and url != base and url not in out:
+            out.append(url)
+    return out[:2]
+
+
 def file_name(meta: dict) -> str:
     first = (meta.get("authors") or ["documento"])[0].split()[-1:] or ["documento"]
     base = f"{first[0]} {meta.get('year') or ''} {meta.get('title') or ''}".strip()
@@ -127,7 +152,12 @@ def import_one(raw: str, fetch, save) -> dict:
     else:
         return {"item": text, "status": "falhou", "reason": "Use um DOI (10.xxxx/...) ou um link https."}
     last = "sem PDF válido"
-    for url in urls[:3]:
+    queue, tried, followed = list(urls[:3]), set(), 0
+    while queue:
+        url = queue.pop(0)
+        if url in tried:
+            continue
+        tried.add(url)
         try:
             data = fetch(url, MAX_BYTES[".pdf"], "application/pdf,*/*")
         except ValueError as error:
@@ -135,6 +165,12 @@ def import_one(raw: str, fetch, save) -> dict:
             continue
         if not data[:1024].lstrip().startswith(b"%PDF"):
             last = "o link não entrega um PDF (página de apresentação)"
+            # Página do artigo: segue o PDF que ela mesma declara (no máximo 2 saltos).
+            if followed < 2:
+                links = [u for u in pdf_links_in_page(data, url) if u not in tried]
+                if links:
+                    followed += 1
+                    queue = links + queue
             continue
         origin = {"provider": "acesso_aberto", "upstream_id": "R09", "doi": doi.group(1) if doi else None,
                   "openalex": meta.get("openalex"), "license": meta.get("license"), "source_url": url,
