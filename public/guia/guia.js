@@ -1644,7 +1644,7 @@ function actionHandler(btn){const a=btn.dataset.action;const rec=btn.dataset.rec
   }
   if(a==='send-to-project'){const plan=buildGuidePlan();if(!plan.titulo&&!plan.pergunta){notify('Preencha pelo menos o tema ou a pergunta antes de levar o plano.');return;}window.ScriptoriumPonteGuia?.enviar(plan);return;}
   if(a==='tab'){state.tab=btn.dataset.tab;flush();render();return;}
-  if(a==='jump'){state.active=Math.min(8,Math.max(1,Number(btn.dataset.stage)||1));state.tab='entender';flush();closeModal();render();R.getElementById('stageSheet')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
+  if(a==='jump'){const targetStage=Math.min(8,Math.max(1,Number(btn.dataset.stage)||1));const lvl=supportLevel();state.active=targetStage;state.tab=(lvl==='autonomo'||(lvl==='intermediario'&&info(targetStage).count>0))?'preencher':'entender';flush();closeModal();render();R.getElementById('stageSheet')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
   if(a==='glossary'){glossaryModal();return;}if(a==='help'){helpModal();return;}if(a==='examples'){examplesModal();return;}if(a==='versions'){versionModal();return;}if(a==='audit'){openAudit();return;}if(a==='flow-map'){openFlowMapModal();return;}if(a==='rubric'){openRubricModal();return;}if(a==='export'){exportModal();return;}if(a==='backup'){backupModal();return;}if(a==='settings'){settingsModal();return;}
   if(a==='save-rubric'){
     const scores={};

@@ -337,6 +337,35 @@ class LibraryFase1ApiTests(unittest.TestCase):
         self.assertEqual(rd.status_code, 200)
         self.assertEqual(rd.json()["study_notes"], [])
 
+    def test_manual_upload_blocks_duplicate_and_summary_detail_endpoints(self):
+        payload = b"Artigo de teste em texto UTF-8 para verificar duplicata manual."
+        r1 = self.client.post(
+            "/api/library/items?filename=artigo_a.txt&collection=Revisao",
+            content=payload, headers={"Content-Type": "application/octet-stream"},
+        )
+        self.assertEqual(r1.status_code, 201)
+        item_id = r1.json()["item"]["id"]
+
+        # Mesmo arquivo enviado de novo -> 409 com nome do arquivo existente
+        r_dup = self.client.post(
+            "/api/library/items?filename=artigo_copia.txt&collection=Revisao",
+            content=payload, headers={"Content-Type": "application/octet-stream"},
+        )
+        self.assertEqual(r_dup.status_code, 409)
+        self.assertIn("artigo_a.txt", r_dup.json()["detail"])
+
+        # Adiciona 1 fichamento e compara listagem summary=true vs detalhe individual
+        self.client.post(f"/api/library/items/{item_id}/notes", json={"page": "3", "note": "Nota importante"})
+        r_sum = self.client.get("/api/library/items?summary=true")
+        self.assertEqual(r_sum.status_code, 200)
+        it_sum = r_sum.json()["items"][0]
+        self.assertEqual(it_sum["study_notes_count"], 1)
+        self.assertEqual(it_sum["study_notes"], [])
+
+        r_det = self.client.get(f"/api/library/items/{item_id}")
+        self.assertEqual(r_det.status_code, 200)
+        self.assertEqual(len(r_det.json()["item"]["study_notes"]), 1)
+
     def test_frontend_fase1_contracts(self):
         html = (ROOT / "public" / "index.html").read_text(encoding="utf-8")
         app_js = (ROOT / "public" / "app.js").read_text(encoding="utf-8")
