@@ -225,6 +225,26 @@ class Store:
         self._refs_cache.pop(pid, None)
         self.db.collection("mcp_projects").document(pid).update({**fields, "updated_at": now()})
 
+    def delete_project(self, uid: str, pid: str) -> dict:
+        """Apaga definitivamente um texto (projeto MCP), seus artefatos no bucket e revoga links de orientação.
+
+        Preserva integralmente as fontes originais da Biblioteca (`library/{uid}/`).
+        Recusa exclusão enquanto o servidor estiver executando preparo/compilação ativa.
+        """
+        project = self.project(uid, pid)
+        if project.get("status") in ("preparando", "compilando", "refazendo_referencias"):
+            raise Falha("Aguarde o servidor terminar a etapa em andamento antes de apagar este texto.")
+        self.revoke_advisor_share(uid, pid)
+        prefix = f"mcp/{uid}/{project['id']}/"
+        files_removed = 0
+        for blob in list(self.bucket.list_blobs(prefix=prefix)):
+            if str(blob.name).startswith(prefix):
+                blob.delete()
+                files_removed += 1
+        self._refs_cache.pop(project["id"], None)
+        self.db.collection("mcp_projects").document(project["id"]).delete()
+        return {"id": project["id"], "deleted": True, "files_removed": files_removed}
+
     # ------------------------------------------------------ link de orientação
     def create_advisor_share(self, uid: str, pid: str, days: int = 14, note: str = "") -> dict:
         """Onda 3: cria link temporário e revogável somente leitura para o(a) orientador(a)."""

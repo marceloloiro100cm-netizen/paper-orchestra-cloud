@@ -183,6 +183,15 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
         except Falha:
             raise HTTPException(404, "Projeto não encontrado.") from None
 
+    @router.delete("/projetos/{project_id}")
+    def delete_project(project_id: str, user: dict = dependency):
+        """Exclui definitivamente um texto escrito (mantendo as fontes originais na Biblioteca)."""
+        owned(project_id, user)
+        try:
+            return store.delete_project(user["uid"], project_id)
+        except Falha as exc:
+            raise HTTPException(409, str(exc)) from None
+
     def owned(project_id: str, user: dict) -> dict:
         try:
             return store.project(user["uid"], project_id)
