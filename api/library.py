@@ -15,6 +15,20 @@ from typing import Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
+from abnt_refs import (
+    DOI_RE,
+    READING_STATUSES,
+    STUDY_ROLES,
+    bib_entry_to_bibtex,
+    check_citation_coherence,
+    export_library_references,
+    find_duplicates,
+    format_abnt_bundle,
+    item_duplicate_keys,
+    normalize_doi,
+    parse_references_text,
+    stable_key,
+)
 from upload_guard import inspect as inspect_upload
 
 MAX_BYTES = {
@@ -77,10 +91,16 @@ def validate_signature(data: bytes, suffix: str) -> None:
 
 
 def exposed(record: dict) -> dict:
-    return {key: record.get(key) for key in (
+    out = {key: record.get(key) for key in (
         "id", "name", "format", "size", "collection", "description", "sha256",
         "created_at", "archived_at", "status", "origin", "guard", "bib_entry",
     )}
+    out["role"] = record.get("role") or ""
+    out["reading_status"] = record.get("reading_status") or "a_ler"
+    out["exclude_reason"] = record.get("exclude_reason") or ""
+    out["study_notes"] = record.get("study_notes") or []
+    out["abnt"] = format_abnt_bundle(record.get("bib_entry"), str(record.get("name") or ""))
+    return out
 
 
 def quarantine_message(guard: dict) -> str:
@@ -91,8 +111,9 @@ def quarantine_message(guard: dict) -> str:
 
 
 def save_library_item(db, bucket, owner_uid: str, name: str, suffix: str, data: bytes,
-                      collection_name: str, description: str, origin: dict | None = None) -> dict:
-    """Grava original imutável no GCS e metadados no Firestore (upload e Zotero)."""
+                      collection_name: str, description: str, origin: dict | None = None,
+                      bib_entry: dict | None = None, role: str = "") -> dict:
+    """Grava original imutável no GCS e metadados no Firestore (upload, Zotero e referências)."""
     collection = db.collection("library_items")
     existing = list(collection.where("owner_uid", "==", owner_uid).limit(MAX_ITEMS_PER_OWNER + 1).stream())
     if sum(s.to_dict().get("status") == "active" for s in existing) >= MAX_ITEMS_PER_OWNER:
@@ -116,11 +137,17 @@ def save_library_item(db, bucket, owner_uid: str, name: str, suffix: str, data: 
         "description": description.strip(), "collection": collection_name.strip(),
         "sha256": hashlib.sha256(data).hexdigest(), "object_path": path, "created_at": utc_now(),
         "archived_at": "", "status": "quarantined" if quarantined else "active",
+        "role": role if role in STUDY_ROLES else "",
+        "reading_status": "a_ler",
+        "exclude_reason": "",
+        "study_notes": [],
         "guard": {"version": guard["version"], "verdict": guard["verdict"],
                   "findings": guard["findings"][:12]},
     }
     if origin:
         document["origin"] = origin
+    if bib_entry:
+        document["bib_entry"] = bib_entry
     blob = bucket.blob(path)
     # Em quarentena, gravado como binário genérico: nunca servido como PDF/DOCX.
     blob.upload_from_string(data, content_type="application/octet-stream" if quarantined else MIMES[suffix],
@@ -136,10 +163,16 @@ def save_library_item(db, bucket, owner_uid: str, name: str, suffix: str, data: 
     return document
 
 
-def make_library_router(db, bucket, verify_user: Callable):
+def make_library_router(db, bucket, verify_user: Callable, fetch: Callable | None = None):
     router = APIRouter(prefix="/api/library", tags=["biblioteca"])
     dependencies = Depends(verify_user)
     collection = db.collection("library_items")
+
+    def active_items(uid: str) -> list[dict]:
+        docs = collection.where("owner_uid", "==", uid).limit(MAX_ITEMS_PER_OWNER + 50).stream()
+        items = [doc.to_dict() for doc in docs if (doc.to_dict() or {}).get("status") == "active"]
+        items.sort(key=lambda i: i.get("created_at") or "", reverse=True)
+        return items
 
     def owned(item_id: str, user: dict):
         if not re.fullmatch(r"[0-9a-f]{32}", item_id):
@@ -310,5 +343,267 @@ def make_library_router(db, bucket, verify_user: Callable):
             collection.document(item_id).update({"status": "archived", "archived_at": utc_now()})
         # Arquivar não apaga o original: pesquisas vinculadas continuam reproduzíveis.
         return {"status": "archived", "id": item_id}
+
+    # --- Fase 1: Organização de Estudo, Fichamento por Página, DOI/BibTeX/RIS e ABNT ---
+
+    @router.patch("/items/{item_id}/study")
+    async def update_study_meta(item_id: str, request: Request, user: dict = dependencies):
+        """Atualiza papel metodológico, status de leitura, coleção ou descrição da fonte."""
+        item = owned(item_id, user)
+        if item.get("status") != "active":
+            raise HTTPException(409, "Apenas fontes ativas podem ser organizadas.")
+        try:
+            body = await request.json()
+        except ValueError:
+            raise HTTPException(422, "Dados inválidos.") from None
+        if not isinstance(body, dict):
+            raise HTTPException(422, "Dados inválidos.")
+        updates: dict = {}
+        if "role" in body:
+            role = str(body.get("role") or "").strip()
+            if role not in STUDY_ROLES:
+                raise HTTPException(422, "Papel metodológico inválido.")
+            updates["role"] = role
+        if "reading_status" in body:
+            status = str(body.get("reading_status") or "a_ler").strip()
+            if status not in READING_STATUSES:
+                raise HTTPException(422, "Status de leitura inválido.")
+            updates["reading_status"] = status
+        if "exclude_reason" in body:
+            updates["exclude_reason"] = str(body.get("exclude_reason") or "").strip()[:240]
+        if "collection" in body:
+            col = str(body.get("collection") or "").strip()[:60]
+            if not col:
+                raise HTTPException(422, "Informe uma coleção.")
+            updates["collection"] = col
+        if "description" in body:
+            updates["description"] = str(body.get("description") or "").strip()[:300]
+        if not updates:
+            raise HTTPException(422, "Nenhum campo para atualizar.")
+        collection.document(item_id).update(updates)
+        merged = {**item, **updates}
+        return {"item": exposed(merged)}
+
+    @router.post("/items/{item_id}/notes", status_code=201)
+    async def add_study_note(item_id: str, request: Request, user: dict = dependencies):
+        """Salva um fichamento humano vinculado à página da fonte (usado no /citar e no Guia)."""
+        item = owned(item_id, user)
+        if item.get("status") != "active":
+            raise HTTPException(409, "Apenas fontes ativas podem receber fichamentos.")
+        try:
+            body = await request.json()
+        except ValueError:
+            raise HTTPException(422, "Dados inválidos.") from None
+        if not isinstance(body, dict):
+            raise HTTPException(422, "Dados inválidos.")
+        quote = str(body.get("quote") or "").strip()[:1500]
+        note = str(body.get("note") or "").strip()[:1500]
+        if not quote and not note:
+            raise HTTPException(422, "Informe ao menos um trecho da fonte ou uma anotação sua.")
+        notes = list(item.get("study_notes") or [])
+        if len(notes) >= 50:
+            raise HTTPException(409, "Limite de 50 fichamentos por fonte atingido.")
+        entry = {
+            "id": uuid.uuid4().hex[:12],
+            "page": str(body.get("page") or "").strip()[:24],
+            "quote": quote,
+            "note": note,
+            "tag": str(body.get("tag") or "").strip()[:40],
+            "support_checked": bool(body.get("support_checked", False)),
+            "created_at": utc_now(),
+        }
+        notes.append(entry)
+        collection.document(item_id).update({"study_notes": notes})
+        return {"note": entry, "study_notes": notes}
+
+    @router.patch("/items/{item_id}/notes/{note_id}")
+    async def edit_study_note(item_id: str, note_id: str, request: Request, user: dict = dependencies):
+        item = owned(item_id, user)
+        try:
+            body = await request.json()
+        except ValueError:
+            raise HTTPException(422, "Dados inválidos.") from None
+        if not isinstance(body, dict):
+            raise HTTPException(422, "Dados inválidos.")
+        notes = list(item.get("study_notes") or [])
+        target = next((n for n in notes if n.get("id") == note_id), None)
+        if target is None:
+            raise HTTPException(404, "Fichamento não encontrado.")
+        if "page" in body:
+            target["page"] = str(body.get("page") or "").strip()[:24]
+        if "quote" in body:
+            target["quote"] = str(body.get("quote") or "").strip()[:1500]
+        if "note" in body:
+            target["note"] = str(body.get("note") or "").strip()[:1500]
+        if "tag" in body:
+            target["tag"] = str(body.get("tag") or "").strip()[:40]
+        if "support_checked" in body:
+            target["support_checked"] = bool(body.get("support_checked"))
+        if not target.get("quote") and not target.get("note"):
+            raise HTTPException(422, "O fichamento precisa de trecho ou anotação.")
+        target["updated_at"] = utc_now()
+        collection.document(item_id).update({"study_notes": notes})
+        return {"note": target, "study_notes": notes}
+
+    @router.delete("/items/{item_id}/notes/{note_id}")
+    def remove_study_note(item_id: str, note_id: str, user: dict = dependencies):
+        item = owned(item_id, user)
+        notes = list(item.get("study_notes") or [])
+        remaining = [n for n in notes if n.get("id") != note_id]
+        if len(remaining) == len(notes):
+            raise HTTPException(404, "Fichamento não encontrado.")
+        collection.document(item_id).update({"study_notes": remaining})
+        return {"deleted": True, "study_notes": remaining}
+
+    @router.post("/import-references", status_code=201)
+    async def import_references(request: Request, user: dict = dependencies):
+        """Importa referências em 1 clique por BibTeX, RIS ou lista de DOIs (com deduplicação)."""
+        from oa_import import meta_to_bib_entry, resolve_doi, safe_get
+
+        uid = user["uid"]
+        try:
+            body = await request.json()
+        except ValueError:
+            raise HTTPException(422, "Dados inválidos.") from None
+        if not isinstance(body, dict):
+            raise HTTPException(422, "Dados inválidos.")
+        raw_text = str(body.get("text") or "").strip()
+        if not raw_text:
+            raise HTTPException(422, "Cole ao menos um DOI, registro BibTeX ou RIS.")
+        if len(raw_text) > 500_000:
+            raise HTTPException(413, "Texto muito grande (limite de 500 KB por importação).")
+        col_name = str(body.get("collection") or "Referências").strip()[:60] or "Referências"
+        role = str(body.get("role") or "").strip()
+        if role not in STUDY_ROLES:
+            role = ""
+
+        current = active_items(uid)
+        seen_keys: set[str] = set()
+        for existing in current:
+            seen_keys.update(item_duplicate_keys(existing))
+
+        # 1) Tenta BibTeX ou RIS direto
+        candidates = parse_references_text(raw_text)
+        results = []
+
+        # 2) Se não for BibTeX/RIS, trata como lista de DOIs (até 30 por vez)
+        if not candidates:
+            lines = [ln.strip() for ln in re.split(r"[\r\n]+", raw_text) if ln.strip()]
+            dois = []
+            for ln in lines[:30]:
+                d = normalize_doi(ln)
+                if d:
+                    dois.append(d)
+                else:
+                    results.append({"input": ln[:120], "status": "falhou",
+                                    "reason": "Formato não reconhecido. Use DOI (10.xxxx/...), BibTeX (@article{...}) ou RIS (TY  - ...)."})
+            fetcher = fetch or safe_get
+            for doi in dict.fromkeys(dois):
+                if ("doi:" + doi) in seen_keys:
+                    results.append({"input": doi, "status": "duplicado", "reason": "Já existe uma fonte com este DOI na biblioteca."})
+                    continue
+                try:
+                    meta = resolve_doi(doi, fetcher)
+                    bib = meta_to_bib_entry(meta)
+                except ValueError as err:
+                    results.append({"input": doi, "status": "falhou", "reason": f"DOI não encontrado no OpenAlex ({err})."})
+                    continue
+                if not bib:
+                    results.append({"input": doi, "status": "falhou", "reason": "Metadados insuficientes para este DOI."})
+                    continue
+                bib["how"] = "doi"
+                candidates.append(bib)
+
+        if len(candidates) > 50:
+            raise HTTPException(422, "Importe no máximo 50 referências por vez.")
+
+        for bib in candidates:
+            fields = bib.get("fields") or {}
+            cand_keys = item_duplicate_keys({"bib_entry": bib})
+            if cand_keys & seen_keys:
+                results.append({
+                    "input": fields.get("title") or fields.get("doi") or bib.get("key"),
+                    "status": "duplicado",
+                    "reason": "Referência já presente na sua biblioteca (mesmo DOI ou título e ano).",
+                })
+                continue
+            bib_entry = {
+                "type": bib.get("type") or "misc",
+                "key": bib.get("key") or stable_key(fields),
+                "fields": fields,
+                "how": bib.get("how") or "confirmada_pelo_pesquisador",
+                "updated_at": utc_now(),
+            }
+            bib_text = bib_entry_to_bibtex(bib_entry) + "\n"
+            first_author = str(fields.get("author") or "").split(" and ")[0].split(",")[0].strip()
+            year = str(fields.get("year") or "").strip()
+            title = str(fields.get("title") or bib_entry["key"]).strip()
+            raw_name = f"{first_author} {year} {title}".strip()
+            safe_stem = re.sub(r"[^A-Za-z0-9À-ÿ_.,() \-]", " ", raw_name)
+            safe_stem = re.sub(r"\s+", " ", safe_stem).strip()[:95] or bib_entry["key"]
+            filename = f"{safe_stem}.bib"
+            origin = {"provider": "referencia_importada", "doi": fields.get("doi") or None, "imported_at": utc_now()}
+            try:
+                doc = save_library_item(
+                    db, bucket, uid, filename, ".bib", bib_text.encode("utf-8"),
+                    col_name, f"Referência bibliográfica ({bib_entry['type']}).",
+                    origin=origin, bib_entry=bib_entry, role=role,
+                )
+            except HTTPException as exc:
+                results.append({"input": title[:120], "status": "falhou", "reason": str(exc.detail)})
+                continue
+            seen_keys.update(item_duplicate_keys(doc))
+            results.append({"input": title[:120], "status": "importado", "item": exposed(doc)})
+
+        counts = {"importado": 0, "duplicado": 0, "falhou": 0}
+        for r in results:
+            st = r.get("status", "falhou")
+            counts[st] = counts.get(st, 0) + 1
+        return {"results": results, "counts": counts}
+
+    @router.get("/duplicates")
+    def list_duplicates(user: dict = dependencies):
+        """Lista possíveis duplicatas na biblioteca ativa (mesmo arquivo, DOI ou título+ano)."""
+        groups = find_duplicates(active_items(user["uid"]))
+        return {"duplicates": groups, "count": len(groups)}
+
+    @router.get("/export")
+    def export_references(
+        fmt: str = Query(default="abnt", pattern="^(abnt|bib|ris)$"),
+        only_included: bool = Query(default=False),
+        role: str = Query(default=""),
+        user: dict = dependencies,
+    ):
+        """Exporta referências da Biblioteca em ABNT NBR 6023:2018, BibTeX (.bib) ou RIS (.ris)."""
+        items = active_items(user["uid"])
+        if only_included:
+            items = [i for i in items if i.get("reading_status") == "incluido"]
+        if role:
+            items = [i for i in items if i.get("role") == role]
+        content, media_type, count = export_library_references(items, fmt=fmt)
+        if count == 0:
+            raise HTTPException(404, "Nenhuma referência bibliográfica encontrada para exportar.")
+        ext = "txt" if fmt == "abnt" else fmt
+        return Response(
+            content=content.encode("utf-8"),
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="scriptorium_referencias.{ext}"',
+                "Cache-Control": "private, no-store",
+                "X-Scriptorium-Count": str(count),
+            },
+        )
+
+    @router.post("/check-citations")
+    async def check_citations(request: Request, user: dict = dependencies):
+        """Confere citações ABNT em um texto contra as fontes reais da Biblioteca."""
+        try:
+            body = await request.json()
+        except ValueError:
+            raise HTTPException(422, "Dados inválidos.") from None
+        text = str((body or {}).get("text") or "") if isinstance(body, dict) else ""
+        if not text.strip():
+            raise HTTPException(422, "Informe o texto para conferir citações.")
+        return check_citation_coherence(text, active_items(user["uid"]))
 
     return router

@@ -101,9 +101,67 @@ def resolve_doi(doi: str, fetch) -> dict:
         if url and url not in urls:
             urls.append(url)
     authors = [((a.get("author") or {}).get("display_name") or "") for a in (work.get("authorships") or [])]
-    return {"title": work.get("title") or doi, "year": work.get("publication_year"), "authors": authors[:6],
-            "license": (work.get("best_oa_location") or {}).get("license"), "openalex": work.get("id"),
-            "is_oa": (work.get("open_access") or {}).get("is_oa"), "pdf_urls": urls}
+    primary_source = ((work.get("primary_location") or {}).get("source") or {})
+    biblio = work.get("biblio") or {}
+    pages = ""
+    if biblio.get("first_page") and biblio.get("last_page"):
+        pages = f"{biblio['first_page']}-{biblio['last_page']}"
+    elif biblio.get("first_page"):
+        pages = str(biblio["first_page"])
+    return {
+        "title": work.get("title") or doi,
+        "year": work.get("publication_year"),
+        "authors": authors[:10],
+        "venue": primary_source.get("display_name") or "",
+        "volume": str(biblio.get("volume") or ""),
+        "number": str(biblio.get("issue") or ""),
+        "pages": pages,
+        "type": work.get("type") or "article",
+        "doi": doi,
+        "license": (work.get("best_oa_location") or {}).get("license"),
+        "openalex": work.get("id"),
+        "is_oa": (work.get("open_access") or {}).get("is_oa"),
+        "pdf_urls": urls,
+    }
+
+
+def meta_to_bib_entry(meta: dict) -> dict | None:
+    """Converte metadados do OpenAlex para o esquema `bib_entry` da Biblioteca."""
+    from abnt_refs import normalize_doi, stable_key
+    title = str(meta.get("title") or "").strip()
+    authors = [str(a).strip() for a in (meta.get("authors") or []) if str(a).strip()]
+    if not title and not authors:
+        return None
+    kind_map = {
+        "article": "article",
+        "journal-article": "article",
+        "proceedings-article": "inproceedings",
+        "book": "book",
+        "book-chapter": "incollection",
+        "dissertation": "phdthesis",
+        "report": "techreport",
+    }
+    kind = kind_map.get(str(meta.get("type") or "").lower(), "article")
+    fields = {
+        "title": title,
+        "author": " and ".join(authors),
+        "year": str(meta.get("year") or ""),
+    }
+    if meta.get("venue"):
+        fields["booktitle" if kind in ("inproceedings", "incollection") else "journal"] = str(meta["venue"]).strip()
+    for k in ("volume", "number", "pages"):
+        if meta.get(k):
+            fields[k] = str(meta[k]).strip()
+    doi_norm = normalize_doi(meta.get("doi"))
+    if doi_norm:
+        fields["doi"] = doi_norm
+    return {
+        "type": kind,
+        "key": stable_key(fields),
+        "fields": {k: v for k, v in fields.items() if v},
+        "how": "openalex_importado",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 _META_PDF = re.compile(
@@ -180,7 +238,11 @@ def import_one(raw: str, fetch, save) -> dict:
         origin = {"provider": "acesso_aberto", "upstream_id": "R09", "doi": doi.group(1) if doi else None,
                   "openalex": meta.get("openalex"), "license": meta.get("license"), "source_url": url,
                   "imported_at": datetime.now(timezone.utc).isoformat()}
+        bib_entry = meta_to_bib_entry(meta) if doi else None
         try:
+            item = save(file_name(meta) if doi else (meta["title"] if meta["title"].lower().endswith(".pdf")
+                                                    else meta["title"] + ".pdf"), data, origin, bib_entry)
+        except TypeError:
             item = save(file_name(meta) if doi else (meta["title"] if meta["title"].lower().endswith(".pdf")
                                                     else meta["title"] + ".pdf"), data, origin)
         except HTTPException as error:
@@ -197,21 +259,32 @@ def make_oa_import_router(db, bucket, verify_user: Callable, fetch=None):
     @router.post("/import-open-access")
     def import_open_access(payload: OpenAccessImport, user: dict = dependency):
         uid = user["uid"]
-        existing = {s.to_dict().get("sha256") for s in db.collection("library_items")
-                    .where("owner_uid", "==", uid).limit(600).stream()
-                    if (s.to_dict() or {}).get("status") == "active"}
+        active_records = [
+            s.to_dict() for s in db.collection("library_items")
+            .where("owner_uid", "==", uid).limit(600).stream()
+            if (s.to_dict() or {}).get("status") == "active"
+        ]
+        existing = {r.get("sha256") for r in active_records if r.get("sha256")}
+        from abnt_refs import normalize_doi
+        existing_dois = {
+            normalize_doi(((r.get("bib_entry") or {}).get("fields") or {}).get("doi") or (r.get("origin") or {}).get("doi"))
+            for r in active_records
+        } - {""}
         get = fetch or safe_get
         results = []
 
-        def save(name, data, origin):
+        def save(name, data, origin, bib_entry=None):
             import hashlib
-            if hashlib.sha256(data).hexdigest() in existing:
+            doi_norm = normalize_doi((origin or {}).get("doi"))
+            if hashlib.sha256(data).hexdigest() in existing or (doi_norm and doi_norm in existing_dois):
                 raise HTTPException(409, "Este PDF já está na sua biblioteca.")
             safe_name = re.sub(r"[^A-Za-z0-9À-ÿ_.,() \-]", "_", name)[:120]
             item = save_library_item(db, bucket, uid, safe_name, ".pdf", data, payload.collection or "Acesso aberto",
                                      f"Importado de acesso aberto{(' (DOI ' + origin['doi'] + ')') if origin.get('doi') else ''}.",
-                                     origin=origin)
+                                     origin=origin, bib_entry=bib_entry)
             existing.add(item["sha256"])
+            if doi_norm:
+                existing_dois.add(doi_norm)
             return item
 
         for raw in dict.fromkeys(i.strip() for i in payload.items if i.strip()):

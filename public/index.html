@@ -1089,8 +1089,19 @@
     .ref-proposal-banner { background: var(--mpie-gold-soft); border: 1px solid var(--warn-border); color: var(--warn-text); border-radius: 10px; padding: 9px 12px; font-size: 0.82rem; margin-bottom: 10px; }
     .lib-ref-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; background: var(--ok-bg); color: var(--ok-text); border: 1px solid var(--ok-border); margin-left: 6px; }
     .lib-ref-pill.pending { background: var(--mpie-gold-soft); color: var(--mpie-gold-text); border-color: var(--warn-border); }
+    .lib-role-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 0.71rem; font-weight: 600; background: var(--mpie-blue-soft); color: var(--mpie-blue-text); border: 1px solid var(--border-main); }
+    .lib-status-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 0.71rem; font-weight: 600; background: var(--bg-subtle); color: var(--text-secondary); border: 1px solid var(--border-main); }
+    .lib-status-pill.incluido { background: var(--ok-bg); color: var(--ok-text); border-color: var(--ok-border); }
+    .lib-status-pill.descartado { background: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
+    .study-modal-box { max-width: 780px; width: 96vw; max-height: 88vh; overflow-y: auto; }
+    .study-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .cite-copy-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 10px; background: var(--bg-subtle); border: 1px solid var(--border-main); margin: 10px 0; }
+    .abnt-preview { font-family: Georgia, serif; font-size: 0.88rem; line-height: 1.5; background: var(--bg-surface); border: 1px solid var(--border-main); border-radius: 8px; padding: 10px 12px; margin: 8px 0; color: var(--text-primary); }
+    .study-note-card { border: 1px solid var(--border-main); border-radius: 10px; padding: 10px 12px; background: var(--bg-surface); margin-bottom: 8px; }
+    .study-note-quote { border-left: 3px solid var(--mpie-blue); padding-left: 10px; margin: 6px 0; font-style: italic; font-size: 0.86rem; color: var(--text-secondary); }
+    .study-note-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-top: 6px; font-size: 0.78rem; }
     @media (max-width: 780px) {
-      .ref-check-grid { grid-template-columns: 1fr; }
+      .ref-check-grid, .study-grid { grid-template-columns: 1fr; }
       .ref-check-form { grid-template-columns: 1fr; }
     }
     /* Retomada automática da sessão sem piscar a tela de login. */
@@ -1847,6 +1858,7 @@
               <button type="button" class="seg-btn" id="view-list-btn">Lista</button>
             </div>
             <button type="button" class="btn alt" id="open-config-cols">⚙ Colunas</button>
+            <button type="button" class="btn alt" id="open-export-refs" title="Exportar referências da biblioteca em ABNT, BibTeX ou RIS">Exportar ABNT / .bib</button>
             <button class="btn alt" type="button" id="refresh-library">Atualizar</button>
           </div>
         </div>
@@ -1856,8 +1868,9 @@
           <summary><span>+ Adicionar fontes</span><span class="subtle" aria-hidden="true">⌄</span></summary>
           <div class="segmented add-tabs" role="tablist" aria-label="Como adicionar">
             <button type="button" class="seg-btn active" role="tab" aria-selected="true" data-add-tab="arquivo">Arquivo</button>
+            <button type="button" class="seg-btn" role="tab" aria-selected="false" data-add-tab="refs">DOI / BibTeX / RIS</button>
             <button type="button" class="seg-btn" role="tab" aria-selected="false" data-add-tab="zotero">Zotero</button>
-            <button type="button" class="seg-btn" role="tab" aria-selected="false" data-add-tab="doi">DOI ou link</button>
+            <button type="button" class="seg-btn" role="tab" aria-selected="false" data-add-tab="doi">PDF aberto</button>
           </div>
           <div class="add-pane" data-add-pane="arquivo">
           <div class="library-grid">
@@ -1874,6 +1887,34 @@
             <button class="btn" type="button" id="upload-library">Guardar na biblioteca</button>
             <span id="library-message" role="status" class="subtle"></span>
           </div>
+          </div>
+
+          <!-- Fase 1: Importação unificada de referências (DOI mesmo fechado, BibTeX ou RIS) com deduplicação -->
+          <div class="add-pane" id="refs-drawer" data-add-pane="refs" hidden>
+          <p class="field-hint">Cole <strong>DOIs</strong> (um por linha, mesmo sem PDF aberto), registros <strong>BibTeX</strong> (<code>@article{...}</code>) ou <strong>RIS</strong> exportados do Zotero, SciELO, BDTD ou Google Acadêmico. Duplicatas são detectadas automaticamente.</p>
+          <label for="refs-text">DOIs, BibTeX ou RIS</label>
+          <textarea id="refs-text" rows="5" placeholder="10.1073/pnas.2422633122&#10;ou cole aqui registros BibTeX (@article{...}) ou RIS (TY  - JOUR ...)"></textarea>
+          <div class="library-grid">
+            <div>
+              <label for="refs-collection">Coluna / Coleção</label>
+              <input id="refs-collection" list="kanban-col-options" type="text" maxlength="60" value="Referências"/>
+            </div>
+            <div>
+              <label for="refs-role">Papel na pesquisa (opcional)</label>
+              <select id="refs-role">
+                <option value="">Definir depois</option>
+                <option value="marco_teorico">Marco Teórico</option>
+                <option value="metodo">Método</option>
+                <option value="evidencia">Evidência Empírica</option>
+                <option value="contraponto">Contraponto / Limite</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn" type="button" id="refs-import">Importar referências</button>
+            <span id="refs-message" role="status" class="subtle"></span>
+          </div>
+          <div id="refs-results"></div>
           </div>
 
           <!-- M26: importação somente leitura do Zotero (a chave não é guardada) -->
@@ -1936,6 +1977,8 @@
 
         <!-- M13: arquivos retidos na verificação de segurança -->
         <div id="quarantine-list" class="budget-alert hidden" role="status"></div>
+        <!-- Fase 1: aviso automático de duplicatas detectadas na biblioteca -->
+        <div id="duplicates-banner" class="budget-alert hidden" role="status"></div>
 
         <!-- Toolbar de busca, filtro de formato e medidor de espaço de leitura (75.000 chars) -->
         <div class="lib-toolbar">
@@ -2688,6 +2731,16 @@
                 renderLibraryViews();
               });
 
+              // Fichamento & ABNT: abre o modal unificado (funciona igual no Kanban e na Lista)
+              const studyBtn = document.createElement('button');
+              studyBtn.type = 'button';
+              studyBtn.className = 'kcard-btn';
+              studyBtn.title = 'Abrir fichamento por página, papel na pesquisa e citação ABNT';
+              studyBtn.textContent = 'Fichar / ABNT';
+              studyBtn.addEventListener('click', () => {
+                window.ScriptoriumBiblioteca?.abrirEstudo(it.stableKey);
+              });
+
               // Apagar: usa o botão da lista original (app.js pede confirmação antes).
               const delBtn = document.createElement('button');
               delBtn.type = 'button';
@@ -2700,8 +2753,8 @@
                 if (real) real.click();
               });
               const left2 = document.createElement('div');
-              left2.style.cssText = 'display:flex;gap:6px;align-items:center';
-              left2.append(toggleBtn, delBtn);
+              left2.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap';
+              left2.append(toggleBtn, studyBtn, delBtn);
               foot.append(left2, selMove);
               card.append(t, m, foot);
               listWrap.appendChild(card);

@@ -934,7 +934,7 @@ const REPEAT={
   theories:{stage:3,model:'M6',title:'Quadro 1: Referencial teórico',help:'Hierarquize os autores centrais e explique a contribuição analítica de cada um. Educação/Informática é exigência do guia de origem; outros programas podem pedir outra composição.',fields:[['conceito','Conceito ou eixo teórico','text'],['autor','Autor(es) de referência','text'],['obra','Obra ou referência verificada','text'],['area','Área de contribuição','select',['Educação','Informática / Tecnologia','EPT','Interdisciplinar','Outra']],['aspecto','Aspecto educacional e função na análise','textarea']]},
   objectives:{stage:4,model:'M7',title:'Objetivos específicos',help:'Cada objetivo deve expressar um resultado de investigação, não uma tarefa como “aplicar questionário”.',fields:[['texto','Objetivo específico','textarea'],['conhecimento','Que conhecimento será produzido ao cumpri-lo?','textarea']]},
   timeline:{stage:7,model:'M11',title:'Cronograma por entregável',help:'Planeje de trás para frente a partir da defesa. Registre atividades, datas e entregáveis; reserve prazo para ética e qualificação.',fields:[['fase','Fase/atividade','text'],['inicio','Início','month'],['fim','Fim','month'],['entrega','Entregável verificável','textarea'],['dependencia','Dependências e autorizações','text']]},
-  aiUse:{stage:8,model:'M12',title:'Registro de uso de IA',help:'Registre ferramenta, data, finalidade, instrução/prompt relevante e verificação humana; siga a norma de seu programa.',fields:[['data','Data','date'],['ferramenta','Ferramenta e modelo, se conhecido','text'],['finalidade','Finalidade do uso','text'],['prompt','Instrução ou prompt utilizado','textarea'],['conferencia','Conferência, decisões e responsabilidade humana','textarea']]}
+  aiUse:{stage:8,model:'M12',title:'Registro de uso de IA e decisões autorais',help:'Registre ferramenta, data, finalidade, sua postura autoral (Aceitei, Adaptei ou Rejeitei) e a verificação humana realizada (IN IFRS 16/2026).',fields:[['data','Data','date'],['ferramenta','Ferramenta e modelo, se conhecido','text'],['finalidade','Finalidade do uso ou etapa','text'],['postura','Decisão autoral','select',['Aceitei','Adaptei','Rejeitei','Não utilizei IA']],['prompt','Sugestão recebida ou instrução utilizada','textarea'],['conferencia','Por que aceitei, adaptei ou rejeitei? (conferência humana)','textarea']]}
 };
 const EXTRA_GLOSSARY=[
 ['Questão de pesquisa','Pergunta principal, investigável e delimitada, cuja resposta a pesquisa pretende construir.'],
@@ -1147,12 +1147,22 @@ function renderInputControl(field,v,context={}){
   else if(typ==='textarea'){input=`<textarea id="${id}" ${att} rows="${context.rec?3:4}" aria-describedby="${hintId}" placeholder="${esc(lvl==='autonomo'?'Escreva aqui…':(field.placeholder||'Escreva aqui com suas palavras…'))}">${esc(v)}</textarea>`;}
   else{input=`<input id="${id}" ${att} type="${['date','month','number','text'].includes(typ)?typ:'text'}" value="${esc(v)}" aria-describedby="${hintId}" placeholder="${esc(lvl==='autonomo'?'':(field.placeholder||''))}">`;}
   const tools=[];
+  if(typ==='textarea'&&key!=='sec_referencias')tools.push(`<button class="btn sm ghost" data-action="open-cite" data-target="${esc(id)}" type="button" title="Inserir citação ABNT da sua Biblioteca (atalho: digite /citar)">📚 Citar</button>`);
+  if(!context.rec&&key==='sec_referencias')tools.push(`<button class="btn sm primary" data-action="sync-abnt-refs" type="button">📚 Gerar ABNT das citações</button>`);
+  if(!context.rec&&key==='registroIA_M12')tools.push(`<button class="btn sm primary" data-action="gen-in16" type="button">📄 Gerar Declaração IN 16/2026</button>`);
   if(!context.rec&&lvl!=='autonomo'&&hint)tools.push(`<button class="btn sm ghost" data-action="field-hint" data-field="${esc(key)}" type="button">Pista</button>`);
   if(!context.rec&&lvl!=='autonomo'&&field.example)tools.push(`<button class="btn sm" data-action="field-example" data-field="${esc(key)}" type="button">${lvl==='inicial'?'Ver exemplo':'Exemplo'}</button>`);
   const hintMarkup=lvl==='inicial'
     ?`<p id="${hintId}" class="hint">${esc(hint||'Escreva com suas palavras, sem pressa: você pode editar depois.')}</p>`
     :`<p id="${hintId}" class="hint sr-only">${esc(hint||'Campo de escrita autoral.')}</p>`;
-  return `<div class="field"><div class="field-label"><label for="${id}">${esc(field.label)}</label>${tools.length?`<div class="flex" style="gap:6px">${tools.join('')}</div>`:''}</div>${hintMarkup}${input}</div>`;
+  let extraBar='';
+  if(!context.rec&&key==='sec_referencias'){
+    const rep=analyzeGuideCitations();
+    if(rep.libCount>0||rep.citationsFound>0){
+      extraBar=`<div class="notice" style="margin:4px 0 8px"><strong>Coerência bibliográfica (Biblioteca ↔ Guia):</strong> ${rep.matched.length} obra(s) citadas e conferidas na Biblioteca`+(rep.missing.length?` · <span style="color:var(--danger-text,#8F4A00)"><strong>${rep.missing.length} citação(ões) sem fonte na Biblioteca:</strong> ${esc(rep.missing.map(x=>x.raw).slice(0,5).join(', '))}</span>`:'')+(rep.uncited.length?` · ${rep.uncited.length} obra(s) na Biblioteca ainda não citadas`:'')+`.</div>`;
+    }
+  }
+  return `<div class="field"><div class="field-label"><label for="${id}">${esc(field.label)}</label>${tools.length?`<div class="flex" style="gap:6px">${tools.join('')}</div>`:''}</div>${hintMarkup}${extraBar}${input}</div>`;
 }
 function renderStandard(s,onlyKeys=null){let fields=s.fields;if(onlyKeys)fields=fields.filter(f=>onlyKeys.includes(f.key));const body=fields.map(f=>renderInputControl(f,state.values[f.key]||'')).join('');return `<div class="fieldgroup">${body}</div>`;}
 function renderRepeat(name){
@@ -1180,7 +1190,7 @@ function renderPreencher(s){let body='';if(s.id===3){body=renderRepeat('searchBl
   else body=renderStandard(s);
   return `<div class="section-max section-gap"><div class="notice"><strong>Escreva no seu tempo:</strong> tudo o que você digita fica salvo automaticamente. Você pode sair e voltar depois sem perder nada.</div>${renderLegacy(s)}${body}<div class="action-footer"><button type="button" class="btn" data-action="examples">Ver exemplos prontos</button><button type="button" class="btn primary" data-action="tab" data-tab="conferir">Revisar e avançar →</button></div></div>`;}
 function renderConferir(s){const p=info(s.id);const items=s.criteria.map((c,i)=>{const k=`${s.id}:${i}`;return `<div class="check-card"><input type="checkbox" id="check-${s.id}-${i}" data-check="${esc(k)}" ${state.criteria[k]?'checked':''}><div><label for="check-${s.id}-${i}">${esc(c)}</label><textarea class="check-note" rows="2" data-evidence="${esc(k)}" aria-label="Anotação para o critério ${i+1}" placeholder="Anotação opcional (o que já está pronto ou o que falta revisar)…">${esc(state.evidence[k]||'')}</textarea></div></div>`;}).join('');
-const rev=state.reviews[s.id];const dec=(state.decisions||{})[s.id]||'';return `<div class="section-max section-gap"><div class="card warning"><span class="eyebrow">Revisão pessoal desta etapa</span><p class="small" style="margin:6px 0">Marque cada item abaixo quando sentir que ele está bem resolvido no seu texto. Você pode avançar e voltar quando quiser.</p><div class="status-steps">${['Em andamento','Preenchida','Conferida','Revisão da orientação'].map((q,i)=>`<span class="status-step ${(i===0&&p.count>0)||(i===1&&p.complete)||(i===2&&p.complete&&p.allChecked)||(i===3&&rev&&rev.result==='revisado')?'on':''}">${q}</span>`).join('')}</div></div><h3>Lista de conferência</h3><div class="small muted">Preenchido: ${p.count} de ${p.max} blocos · Marcados: ${s.criteria.filter((_,i)=>state.criteria[`${s.id}:${i}`]).length} de ${s.criteria.length}</div>${items}<div class="card white"><span class="eyebrow">Aprendizagem visível (opcional)</span><h3 style="margin-top:4px">Por que tomei estas decisões nesta etapa?</h3><p class="small muted">Explique em 2 ou 3 linhas por que escolheu este recorte, autor ou método. Isso fortalece sua autoria e ajuda na reunião de orientação e na banca.</p><textarea class="form-control" rows="3" data-decision="${s.id}" aria-label="Justificativa das decisões da etapa ${s.id}" placeholder="Ex.: escolhi este método porque permite acompanhar a turma real durante um semestre…">${esc(dec)}</textarea></div><div class="card white"><h3>Comentário da orientação (opcional)</h3>${rev?.stale?'<div class="notice" style="margin-bottom:10px">Você editou esta etapa depois do último parecer registrado.</div>':''}<p class="small">${rev?'Último registro: '+esc(rev.reviewer)+' · '+esc(rev.date)+': '+esc(rev.comment):'Nenhum comentário registrado ainda.'}</p><button type="button" class="btn sm" data-action="review">Registrar comentário recebido</button></div><div class="action-footer"><button type="button" class="btn" data-action="snapshot">Guardar uma versão</button><div class="flex"><button type="button" class="btn" data-action="jump" data-stage="${Math.max(1,s.id-1)}" ${s.id===1?'disabled':''}>← Etapa anterior</button><button type="button" class="btn primary" data-action="jump" data-stage="${Math.min(8,s.id+1)}">${s.id===8?'Concluir revisão':'Ir para a Etapa '+Math.min(8,s.id+1)+' →'}</button></div></div></div>`;}
+const rev=state.reviews[s.id];const dec=(state.decisions||{})[s.id]||'';return `<div class="section-max section-gap"><div class="card warning"><span class="eyebrow">Revisão pessoal desta etapa</span><p class="small" style="margin:6px 0">Marque cada item abaixo quando sentir que ele está bem resolvido no seu texto. Você pode avançar e voltar quando quiser.</p><div class="status-steps">${['Em andamento','Preenchida','Conferida','Revisão da orientação'].map((q,i)=>`<span class="status-step ${(i===0&&p.count>0)||(i===1&&p.complete)||(i===2&&p.complete&&p.allChecked)||(i===3&&rev&&rev.result==='revisado')?'on':''}">${q}</span>`).join('')}</div></div><h3>Lista de conferência</h3><div class="small muted">Preenchido: ${p.count} de ${p.max} blocos · Marcados: ${s.criteria.filter((_,i)=>state.criteria[`${s.id}:${i}`]).length} de ${s.criteria.length}</div>${items}<div class="card white"><span class="eyebrow">Aprendizagem visível (opcional)</span><h3 style="margin-top:4px">Por que tomei estas decisões nesta etapa?</h3><p class="small muted">Explique em 2 ou 3 linhas por que escolheu este recorte, autor ou método. Isso fortalece sua autoria e ajuda na reunião de orientação e na banca.</p><textarea class="form-control" rows="3" data-decision="${s.id}" aria-label="Justificativa das decisões da etapa ${s.id}" placeholder="Ex.: escolhi este método porque permite acompanhar a turma real durante um semestre…">${esc(dec)}</textarea><details style="margin-top:12px"><summary class="small bold" style="cursor:pointer">Registrar decisão sobre sugestão de IA nesta etapa (Aceitei / Adaptei / Rejeitei) ▾</summary><div style="margin-top:10px;display:flex;flex-direction:column;gap:8px"><div class="flex"><select id="qAiPostura" class="form-control" style="max-width:200px"><option value="Adaptei">Adaptei a sugestão</option><option value="Aceitei">Aceitei a sugestão</option><option value="Rejeitei">Rejeitei a sugestão</option></select><input id="qAiTool" class="form-control" style="flex:1;min-width:180px" placeholder="Ferramenta (ex.: ChatGPT, Gemini, Scriptorium)"></div><textarea id="qAiWhy" rows="2" class="form-control" placeholder="Qual foi a sugestão e por que você decidiu aceitar, adaptar ou rejeitar?"></textarea><div class="flex"><button type="button" class="btn sm primary" data-action="quick-ai-decision">Salvar decisão no registro M12</button><span class="tiny muted">Alimenta automaticamente a Declaração IN IFRS 16/2026 (Etapa 8).</span></div></div></details></div><div class="card white"><h3>Comentário da orientação (opcional)</h3>${rev?.stale?'<div class="notice" style="margin-bottom:10px">Você editou esta etapa depois do último parecer registrado.</div>':''}<p class="small">${rev?'Último registro: '+esc(rev.reviewer)+' · '+esc(rev.date)+': '+esc(rev.comment):'Nenhum comentário registrado ainda.'}</p><button type="button" class="btn sm" data-action="review">Registrar comentário recebido</button></div><div class="action-footer"><button type="button" class="btn" data-action="snapshot">Guardar uma versão</button><div class="flex"><button type="button" class="btn" data-action="jump" data-stage="${Math.max(1,s.id-1)}" ${s.id===1?'disabled':''}>← Etapa anterior</button><button type="button" class="btn primary" data-action="jump" data-stage="${Math.min(8,s.id+1)}">${s.id===8?'Concluir revisão':'Ir para a Etapa '+Math.min(8,s.id+1)+' →'}</button></div></div></div>`;}
 function buildGuidePlan(){
   const titulo=val('tituloFinal')||val('tituloProvisorio')||val('tema');
   const obs=recs('objectives').map((o,i)=>plain(o.texto)?`${i+1}. ${plain(o.texto)}`:'').filter(Boolean);
@@ -1263,6 +1273,8 @@ function audit(){const arr=[];const put=(lvl,title,text,step)=>arr.push({lvl,tit
   if(isArticle()&&!val('revistaAlvo'))put('warn','Revista-alvo não definida','A revista define tamanho, estrutura e normas do artigo.',7);
   if(isArticle()&&!val('sec_resumo'))put('warn','Resumo ausente','O resumo deve trazer objetivo, método, resultados e conclusão.',7);
   if(!val('sec_referencias'))put('warn','Referências do projeto ausentes','Inclua somente as fontes efetivamente verificadas.',7);
+  const citeCheck=analyzeGuideCitations();
+  if(citeCheck.missing.length)put('warn',`Citações sem fonte na Biblioteca (${citeCheck.missing.length})`,'As citações '+citeCheck.missing.map(x=>x.raw).slice(0,4).join(', ')+' aparecem no texto do Guia mas ainda não constam na sua Biblioteca com ficha confirmada.',7);
   if(!isArticle()&&recs('timeline').length===0)put('warn','Cronograma ausente','Inclua atividades, datas, dependências e entregáveis.',7);
   if(recs('aiUse').length===0&&!/não utilizei/i.test(val('registroIA_M12')))put('warn','Uso de IA não documentado','Registre usos efetivos ou declare explicitamente que não houve uso.',8);
   for(const s of STAGES)if(info(s.id).code==='empty')put('info',`Etapa ${s.id} não iniciada`,'É possível avançar livremente, mas ela precisa ser revisada antes da conclusão.',s.id);
@@ -1281,8 +1293,154 @@ function settingsModal(){modal('Tamanho da letra e leitura',`<p class="small mut
 function readableField(f){const v=val(f.key);return `<section><h3>${esc(f.label)}</h3><div class="print-p">${htmlLines(v||'[Não preenchido]')}</div></section>`;}
 function recordPrint(name){const c=REPEAT[name];return `<section><h2>${esc(c.model)} · ${esc(c.title)}</h2>${recs(name).length?recs(name).map((r,i)=>`<div class="print-box"><h3>Registro ${i+1}</h3>${c.fields.map(([key,label])=>`<p class="print-p"><strong>${esc(label)}:</strong> ${htmlLines(r[key]||'(vazio)')}</p>`).join('')}</div>`).join(''):'<p class="empty">Nenhum registro preenchido.</p>'}</section>`;}
 function m9HTML(){return renderM9().replace(/class="card white"/g,'class="print-box"');}
+function normalizeAscii(s){return String(s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+function extractGuideTextForCitations(){
+  const chunks=[];
+  for(const [k,v] of Object.entries(state.values||{})){if(k!=='sec_referencias'&&plain(v))chunks.push(String(v));}
+  for(const [k,arr] of Object.entries(state.records||{})){
+    if(Array.isArray(arr))for(const row of arr)for(const [rk,rv] of Object.entries(row||{}))if(rk!=='id'&&plain(rv))chunks.push(String(rv));
+  }
+  return chunks.join('\n');
+}
+function itemSurnameYear(item){
+  const f=(item?.bib_entry?.fields)||{};
+  const yr=String(f.year||'').match(/\b(1[5-9]\d{2}|20\d{2})\b/)?.[1]||'';
+  const rawAuth=String(f.author||'').split(/\s+and\s+|;/i)[0].trim();
+  let surname='';
+  if(rawAuth.includes(','))surname=rawAuth.split(',')[0].trim();
+  else if(rawAuth.includes(' '))surname=rawAuth.split(/\s+/).pop();
+  else surname=rawAuth;
+  return {surname:normalizeAscii(surname),year:yr};
+}
+function analyzeGuideCitations(){
+  const lib=(window.ScriptoriumBiblioteca?.listar()||[]).filter(i=>i&&i.abnt&&i.abnt.reference);
+  const txt=extractGuideTextForCitations();
+  const seen=new Set(), found=[];
+  const reP=/\(([A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þa-zà-öø-ÿ'\- ]{1,60}(?:;\s*[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þa-zà-öø-ÿ'\- ]{1,40}){0,2}(?:\s+et\s+al\.?)?),\s*((?:1[89]|20)\d{2}[a-z]?)(?:,\s*p\.?\s*[\d\-–]+)?\)/g;
+  const reN=/\b([A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]{2,30}(?:\s+(?:e|&)\s+[A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]{2,30}|\s+et\s+al\.?)?)\s*\(((?:1[89]|20)\d{2}[a-z]?)(?:,\s*p\.?\s*[\d\-–]+)?\)/g;
+  for(const rx of [reP,reN]){
+    let m;while((m=rx.exec(txt))!==null){
+      const first=m[1].split(/\s*;\s*|\s+et\s+al\.?|\s+e\s+|\s*&\s*/i)[0].trim();
+      const s=normalizeAscii(first), y=m[2].replace(/[a-z]$/,'');
+      const sig=`${s}|${y}`;
+      if(s.length>=2&&!seen.has(sig)){seen.add(sig);found.push({raw:m[0],surname:s,year:y});}
+    }
+  }
+  const matchedIds=new Set(), matched=[], missing=[];
+  for(const c of found){
+    const hit=lib.find(it=>{const sy=itemSurnameYear(it);return sy.year===c.year&&(sy.surname===c.surname||sy.surname.endsWith(' '+c.surname));});
+    if(hit){if(!matchedIds.has(hit.id)){matchedIds.add(hit.id);matched.push(hit);}}
+    else missing.push(c);
+  }
+  matched.sort((a,b)=>normalizeAscii(a.abnt.reference).localeCompare(normalizeAscii(b.abnt.reference)));
+  const uncited=lib.filter(it=>!matchedIds.has(it.id));
+  return {libCount:lib.length,citationsFound:found.length,matched,missing,uncited,abntText:matched.map(it=>it.abnt.reference).join('\n\n')};
+}
+function buildIn16Declaration(){
+  const titulo=val('tituloFinal')||val('tituloProvisorio')||val('tema')||'[Título do trabalho]';
+  const tipoLabel=isArticle()?'artigo científico':'projeto de pesquisa / TCC';
+  const uses=recs('aiUse').filter(r=>plain(r.ferramenta)||plain(r.finalidade)||plain(r.conferencia)||plain(r.postura));
+  const counts={Aceitei:0,Adaptei:0,Rejeitei:0};
+  for(const u of uses){if(counts[u.postura]!==undefined)counts[u.postura]++;}
+  const lib=window.ScriptoriumBiblioteca?.listar()||[];
+  const checkedNotes=lib.reduce((acc,it)=>acc+(it.study_notes||[]).filter(n=>n.support_checked).length,0);
+  const citeRep=analyzeGuideCitations();
+  const lines=[
+    `DECLARAÇÃO DE USO ÉTICO DE INTELIGÊNCIA ARTIFICIAL E DECISÕES AUTORAIS (IN IFRS nº 16/2026)`,
+    `Trabalho (${tipoLabel}): ${titulo}`,
+    `Data de geração: ${dateNow()}`,
+    '',
+  ];
+  if(!uses.length){
+    lines.push('Declaro que, até o momento, não utilizei ferramentas de Inteligência Artificial Generativa na redação deste trabalho, tendo elaborado integralmente as decisões metodológicas e o texto com apoio do Guia de Escrita (sem IA) do Scriptorium MPIE.');
+  } else {
+    lines.push(`Declaro, em conformidade com a Instrução Normativa IFRS nº 16/2026, que o uso de apoio computacional/IA neste trabalho foi supervisionado, auditável e subordinado à autoria humana. Resumo das decisões autorais registradas no M12: ${counts.Aceitei} sugestão(ões) aceita(s), ${counts.Adaptei} adaptada(s) e ${counts.Rejeitei} rejeitada(s).`);
+    lines.push('');
+    lines.push('Registros de uso e conferência humana:');
+    uses.forEach((u,idx)=>{
+      lines.push(`${idx+1}. [${u.data||'s/ data'}] ${u.ferramenta||'Ferramenta não informada'} · Finalidade: ${u.finalidade||'(não informada)'} | Decisão autoral: ${u.postura||'Não informada'} | Justificativa/Conferência: ${u.conferencia||'(pendente)'}`);
+    });
+  }
+  lines.push('');
+  lines.push(`Verificação de fontes: ${citeRep.matched.length} obra(s) citada(s) conferida(s) na Biblioteca privada e ${checkedNotes} fichamento(s) com sustentação verificada diretamente na fonte original.`);
+  lines.push('Assumo integral responsabilidade intelectual pela veracidade dos dados, pela interpretação das fontes e pelas decisões metodológicas apresentadas.');
+  return lines.join('\n');
+}
+let citeTargetEl=null;
+function formatCiteForItem(item,mode,page){
+  const base=mode==='narr'?(item.abnt?.cite_narrative||''):(item.abnt?.cite_parenthetical||'');
+  if(!base)return `(${(item.name||'FONTE').replace(/\.\w+$/,'')})`;
+  const p=String(page||'').trim().replace(/^(p\.?|pág\.?|pp\.?)\s*/i,'');
+  if(!p)return base;
+  return base.replace(/\)$/,`, p. ${p})`);
+}
+function insertAtCursor(el,text){
+  if(!el)return;
+  const start=el.selectionStart??el.value.length, end=el.selectionEnd??el.value.length;
+  el.value=el.value.slice(0,start)+text+el.value.slice(end);
+  const pos=start+text.length;
+  el.focus();try{el.setSelectionRange(pos,pos);}catch(_){}
+  el.dispatchEvent(new Event('input',{bubbles:true}));
+}
+function openCitePicker(targetEl){
+  citeTargetEl=targetEl;
+  const lib=window.ScriptoriumBiblioteca?.listar()||[];
+  const roleNames={'':'Todos os papéis',marco_teorico:'Marco Teórico',metodo:'Método',evidencia:'Evidência',contraponto:'Contraponto'};
+  if(!lib.length){
+    modal('Citar da sua Biblioteca (ABNT)',
+      `<div class="card warning"><strong>Sua Biblioteca ainda não tem fontes carregadas.</strong><p class="small" style="margin:6px 0 0">Adicione PDFs, DOIs, BibTeX ou RIS na aba <strong>Biblioteca</strong> para citar com 1 clique e gerar referências ABNT automaticamente.</p></div>`,
+      `<button type="button" class="btn" data-action="close-modal">Fechar</button><button type="button" class="btn primary" data-action="open-library">Abrir Biblioteca →</button>`);
+    return;
+  }
+  const body=`<div class="flex" style="margin-bottom:10px">
+    <input id="citeSearch" class="form-control" style="flex:1;min-width:180px" placeholder="Filtrar por autor, título ou fichamento…">
+    <select id="citeRole" class="form-control" style="max-width:170px">${Object.entries(roleNames).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join('')}</select>
+    <select id="citeMode" class="form-control" style="max-width:180px"><option value="paren">(AUTOR, ano)</option><option value="narr">Autor (ano)</option></select>
+    <input id="citePage" class="form-control" style="max-width:105px" placeholder="p. (opc.)">
+  </div>
+  <div id="citeList" class="modal-scroll"></div>`;
+  modal('Inserir citação ABNT da Biblioteca (/citar)',body,`<button type="button" class="btn" data-action="close-modal">Fechar</button><button type="button" class="btn" data-action="open-library">Gerenciar Biblioteca</button>`);
+  const paint=()=>{
+    const q=normalizeAscii(R.getElementById('citeSearch')?.value||'');
+    const role=R.getElementById('citeRole')?.value||'';
+    const mode=R.getElementById('citeMode')?.value||'paren';
+    const page=R.getElementById('citePage')?.value||'';
+    const filtered=lib.filter(it=>{
+      if(role&&(it.role||'')!==role)return false;
+      if(!q)return true;
+      const hay=normalizeAscii([it.name,it.abnt?.reference,it.bib_entry?.fields?.author,it.bib_entry?.fields?.title,...(it.study_notes||[]).map(n=>`${n.quote} ${n.note} ${n.tag}`)].join(' '));
+      return hay.includes(q);
+    });
+    const listEl=R.getElementById('citeList');if(!listEl)return;
+    if(!filtered.length){listEl.innerHTML='<p class="empty">Nenhuma fonte corresponde ao filtro.</p>';return;}
+    listEl.innerHTML=filtered.map(it=>{
+      const citePreview=formatCiteForItem(it,mode,page);
+      const notes=(it.study_notes||[]).map((n,ni)=>{
+        const nc=formatCiteForItem(it,mode,n.page||page);
+        return `<div style="margin-top:6px;padding:8px 10px;border-left:3px solid var(--mpie-blue,#1466B8);background:var(--bg-subtle,#EFF4FA);border-radius:6px">
+          <div class="flex spread"><span class="tiny bold">${n.page?'p. '+esc(n.page):'Fichamento'}${n.tag?' · '+esc(n.tag):''}${n.support_checked?' · ✓ sustentação conferida':''}</span>
+          <button type="button" class="btn sm" data-action="pick-cite-note" data-lib-id="${esc(it.id)}" data-note-idx="${ni}">Inserir ${esc(nc)}</button></div>
+          ${n.quote?`<div class="tiny muted" style="font-style:italic;margin-top:4px">“${esc(n.quote.slice(0,180))}${n.quote.length>180?'…':''}”</div>`:''}
+          ${n.note?`<div class="tiny" style="margin-top:3px">${esc(n.note.slice(0,200))}</div>`:''}
+        </div>`;
+      }).join('');
+      return `<div class="card white" style="margin-bottom:10px">
+        <div class="flex spread">
+          <div><strong>${esc(it.bib_entry?.fields?.title||it.name)}</strong> ${it.role?`<span class="pill">${esc(roleNames[it.role]||it.role)}</span>`:''}</div>
+          <button type="button" class="btn sm primary" data-action="pick-cite" data-lib-id="${esc(it.id)}">Inserir ${esc(citePreview)}</button>
+        </div>
+        ${it.abnt?.reference?`<p class="tiny muted" style="margin:6px 0 0">${esc(it.abnt.reference)}</p>`:'<p class="tiny muted" style="margin:6px 0 0">Ficha bibliográfica ainda pendente na Biblioteca.</p>'}
+        ${notes}
+      </div>`;
+    }).join('');
+  };
+  ['citeSearch','citeRole','citeMode','citePage'].forEach(id=>R.getElementById(id)?.addEventListener('input',paint));
+  ['citeRole','citeMode'].forEach(id=>R.getElementById(id)?.addEventListener('change',paint));
+  paint();
+  R.getElementById('citeSearch')?.focus();
+}
 function exportContent(kind){let result=`<div class="small">Scriptorium MPIE · Guia de escrita · Gerado em ${esc(dateNow())}</div><h1>${kind==='resumo'?'Resumo para a orientação: M6, M9 e M10':kind==='projeto'?(isArticle()?'Artigo: versão de trabalho':'Projeto de pesquisa: versão de trabalho'):'Memorial formativo de decisões'}</h1><p class="small">Conteúdo autoral registrado no guia. Campos não preenchidos são indicados. Revisão acadêmica não substituída.</p>`;
-  if(kind==='resumo'){const decs=STAGES.map(s=>(state.decisions||{})[s.id]?`<p class="print-p"><strong>Etapa ${s.id} (${esc(STAGE_LABELS[s.id])}):</strong> ${htmlLines(state.decisions[s.id])}</p>`:'').filter(Boolean).join('');result+=`<h2>Quadro 1: Referencial (M6)</h2>`+recs('theories').map((x,i)=>`<p class="print-p">${i+1}. ${esc(x.conceito)}: ${esc(x.autor)} · ${esc(x.aspecto)}</p>`).join('')+`<h2>Quadro 2: Projeto (M9, síntese adaptada)</h2>`+m9HTML()+(isArticle()?`<h2>Resultados e discussão</h2>`:`<h2>Quadro 3: Produto (M10)</h2>`)+byStage(6).fields.map(readableField).join('')+(decs?`<h2>Justificativas metodológicas do estudante</h2>`+decs:'')+`<h2>Roteiro de apresentação</h2>`+presentation();return result;}
+  if(kind==='resumo'){const decs=STAGES.map(s=>(state.decisions||{})[s.id]?`<p class="print-p"><strong>Etapa ${s.id} (${esc(STAGE_LABELS[s.id])}):</strong> ${htmlLines(state.decisions[s.id])}</p>`:'').filter(Boolean).join('');result+=`<h2>Quadro 1: Referencial (M6)</h2>`+recs('theories').map((x,i)=>`<p class="print-p">${i+1}. ${esc(x.conceito)}: ${esc(x.autor)} · ${esc(x.aspecto)}</p>`).join('')+`<h2>Quadro 2: Projeto (M9, síntese adaptada)</h2>`+m9HTML()+(isArticle()?`<h2>Resultados e discussão</h2>`:`<h2>Quadro 3: Produto (M10)</h2>`)+byStage(6).fields.map(readableField).join('')+(decs?`<h2>Justificativas metodológicas do estudante</h2>`+decs:'')+`<h2>Declaração de uso ético de IA (IN IFRS 16/2026)</h2><div class="print-p">${htmlLines(val('registroIA_M12')||buildIn16Declaration())}</div>`+`<h2>Roteiro de apresentação</h2>`+presentation();return result;}
   if(kind==='projeto'&&isArticle()){const sections=[['Título','tituloFinal'],['Resumo','sec_resumo'],['Palavras-chave','palavrasChave'],['Introdução','sec_introducao'],['Revisão de literatura','sec_revisao'],['Referencial teórico','sec_referencial'],['Metodologia','sec_metodologia'],['Resultados','sec_resultados'],['Discussão','sec_discussao'],['Considerações finais','sec_conclusao'],['Referências','sec_referencias']];result+=`<p class="small">Revista-alvo: ${esc(val('revistaAlvo')||'não definida')}</p>`+sections.map(([name,key])=>`<section><h2>${esc(name)}</h2><div class="print-p">${htmlLines(val(key)||'[Não preenchido]')}</div></section>`).join('');return result;}
   if(kind==='projeto'){result+=`<h2>Identificação</h2>`+byStage(1).fields.map(readableField).join('');const sections=[['Título','tituloFinal'],['Introdução','sec_introducao'],['Revisão de literatura','sec_revisao'],['Justificativa','sec_justificativa'],['Objetivos','sec_objetivos'],['Referencial teórico','sec_referencial'],['Metodologia','sec_metodologia'],['Produto técnico-tecnológico','sec_produto'],['Referências','sec_referencias']];result+=sections.map(([name,key])=>`<section><h2>${esc(name)}</h2><div class="print-p">${htmlLines(val(key)||'[Não preenchido]')}</div></section>`).join('')+recordPrint('timeline');return result;}
   for(const s of STAGES){result+=`<section><h2>Etapa ${s.id}: ${esc(s.title)}</h2><p class="small">Estado: ${esc(info(s.id).label)}. Modelos: ${esc(s.models)}.</p>`+s.fields.map(readableField).join('');for(const [key,c] of Object.entries(REPEAT))if(c.stage===s.id)result+=recordPrint(key);if(s.id===5){const obs=recs('objectives');result+='<h2>M8 · Matriz metodológica</h2>'+obs.map(o=>`<div class="print-box"><h3>${esc(o.texto)}</h3>${Object.entries((state.records.methodLinks||{})[o.id]||{}).map(([key,v])=>`<p><strong>${esc(key)}:</strong> ${htmlLines(v)}</p>`).join('')}</div>`).join('');}if(s.id===8)result+=m9HTML();}
@@ -1306,6 +1464,51 @@ function actionHandler(btn){const a=btn.dataset.action;const rec=btn.dataset.rec
   if(a==='set-support'){const lvl=btn.dataset.level;if(!['inicial','intermediario','autonomo'].includes(lvl)||lvl===state.supportLevel)return;state.supportLevel=lvl;scheduleSave();render();notify(lvl==='inicial'?'Apoio inicial ativado: dicas, pistas e exemplos visíveis.':lvl==='intermediario'?'Apoio intermediário: pistas sob demanda antes de exemplos.':'Modo autônomo: sem dicas automáticas, ideal para praticar sozinho.');return;}
   if(a==='field-hint'){fieldHintModal(btn.dataset.field);return;}
   if(a==='open-articles'){window.ScriptoriumNavegar?.('3');return;}
+  if(a==='open-library'){closeModal();window.ScriptoriumNavegar?.('1');return;}
+  if(a==='open-cite'){const el=R.getElementById(btn.dataset.target);if(el)openCitePicker(el);return;}
+  if(a==='pick-cite'||a==='pick-cite-note'){
+    const lib=window.ScriptoriumBiblioteca?.listar()||[];
+    const it=lib.find(x=>x.id===btn.dataset.libId);
+    if(it&&citeTargetEl){
+      const mode=R.getElementById('citeMode')?.value||'paren';
+      const pageInput=R.getElementById('citePage')?.value||'';
+      const note=a==='pick-cite-note'?(it.study_notes||[])[Number(btn.dataset.noteIdx)]:null;
+      const citeText=formatCiteForItem(it,mode,(note&&note.page)||pageInput);
+      closeModal();
+      insertAtCursor(citeTargetEl,citeText);
+      notify('✓ Citação inserida: '+citeText);
+    }
+    return;
+  }
+  if(a==='sync-abnt-refs'){
+    const rep=analyzeGuideCitations();
+    if(!rep.matched.length){notify(rep.libCount?'Nenhuma citação do Guia correspondeu às obras confirmadas na Biblioteca. Use /citar para inserir citações vinculadas.':'Adicione e confirme suas fontes na aba Biblioteca primeiro.');return;}
+    snapshot('Antes de gerar referências ABNT',state.active,'Cópia preventiva automática.');
+    markChanged(7);
+    state.values.sec_referencias=rep.abntText;
+    flush();render();
+    notify(`✓ ${rep.matched.length} referência(s) ABNT gerada(s) em ordem alfabética`+(rep.missing.length?` · ${rep.missing.length} citação(ões) sem fonte na Biblioteca`:'')+'.');
+    return;
+  }
+  if(a==='gen-in16'){
+    snapshot('Antes de gerar declaração IN 16/2026',state.active,'Cópia preventiva automática.');
+    markChanged(8);
+    state.values.registroIA_M12=buildIn16Declaration();
+    flush();render();
+    notify('✓ Declaração IN IFRS 16/2026 gerada a partir das suas decisões autorais e fontes.');
+    return;
+  }
+  if(a==='quick-ai-decision'){
+    const postura=R.getElementById('qAiPostura')?.value||'Adaptei';
+    const tool=plain(R.getElementById('qAiTool')?.value)||'Ferramenta de IA';
+    const why=plain(R.getElementById('qAiWhy')?.value);
+    if(!why){notify('Explique brevemente qual foi a sugestão e por que você tomou essa decisão.');return;}
+    state.records.aiUse=recs('aiUse');
+    state.records.aiUse.push({id:uid(),data:new Date().toISOString().slice(0,10),ferramenta:tool,finalidade:`Etapa ${state.active} (${STAGE_LABELS[state.active]})`,postura,prompt:'',conferencia:why});
+    flush();render();
+    notify(`✓ Decisão ("${postura}") registrada no M12 (Etapa 8).`);
+    return;
+  }
   if(a==='send-to-project'){const plan=buildGuidePlan();if(!plan.titulo&&!plan.pergunta){notify('Preencha pelo menos o tema ou a pergunta antes de levar o plano.');return;}window.ScriptoriumPonteGuia?.enviar(plan);return;}
   if(a==='tab'){state.tab=btn.dataset.tab;flush();render();return;}
   if(a==='jump'){state.active=Math.min(8,Math.max(1,Number(btn.dataset.stage)||1));state.tab='entender';flush();closeModal();render();R.getElementById('stageSheet')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
@@ -1333,7 +1536,14 @@ function actionHandler(btn){const a=btn.dataset.action;const rec=btn.dataset.rec
   if(a==='speak'){if(!('speechSynthesis'in window)){notify('Leitura em voz alta indisponível neste navegador.');return;}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(byStage(state.active).plainExplain);u.lang='pt-BR';speechSynthesis.speak(u);return;}
 }
 R.addEventListener('click',ev=>{const btn=ev.target.closest('[data-action]');if(btn){ev.preventDefault();actionHandler(btn);}else if(ev.target.id==='modalBackdrop')closeModal();});
-R.addEventListener('input',ev=>{const el=ev.target;if(el.dataset.field){markChanged(state.active);state.values[el.dataset.field]=el.value;scheduleSave();}
+R.addEventListener('input',ev=>{const el=ev.target;
+  if(el.tagName==='TEXTAREA'&&el.dataset.field!=='sec_referencias'&&/\/citar$/i.test(el.value.slice(0,el.selectionStart??el.value.length))){
+    const pos=el.selectionStart??el.value.length;
+    el.value=el.value.slice(0,pos-6)+el.value.slice(pos);
+    try{el.setSelectionRange(pos-6,pos-6);}catch(_){}
+    openCitePicker(el);
+  }
+  if(el.dataset.field){markChanged(state.active);state.values[el.dataset.field]=el.value;scheduleSave();}
   else if(el.dataset.rec){const obj=recs(el.dataset.rec).find(r=>r.id===el.dataset.item);if(obj){markChanged(state.active);obj[el.dataset.key]=el.value;scheduleSave();}}
   else if(el.dataset.matrix){if(!state.records.methodLinks||Array.isArray(state.records.methodLinks))state.records.methodLinks={};if(!state.records.methodLinks[el.dataset.matrix])state.records.methodLinks[el.dataset.matrix]={};markChanged(state.active);state.records.methodLinks[el.dataset.matrix][el.dataset.matrixKey]=el.value;scheduleSave();}
   else if(el.dataset.evidence){state.evidence[el.dataset.evidence]=el.value;scheduleSave();}
@@ -1402,6 +1612,7 @@ load();applyMode();if(!lastKnownWrite&&!savingError)persist();render();
 window.ScriptoriumGuiaResumo=buildGuidePlan;
 const CONTA=window.ScriptoriumConta;if(CONTA){NUVEM.conta(CONTA.usuario());CONTA.aoMudar(u=>{NUVEM.conta(u);renderProjectBridge();});}
 window.ScriptoriumProjetos?.aoMudar(()=>renderProjectBridge());
+window.ScriptoriumBiblioteca?.aoMudar(()=>{if(state.active===7&&state.tab==='preencher')render();});
 
 }
 window.ScriptoriumGuia={montar};
