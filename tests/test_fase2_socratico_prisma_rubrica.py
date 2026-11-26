@@ -151,7 +151,12 @@ class Fase2BackendTests(unittest.TestCase):
         self.assertIn("openRubricModal", guia_js)
         self.assertIn("RUBRIC_DIMS", guia_js)
         self.assertIn("modo_pedagogico", guia_js)
+        self.assertIn("ScriptoriumGuiaAcoes", guia_js)
+        self.assertIn("adicionarLeituraM4", app_js)
+        self.assertIn("inserirResumoPrisma", app_js)
         self.assertNotIn("—", guia_js)
+        rep_doc = (ROOT / "docs" / "REPLICABILIDADE-PTT.md").read_text(encoding="utf-8")
+        self.assertIn("v1.1-piloto", rep_doc)
 
 
 if __name__ == "__main__":
