@@ -543,6 +543,17 @@ h4 { font-size: 0.96rem; font-weight: 700; margin-bottom: 6px; color: var(--text
   justify-content: flex-end;
 }
 .modal-scroll { max-height: 54vh; overflow: auto; padding-right: 4px; }
+.flow-map { display: flex; flex-direction: column; gap: 6px; }
+.flow-node { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-main, #D8E3F0); background: var(--bg-subtle, #EFF4FA); }
+.flow-node.ok { border-left: 4px solid var(--mpie-blue, #1466B8); background: var(--ok-bg, #E8F2FC); }
+.flow-node.partial { border-left: 4px solid var(--mpie-gold, #F4B93B); background: var(--warn-bg, #FFFBEB); }
+.flow-node.pending { border-left: 4px solid var(--border-main, #D8E3F0); }
+.flow-arrow { text-align: center; font-size: 0.85rem; color: var(--text-muted, #5F748E); line-height: 1; }
+.rubric-dim { border: 1px solid var(--border-main, #D8E3F0); border-radius: 12px; padding: 12px 14px; background: var(--bg-surface, #FFFFFF); margin-bottom: 10px; }
+.rubric-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.rubric-opt { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: 1px solid var(--border-main, #D8E3F0); border-radius: 9px; background: var(--bg-subtle, #EFF4FA); cursor: pointer; font-size: 0.84rem; line-height: 1.4; }
+.rubric-opt.picked { border-color: var(--mpie-blue, #1466B8); background: var(--ok-bg, #E8F2FC); font-weight: 600; }
+@media (max-width: 680px) { .rubric-opts { grid-template-columns: 1fr; } }
 
 #toast {
   position: fixed;
@@ -638,6 +649,8 @@ const MARKUP=`
       <summary aria-expanded="false">Mais ferramentas (dicionário, exemplos, versões e tamanho da letra) ▾</summary>
       <div class="tools-menu-grid">
         <button type="button" class="btn sm" data-action="audit">Conferir coerência</button>
+        <button type="button" class="btn sm" data-action="flow-map">Mapa visual do projeto</button>
+        <button type="button" class="btn sm" data-action="rubric">Autoavaliação (Rubrica 0 a 15)</button>
         <button type="button" class="btn sm" data-action="examples">Ver exemplos prontos</button>
         <button type="button" class="btn sm" data-action="glossary">Dicionário de termos</button>
         <button type="button" class="btn sm" data-action="versions">Versões salvas</button>
@@ -653,7 +666,10 @@ const MARKUP=`
         <div class="eyebrow">Fio condutor do seu texto</div>
         <div class="small muted">Clique em qualquer ponto para ir direto à etapa correspondente.</div>
       </div>
-      <button type="button" class="btn sm" data-action="audit">Conferir coerência</button>
+      <div class="flex" style="gap:6px">
+        <button type="button" class="btn sm" data-action="flow-map">Mapa visual</button>
+        <button type="button" class="btn sm" data-action="audit">Conferir coerência</button>
+      </div>
     </div>
     <nav id="chain" class="chain-links" aria-label="Etapas do fio condutor"></nav>
   </section>
@@ -1028,11 +1044,11 @@ const plain=s=>String(s??'').trim();
 const val=k=>plain(state.values[k]);
 const isFilled=k=>Boolean(val(k));
 const copy=o=>JSON.parse(JSON.stringify(o));
-function emptyState(){return {schema:2,tipo:'artigo',active:1,tab:'entender',theme:'light',font:1,supportLevel:'inicial',values:{},records:{},criteria:{},evidence:{},decisions:{},reviews:{},versions:[],changedAt:Date.now(),startedAt:Date.now()};}
+function emptyState(){return {schema:2,tipo:'artigo',active:1,tab:'entender',theme:'light',font:1,supportLevel:'inicial',values:{},records:{},criteria:{},evidence:{},decisions:{},rubricSelf:{scores:{},qMethod:'',qLimit:'',updatedAt:''},reviews:{},versions:[],changedAt:Date.now(),startedAt:Date.now()};}
 let state=emptyState(), saveTimer=null, savingError=false, writeConflict=false, lastKnownWrite=0, toastTimer=null, lastModalFocus=null, lastAutosnap=0;
 function load(){try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){const got=JSON.parse(raw);if(got&&got.schema===2&&got.values&&got.records){state={...emptyState(),...got};lastKnownWrite=state.changedAt||0;return;}}}catch(e){savingError=true;}
   try{const old=localStorage.getItem(OLD_KEY);if(old){const orig=JSON.parse(old);state.values={...orig.values};state.criteria={...orig.checks};state.active=Math.min(8,Math.max(1,Number(orig.activeStage)||1));state.tab=orig.subTab||'entender';state.theme=orig.theme||'light';state.font=orig.fontScale||1;state.versions.push({id:uid(),label:'Migração de campos antigos',date:dateNow(),stage:0,snapshot:snap(),note:'Migração preliminar dos campos da versão 1, mantendo os dados originais intactos. Revise os novos modelos estruturados.'});persist();}}catch(e){/* usuário poderá usar importação manual */}}
-function snap(){return copy({values:state.values,records:state.records,criteria:state.criteria,evidence:state.evidence,decisions:state.decisions||{},reviews:state.reviews});}
+function snap(){return copy({values:state.values,records:state.records,criteria:state.criteria,evidence:state.evidence,decisions:state.decisions||{},rubricSelf:state.rubricSelf||{},reviews:state.reviews});}
 function snapshot(label='Cópia manual',stage=state.active,note=''){state.versions.push({id:uid(),label,date:dateNow(),stage,note,snapshot:snap()});if(state.versions.length>MAX_VERSIONS)state.versions=state.versions.slice(-MAX_VERSIONS);return state.versions[state.versions.length-1];}
 function persist(){try{const stored=localStorage.getItem(STORAGE_KEY);if(stored){const x=JSON.parse(stored);if(x.changedAt>lastKnownWrite){writeConflict=true;savingError=true;updateStatus();return false;}}if(writeConflict){savingError=true;updateStatus();return false;}state.changedAt=Date.now();localStorage.setItem(STORAGE_KEY,JSON.stringify(state));lastKnownWrite=state.changedAt;savingError=false;if(NUVEM)NUVEM.agendar();updateStatus();return true;}catch(e){savingError=true;updateStatus();return false;}}
 function scheduleSave(){const s=R.getElementById('saveStatus');if(s)s.textContent='● Alterações locais ainda não gravadas…';clearTimeout(saveTimer);saveTimer=setTimeout(persist,320);}
@@ -1188,7 +1204,8 @@ function renderPreencher(s){let body='';if(s.id===3){body=renderRepeat('searchBl
   else if(s.id===7)body=renderStandard(s)+renderRepeat('timeline');
   else if(s.id===8)body=renderM9()+renderStandard(s)+renderRepeat('aiUse')+presentation();
   else body=renderStandard(s);
-  return `<div class="section-max section-gap"><div class="notice"><strong>Escreva no seu tempo:</strong> tudo o que você digita fica salvo automaticamente. Você pode sair e voltar depois sem perder nada.</div>${renderLegacy(s)}${body}<div class="action-footer"><button type="button" class="btn" data-action="examples">Ver exemplos prontos</button><button type="button" class="btn primary" data-action="tab" data-tab="conferir">Revisar e avançar →</button></div></div>`;}
+  const socraticCue=(supportLevel()==='inicial'&&s.guidingQuestions?.length)?`<div style="margin-top:6px"><strong>Pergunta socrática para guiar esta etapa:</strong> ${esc(s.guidingQuestions[0])}</div>`:'';
+  return `<div class="section-max section-gap"><div class="notice"><strong>Escreva no seu tempo:</strong> tudo o que você digita fica salvo automaticamente. Você pode sair e voltar depois sem perder nada.${socraticCue}</div>${renderLegacy(s)}${body}<div class="action-footer"><button type="button" class="btn" data-action="examples">Ver exemplos prontos</button><button type="button" class="btn primary" data-action="tab" data-tab="conferir">Revisar e avançar →</button></div></div>`;}
 function renderConferir(s){const p=info(s.id);const items=s.criteria.map((c,i)=>{const k=`${s.id}:${i}`;return `<div class="check-card"><input type="checkbox" id="check-${s.id}-${i}" data-check="${esc(k)}" ${state.criteria[k]?'checked':''}><div><label for="check-${s.id}-${i}">${esc(c)}</label><textarea class="check-note" rows="2" data-evidence="${esc(k)}" aria-label="Anotação para o critério ${i+1}" placeholder="Anotação opcional (o que já está pronto ou o que falta revisar)…">${esc(state.evidence[k]||'')}</textarea></div></div>`;}).join('');
 const rev=state.reviews[s.id];const dec=(state.decisions||{})[s.id]||'';return `<div class="section-max section-gap"><div class="card warning"><span class="eyebrow">Revisão pessoal desta etapa</span><p class="small" style="margin:6px 0">Marque cada item abaixo quando sentir que ele está bem resolvido no seu texto. Você pode avançar e voltar quando quiser.</p><div class="status-steps">${['Em andamento','Preenchida','Conferida','Revisão da orientação'].map((q,i)=>`<span class="status-step ${(i===0&&p.count>0)||(i===1&&p.complete)||(i===2&&p.complete&&p.allChecked)||(i===3&&rev&&rev.result==='revisado')?'on':''}">${q}</span>`).join('')}</div></div><h3>Lista de conferência</h3><div class="small muted">Preenchido: ${p.count} de ${p.max} blocos · Marcados: ${s.criteria.filter((_,i)=>state.criteria[`${s.id}:${i}`]).length} de ${s.criteria.length}</div>${items}<div class="card white"><span class="eyebrow">Aprendizagem visível (opcional)</span><h3 style="margin-top:4px">Por que tomei estas decisões nesta etapa?</h3><p class="small muted">Explique em 2 ou 3 linhas por que escolheu este recorte, autor ou método. Isso fortalece sua autoria e ajuda na reunião de orientação e na banca.</p><textarea class="form-control" rows="3" data-decision="${s.id}" aria-label="Justificativa das decisões da etapa ${s.id}" placeholder="Ex.: escolhi este método porque permite acompanhar a turma real durante um semestre…">${esc(dec)}</textarea><details style="margin-top:12px"><summary class="small bold" style="cursor:pointer">Registrar decisão sobre sugestão de IA nesta etapa (Aceitei / Adaptei / Rejeitei) ▾</summary><div style="margin-top:10px;display:flex;flex-direction:column;gap:8px"><div class="flex"><select id="qAiPostura" class="form-control" style="max-width:200px"><option value="Adaptei">Adaptei a sugestão</option><option value="Aceitei">Aceitei a sugestão</option><option value="Rejeitei">Rejeitei a sugestão</option></select><input id="qAiTool" class="form-control" style="flex:1;min-width:180px" placeholder="Ferramenta (ex.: ChatGPT, Gemini, Scriptorium)"></div><textarea id="qAiWhy" rows="2" class="form-control" placeholder="Qual foi a sugestão e por que você decidiu aceitar, adaptar ou rejeitar?"></textarea><div class="flex"><button type="button" class="btn sm primary" data-action="quick-ai-decision">Salvar decisão no registro M12</button><span class="tiny muted">Alimenta automaticamente a Declaração IN IFRS 16/2026 (Etapa 8).</span></div></div></details></div><div class="card white"><h3>Comentário da orientação (opcional)</h3>${rev?.stale?'<div class="notice" style="margin-bottom:10px">Você editou esta etapa depois do último parecer registrado.</div>':''}<p class="small">${rev?'Último registro: '+esc(rev.reviewer)+' · '+esc(rev.date)+': '+esc(rev.comment):'Nenhum comentário registrado ainda.'}</p><button type="button" class="btn sm" data-action="review">Registrar comentário recebido</button></div><div class="action-footer"><button type="button" class="btn" data-action="snapshot">Guardar uma versão</button><div class="flex"><button type="button" class="btn" data-action="jump" data-stage="${Math.max(1,s.id-1)}" ${s.id===1?'disabled':''}>← Etapa anterior</button><button type="button" class="btn primary" data-action="jump" data-stage="${Math.min(8,s.id+1)}">${s.id===8?'Concluir revisão':'Ir para a Etapa '+Math.min(8,s.id+1)+' →'}</button></div></div></div>`;}
 function buildGuidePlan(){
@@ -1202,7 +1219,8 @@ function buildGuidePlan(){
     val('estrategia')&&('Estratégia metodológica: '+val('estrategia')),
   ].filter(Boolean);
   const tipo=isArticle()?'artigo':'dissertacao';
-  return {titulo,pergunta:parts.join('\n\n'),tipo,modelo:tipo==='dissertacao'?'abnt-dissertacao':'abnt-artigo'};
+  const pedMap={inicial:'tutor_socratico',intermediario:'intermediario',autonomo:'autonomo'};
+  return {titulo,pergunta:parts.join('\n\n'),tipo,modelo:tipo==='dissertacao'?'abnt-dissertacao':'abnt-artigo',modo_pedagogico:pedMap[supportLevel()]||'tutor_socratico'};
 }
 function renderProjectBridge(){
   const box=R.getElementById('projectBridge');if(!box)return;
@@ -1282,6 +1300,106 @@ function audit(){const arr=[];const put=(lvl,title,text,step)=>arr.push({lvl,tit
   return arr;}
 function auditHTML(){const list=audit();const high=list.filter(x=>x.lvl==='high').length;return `<div class="card warning"><strong>${high} pendência(s) estruturais de maior prioridade</strong><p class="small muted">Estas verificações analisam presença e padrões simples de texto. Não são uma avaliação semântica da pesquisa e não utilizam IA neste arquivo.</p></div><ul class="audit-list">${list.map(a=>`<li class="${a.lvl}"><strong>${esc(a.title)} ${badge('Etapa '+a.step)}</strong>${esc(a.text)} <button type="button" class="btn sm" data-action="jump" data-stage="${a.step}">Ir para etapa</button></li>`).join('')}</ul>`;}
 function openAudit(){modal('Conferência de coerência: indicadores locais',`<div class="modal-scroll">${auditHTML()}</div>`,`<button type="button" class="btn" data-action="close-modal">Fechar</button>`);}
+const RUBRIC_DIMS=[
+  {key:'problema',title:'1. Problema e Pergunta',levels:[
+    '0 · Ausente ou não investigável.',
+    '1 · Tema amplo; pergunta pouco definida ou binária.',
+    '2 · Pergunta investigável com delimitação parcial.',
+    '3 · Pergunta clara, delimitada e viável no contexto.'
+  ]},
+  {key:'objetivos',title:'2. Objetivos',levels:[
+    '0 · Ausentes ou desconectados.',
+    '1 · Relação vaga com a pergunta; confusão com tarefas.',
+    '2 · Maioria coerente; uma lacuna relevante.',
+    '3 · Conjunto coerente e suficiente para responder à pergunta.'
+  ]},
+  {key:'metodo',title:'3. Método',levels:[
+    '0 · Não permite responder à pergunta.',
+    '1 · Nomeia técnicas sem explicar sua articulação.',
+    '2 · Dados e procedimentos adequados, com lacunas.',
+    '3 · Articula dados, participantes/contexto, análise e explicita limites.'
+  ]},
+  {key:'evidencias',title:'4. Uso de Evidências',levels:[
+    '0 · Afirmações centrais sem suporte.',
+    '1 · Fontes citadas sem relação clara com o argumento.',
+    '2 · Suporte pertinente com interpretação parcial.',
+    '3 · Relaciona afirmação e fonte, reconhecendo limites e divergências.'
+  ]},
+  {key:'justificativa',title:'5. Justificação Autoral',levels:[
+    '0 · Não explica decisões tomadas.',
+    '1 · Repete fórmulas genéricas sem ligação ao caso.',
+    '2 · Explica escolhas, considerando poucas alternativas.',
+    '3 · Compara alternativas e defende escolhas coerentes com o problema.'
+  ]}
+];
+function rubricTotal(rs){const sc=(rs&&rs.scores)||{};return RUBRIC_DIMS.reduce((a,d)=>a+(Number.isFinite(Number(sc[d.key]))?Number(sc[d.key]):0),0);}
+function rubricAnswered(rs){const sc=(rs&&rs.scores)||{};return RUBRIC_DIMS.filter(d=>sc[d.key]!==undefined&&sc[d.key]!==null&&sc[d.key]!=='').length;}
+function openFlowMapModal(){
+  const obs=recs('objectives').filter(o=>plain(o.texto));
+  const mLinks=state.records.methodLinks||{};
+  const m8Done=obs.filter(o=>{const x=mLinks[o.id]||{};return plain(x.dados)&&plain(x.instrumento)&&plain(x.analise);}).length;
+  const citeRep=analyzeGuideCitations();
+  const lib=window.ScriptoriumBiblioteca?.listar()||[];
+  const libInc=lib.filter(i=>i.reading_status==='incluido').length;
+  const nodes=[
+    {step:2,title:'Problema e Delimitação',st:isFilled('problema')&&isFilled('delimitacao')?'ok':(isFilled('problema')?'partial':'pending'),
+      detail:isFilled('problema')?val('problema').slice(0,110)+(val('problema').length>110?'…':''):'Ainda não preenchido.'},
+    {step:2,title:'Questão de Pesquisa',st:isFilled('pergunta')?'ok':'pending',
+      detail:isFilled('pergunta')?val('pergunta').slice(0,110)+(val('pergunta').length>110?'…':''):'Defina uma pergunta única e investigável.'},
+    {step:3,title:'Revisão, Referencial e Biblioteca',st:(isFilled('m5_lacuna')&&recs('theories').length>=2)?'ok':((isFilled('m5_lacuna')||lib.length>0)?'partial':'pending'),
+      detail:`${recs('readings').length} leitura(s) M4 · ${recs('theories').length} eixo(s) M6 · Biblioteca: ${lib.length} fonte(s) (${libInc} incluída(s), ${citeRep.matched.length} citada(s) no Guia).`},
+    {step:4,title:'Objetivos (Geral e Específicos)',st:(isFilled('objetivoGeral')&&obs.length>=3)?'ok':((isFilled('objetivoGeral')||obs.length>0)?'partial':'pending'),
+      detail:`Objetivo geral ${isFilled('objetivoGeral')?'preenchido':'pendente'} · ${obs.length} objetivo(s) específico(s) registrado(s).`},
+    {step:5,title:'Metodologia e Matriz M8',st:(isFilled('estrategia')&&obs.length>0&&m8Done===obs.length)?'ok':((isFilled('estrategia')||m8Done>0)?'partial':'pending'),
+      detail:`Estratégia: ${val('estrategia')||'pendente'} · Matriz M8: ${m8Done} de ${obs.length} objetivo(s) articulado(s) com dados, instrumento e análise.`},
+    {step:6,title:isArticle()?'Resultados e Discussão':'Produto Técnico-Tecnológico (PTT)',st:(isArticle()?isFilled('resultadosPorObjetivo'):(isFilled('tipoProduto')&&isFilled('pttAvaliacao')))?'ok':((isFilled('tipoProduto')||isFilled('resultadosPorObjetivo'))?'partial':'pending'),
+      detail:isArticle()?(val('resultadosPorObjetivo')||'Organize resultados por objetivo.'):(val('tipoProduto')||'Descreva tipo, demanda e avaliação do PTT.')},
+    {step:8,title:'Referências ABNT e Declaração IN 16/2026',st:(isFilled('sec_referencias')&&(recs('aiUse').length>0||isFilled('registroIA_M12')))?'ok':((isFilled('sec_referencias')||isFilled('registroIA_M12'))?'partial':'pending'),
+      detail:`Citações sem fonte na Biblioteca: ${citeRep.missing.length} · Registros M12: ${recs('aiUse').length} · Autoavaliação: ${rubricAnswered(state.rubricSelf)?rubricTotal(state.rubricSelf)+'/15':'pendente'}.`},
+  ];
+  const labels={ok:'✓ Conectado',partial:'◐ Parcial',pending:'○ Pendente'};
+  const html=`<p class="small muted">Mapa vivo calculado da mesma base do seu Guia e da sua Biblioteca. Clique em qualquer etapa para ajustar.</p>
+    <div class="flow-map modal-scroll">${nodes.map((n,idx)=>`<div class="flow-node ${n.st}">
+      <div><div class="flex" style="gap:6px"><strong>${esc(n.title)}</strong><span class="pill ${n.st==='ok'?'good':n.st==='partial'?'gold':''}">${labels[n.st]}</span></div>
+      <div class="tiny muted" style="margin-top:4px">${esc(n.detail)}</div></div>
+      <button type="button" class="btn sm" data-action="jump" data-stage="${n.step}">Etapa ${n.step}</button>
+    </div>${idx<nodes.length-1?'<div class="flow-arrow" aria-hidden="true">↓</div>':''}`).join('')}</div>`;
+  modal('Mapa visual do fio condutor',html,`<button type="button" class="btn" data-action="audit">Ver pendências</button><button type="button" class="btn primary" data-action="close-modal">Fechar</button>`);
+}
+function openRubricModal(){
+  const rs=state.rubricSelf||{scores:{},qMethod:'',qLimit:''};
+  const sc=rs.scores||{};
+  const total=rubricTotal(rs);
+  const body=`<p class="small muted">Avalie seu próprio pré-projeto sem IA nos 5 critérios conceituais (0 a 15 pontos). A fluência superficial não substitui coerência entre problema, método e evidências.</p>
+    <div class="notice" style="margin-bottom:12px"><strong>Pontuação atual da autoavaliação:</strong> <span id="rubricLiveTotal">${total}</span> / 15 pontos</div>
+    <div class="modal-scroll">
+      ${RUBRIC_DIMS.map(d=>`<div class="rubric-dim"><strong>${esc(d.title)}</strong>
+        <div class="rubric-opts">${d.levels.map((lbl,score)=>{
+          const checked=Number(sc[d.key])===score&&sc[d.key]!==undefined&&sc[d.key]!=='';
+          return `<label class="rubric-opt ${checked?'picked':''}"><input type="radio" name="rub_${d.key}" value="${score}" ${checked?'checked':''} data-rubric-dim="${d.key}"><span>${esc(lbl)}</span></label>`;
+        }).join('')}</div></div>`).join('')}
+      <div class="card white" style="margin-top:10px">
+        <h4>Perguntas de justificativa autoral (Apêndice A)</h4>
+        <div class="field" style="margin-top:8px"><label for="rubQMethod">1. Por que o método escolhido responde adequadamente à sua pergunta de pesquisa?</label><textarea id="rubQMethod" rows="2">${esc(rs.qMethod||'')}</textarea></div>
+        <div class="field" style="margin-top:8px"><label for="rubQLimit">2. Que limitação das evidências utilizadas poderia alterar ou restringir suas conclusões?</label><textarea id="rubQLimit" rows="2">${esc(rs.qLimit||'')}</textarea></div>
+      </div>
+    </div>`;
+  modal('Autoavaliação conceitual (Rubrica 0 a 15)',body,`<button type="button" class="btn" data-action="close-modal">Cancelar</button><button type="button" class="btn primary" data-action="save-rubric">Salvar autoavaliação</button>`);
+  R.querySelectorAll('[data-rubric-dim]').forEach(inp=>inp.addEventListener('change',()=>{
+    const group=inp.closest('.rubric-opts');
+    group?.querySelectorAll('.rubric-opt').forEach(l=>l.classList.toggle('picked',l.querySelector('input')?.checked));
+    let sum=0;
+    for(const d of RUBRIC_DIMS){const c=R.querySelector(`input[name="rub_${d.key}"]:checked`);if(c)sum+=Number(c.value)||0;}
+    const tEl=R.getElementById('rubricLiveTotal');if(tEl)tEl.textContent=String(sum);
+  }));
+}
+function rubricExportHTML(){
+  const rs=state.rubricSelf;
+  if(!rs||(!rubricAnswered(rs)&&!plain(rs.qMethod)&&!plain(rs.qLimit)))return '';
+  const sc=rs.scores||{};
+  const rows=RUBRIC_DIMS.map(d=>`<li><strong>${esc(d.title)}:</strong> ${sc[d.key]!==undefined?esc(sc[d.key])+' / 3':'não marcado'}</li>`).join('');
+  return `<h2>Autoavaliação conceitual (Rubrica 0 a 15)</h2><p class="print-p"><strong>Pontuação total:</strong> ${rubricTotal(rs)} / 15${rs.updatedAt?' · registrada em '+esc(rs.updatedAt):''}</p><ul>${rows}</ul>`+(plain(rs.qMethod)?`<p class="print-p"><strong>Justificativa do método:</strong> ${htmlLines(rs.qMethod)}</p>`:'')+(plain(rs.qLimit)?`<p class="print-p"><strong>Limitação das evidências:</strong> ${htmlLines(rs.qLimit)}</p>`:'');
+}
 function glossaryModal(){const entries=[...EXTRA_GLOSSARY];modal('Dicionário de pesquisa',`<p class="small muted">Definições resumidas para orientar a leitura; consulte a literatura especializada para fundamentação.</p><div class="modal-scroll">${entries.map(([term,def])=>`<div class="card white" style="margin:8px 0"><strong>${esc(term)}</strong><p class="small" style="margin:6px 0 0">${esc(def)}</p></div>`).join('')}</div>`,`<button type="button" class="btn" data-action="close-modal">Fechar</button>`);}
 function helpModal(){modal('Como usar o guia',`<div class="section-gap"><p>O guia organiza a construção de um artigo (ou de um projeto de pesquisa) em oito etapas, sempre com <strong>Entender → Escrever → Conferir</strong>.</p><ol class="helper-list"><li>Comece pela preparação (Etapa 1) e avance até a validação final (Etapa 8).</li><li>Volte a qualquer etapa quando uma nova leitura alterar suas decisões.</li><li>Preencha modelos M1–M12; na Etapa 3, cada busca e cada trabalho têm um registro próprio.</li><li>Use “Conferir relações” para localizar possíveis omissões estruturais, sem presumir aprovação científica.</li><li>Escolha no topo se está construindo um artigo ou um projeto de pesquisa: as etapas 6 a 8 mudam conforme o tipo.</li><li>Use “Versões salvas” para criar cópias recuperáveis; mantenha também backups JSON em lugar seguro.</li><li>Na exportação, gere síntese, projeto ou memorial; use o navegador para imprimir/salvar em PDF.</li></ol><div class="notice"><strong>Limites:</strong> o guia não usa IA; com login no Scriptorium, fica salvo na sua conta; sem login, só neste navegador. Adapte sempre as normas às exigências do seu curso ou programa (como o MPIE / IFRS Campus Porto Alegre). M9 e M12 são sínteses adaptadas para apoiar a organização da pesquisa.</div><p class="small muted">Dados locais podem ser perdidos ao limpar o armazenamento, mudar de dispositivo ou usar navegação privativa. A interface nunca substitui orientação, CEP ou banca.</p></div>`,`<button type="button" class="btn primary" data-action="close-modal">Entendi</button>`);}
 function examplesModal(){modal('Exemplos prontos (sem apagar o que você escreveu)',`<p>Os exemplos originais da disciplina servem apenas como referência. Você pode consultar cada campo sem inseri-los no seu texto.</p><p class="small">Se quiser testar uma demonstração, o botão abaixo preenche <strong>somente campos vazios</strong>, preserva tudo o que você já escreveu e cria uma versão recuperável.</p><div class="card warning"><strong>Aviso:</strong> exemplos ilustrativos não devem ser usados como evidências científicas ou dados reais.</div>`,`<button type="button" class="btn" data-action="close-modal">Fechar</button><button type="button" class="btn primary" data-action="fill-examples">Inserir apenas nos campos vazios</button>`);}
@@ -1440,7 +1558,7 @@ function openCitePicker(targetEl){
   R.getElementById('citeSearch')?.focus();
 }
 function exportContent(kind){let result=`<div class="small">Scriptorium MPIE · Guia de escrita · Gerado em ${esc(dateNow())}</div><h1>${kind==='resumo'?'Resumo para a orientação: M6, M9 e M10':kind==='projeto'?(isArticle()?'Artigo: versão de trabalho':'Projeto de pesquisa: versão de trabalho'):'Memorial formativo de decisões'}</h1><p class="small">Conteúdo autoral registrado no guia. Campos não preenchidos são indicados. Revisão acadêmica não substituída.</p>`;
-  if(kind==='resumo'){const decs=STAGES.map(s=>(state.decisions||{})[s.id]?`<p class="print-p"><strong>Etapa ${s.id} (${esc(STAGE_LABELS[s.id])}):</strong> ${htmlLines(state.decisions[s.id])}</p>`:'').filter(Boolean).join('');result+=`<h2>Quadro 1: Referencial (M6)</h2>`+recs('theories').map((x,i)=>`<p class="print-p">${i+1}. ${esc(x.conceito)}: ${esc(x.autor)} · ${esc(x.aspecto)}</p>`).join('')+`<h2>Quadro 2: Projeto (M9, síntese adaptada)</h2>`+m9HTML()+(isArticle()?`<h2>Resultados e discussão</h2>`:`<h2>Quadro 3: Produto (M10)</h2>`)+byStage(6).fields.map(readableField).join('')+(decs?`<h2>Justificativas metodológicas do estudante</h2>`+decs:'')+`<h2>Declaração de uso ético de IA (IN IFRS 16/2026)</h2><div class="print-p">${htmlLines(val('registroIA_M12')||buildIn16Declaration())}</div>`+`<h2>Roteiro de apresentação</h2>`+presentation();return result;}
+  if(kind==='resumo'){const decs=STAGES.map(s=>(state.decisions||{})[s.id]?`<p class="print-p"><strong>Etapa ${s.id} (${esc(STAGE_LABELS[s.id])}):</strong> ${htmlLines(state.decisions[s.id])}</p>`:'').filter(Boolean).join('');result+=`<h2>Quadro 1: Referencial (M6)</h2>`+recs('theories').map((x,i)=>`<p class="print-p">${i+1}. ${esc(x.conceito)}: ${esc(x.autor)} · ${esc(x.aspecto)}</p>`).join('')+`<h2>Quadro 2: Projeto (M9, síntese adaptada)</h2>`+m9HTML()+(isArticle()?`<h2>Resultados e discussão</h2>`:`<h2>Quadro 3: Produto (M10)</h2>`)+byStage(6).fields.map(readableField).join('')+(decs?`<h2>Justificativas metodológicas do estudante</h2>`+decs:'')+rubricExportHTML()+`<h2>Declaração de uso ético de IA (IN IFRS 16/2026)</h2><div class="print-p">${htmlLines(val('registroIA_M12')||buildIn16Declaration())}</div>`+`<h2>Roteiro de apresentação</h2>`+presentation();return result;}
   if(kind==='projeto'&&isArticle()){const sections=[['Título','tituloFinal'],['Resumo','sec_resumo'],['Palavras-chave','palavrasChave'],['Introdução','sec_introducao'],['Revisão de literatura','sec_revisao'],['Referencial teórico','sec_referencial'],['Metodologia','sec_metodologia'],['Resultados','sec_resultados'],['Discussão','sec_discussao'],['Considerações finais','sec_conclusao'],['Referências','sec_referencias']];result+=`<p class="small">Revista-alvo: ${esc(val('revistaAlvo')||'não definida')}</p>`+sections.map(([name,key])=>`<section><h2>${esc(name)}</h2><div class="print-p">${htmlLines(val(key)||'[Não preenchido]')}</div></section>`).join('');return result;}
   if(kind==='projeto'){result+=`<h2>Identificação</h2>`+byStage(1).fields.map(readableField).join('');const sections=[['Título','tituloFinal'],['Introdução','sec_introducao'],['Revisão de literatura','sec_revisao'],['Justificativa','sec_justificativa'],['Objetivos','sec_objetivos'],['Referencial teórico','sec_referencial'],['Metodologia','sec_metodologia'],['Produto técnico-tecnológico','sec_produto'],['Referências','sec_referencias']];result+=sections.map(([name,key])=>`<section><h2>${esc(name)}</h2><div class="print-p">${htmlLines(val(key)||'[Não preenchido]')}</div></section>`).join('')+recordPrint('timeline');return result;}
   for(const s of STAGES){result+=`<section><h2>Etapa ${s.id}: ${esc(s.title)}</h2><p class="small">Estado: ${esc(info(s.id).label)}. Modelos: ${esc(s.models)}.</p>`+s.fields.map(readableField).join('');for(const [key,c] of Object.entries(REPEAT))if(c.stage===s.id)result+=recordPrint(key);if(s.id===5){const obs=recs('objectives');result+='<h2>M8 · Matriz metodológica</h2>'+obs.map(o=>`<div class="print-box"><h3>${esc(o.texto)}</h3>${Object.entries((state.records.methodLinks||{})[o.id]||{}).map(([key,v])=>`<p><strong>${esc(key)}:</strong> ${htmlLines(v)}</p>`).join('')}</div>`).join('');}if(s.id===8)result+=m9HTML();}
@@ -1512,7 +1630,15 @@ function actionHandler(btn){const a=btn.dataset.action;const rec=btn.dataset.rec
   if(a==='send-to-project'){const plan=buildGuidePlan();if(!plan.titulo&&!plan.pergunta){notify('Preencha pelo menos o tema ou a pergunta antes de levar o plano.');return;}window.ScriptoriumPonteGuia?.enviar(plan);return;}
   if(a==='tab'){state.tab=btn.dataset.tab;flush();render();return;}
   if(a==='jump'){state.active=Math.min(8,Math.max(1,Number(btn.dataset.stage)||1));state.tab='entender';flush();closeModal();render();R.getElementById('stageSheet')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
-  if(a==='glossary'){glossaryModal();return;}if(a==='help'){helpModal();return;}if(a==='examples'){examplesModal();return;}if(a==='versions'){versionModal();return;}if(a==='audit'){openAudit();return;}if(a==='export'){exportModal();return;}if(a==='backup'){backupModal();return;}if(a==='settings'){settingsModal();return;}
+  if(a==='glossary'){glossaryModal();return;}if(a==='help'){helpModal();return;}if(a==='examples'){examplesModal();return;}if(a==='versions'){versionModal();return;}if(a==='audit'){openAudit();return;}if(a==='flow-map'){openFlowMapModal();return;}if(a==='rubric'){openRubricModal();return;}if(a==='export'){exportModal();return;}if(a==='backup'){backupModal();return;}if(a==='settings'){settingsModal();return;}
+  if(a==='save-rubric'){
+    const scores={};
+    for(const d of RUBRIC_DIMS){const c=R.querySelector(`input[name="rub_${d.key}"]:checked`);if(c)scores[d.key]=Number(c.value);}
+    state.rubricSelf={scores,qMethod:plain(R.getElementById('rubQMethod')?.value),qLimit:plain(R.getElementById('rubQLimit')?.value),updatedAt:dateNow()};
+    flush();closeModal();render();
+    notify(`✓ Autoavaliação salva (${rubricTotal(state.rubricSelf)} / 15 pontos).`);
+    return;
+  }
   if(a==='close-modal'){closeModal();return;}if(a==='do-confirm'){const fn=pendingConfirm;pendingConfirm=null;if(fn)fn();return;}
   if(a==='field-example'){fieldExampleModal(btn.dataset.field);return;}
   if(a==='insert-example'){const f=STAGES.flatMap(s=>s.fields).find(f=>f.key===btn.dataset.field);if(!f||!f.example)return;const fill=()=>{snapshot('Antes de inserir exemplo',state.active,'Cópia preventiva.');markChanged(state.active);state.values[f.key]=f.example;flush();closeModal();render();notify('Exemplo inserido. Revise o texto antes de utilizá-lo.');};if(isFilled(f.key))askConfirm('Confirmar substituição','O campo já contém texto. Substituí-lo pelo exemplo? Uma versão será preservada antes da alteração.','Substituir campo',fill,true);else fill();return;}

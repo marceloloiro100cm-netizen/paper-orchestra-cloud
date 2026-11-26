@@ -163,7 +163,7 @@ class Store:
         return job_id
 
     def create_project(self, uid: str, title: str, question: str, ids: list[str], language: str,
-                       template: str, tipo: str = "artigo") -> dict:
+                       template: str, tipo: str = "artigo", pedagogical_mode: str = "tutor_socratico") -> dict:
         ids = list(dict.fromkeys(ids or []))
         if not 3 <= len((title or "").strip()) <= 120:
             raise Falha("O título deve ter de 3 a 120 caracteres.")
@@ -173,12 +173,15 @@ class Store:
             raise Falha(f"Escolha de 1 a {MAX_PROJECT_SOURCES} fontes (use listar_fontes).")
         if template not in flow.TEMPLATES or language not in ("pt-BR", "en") or tipo not in flow.MODES:
             raise Falha("Modelo, idioma ou tipo inválido.")
+        if pedagogical_mode not in PEDAGOGICAL_MODES:
+            pedagogical_mode = "tutor_socratico"
         if self._active_jobs(uid) >= MAX_ACTIVE_JOBS:
             raise Falha("Já há trabalhos em andamento no servidor. Aguarde terminarem.")
         sources = [self._source(uid, i) for i in ids]
         pid = uuid.uuid4().hex
         record = {"id": pid, "owner_uid": uid, "title": title.strip(), "question": question.strip(),
                   "language": language, "template": template, "tipo": tipo, "sources": sources,
+                  "pedagogical_mode": pedagogical_mode, "advisor_comments": [],
                   "status": "preparando", "flow_version": flow.FLOW_VERSION, "stages": {}, "heads": {},
                   "created_at": now(), "updated_at": now(), "files": []}
         self.db.collection("mcp_projects").document(pid).create(record)
@@ -274,6 +277,45 @@ class Store:
             return None
         refs = self.references(project)
         return {"share": share, "project": project, "refs": refs}
+
+    def add_advisor_comment(self, token: str, author: str, stage: str, kind: str, text: str) -> dict | None:
+        """Fase 2: permite ao(à) orientador(a) registrar apontamento por etapa via link autorizado."""
+        found = self.read_advisor_share(token)
+        if not found:
+            return None
+        project = found["project"]
+        comments = list(project.get("advisor_comments") or [])
+        if len(comments) >= MAX_ADVISOR_COMMENTS:
+            raise Falha(f"Limite de {MAX_ADVISOR_COMMENTS} apontamentos da orientação atingido neste projeto.")
+        clean_author = str(author or "").strip()[:80] or "Orientador(a)"
+        clean_stage = str(stage or "Geral").strip()[:80] or "Geral"
+        clean_kind = kind if kind in ADVISOR_COMMENT_KINDS else "sugestao"
+        clean_text = str(text or "").strip()[:1500]
+        if len(clean_text) < 4:
+            raise Falha("Escreva um apontamento com pelo menos 4 caracteres.")
+        entry = {
+            "id": uuid.uuid4().hex[:12],
+            "author": clean_author,
+            "stage": clean_stage,
+            "kind": clean_kind,
+            "text": clean_text,
+            "resolved": False,
+            "created_at": now(),
+        }
+        comments.append(entry)
+        self.update_project(project["id"], advisor_comments=comments)
+        return entry
+
+    def set_advisor_comment_resolved(self, uid: str, pid: str, comment_id: str, resolved: bool) -> dict:
+        project = self.project(uid, pid)
+        comments = list(project.get("advisor_comments") or [])
+        target = next((c for c in comments if c.get("id") == comment_id), None)
+        if target is None:
+            raise Falha("Apontamento não encontrado.")
+        target["resolved"] = bool(resolved)
+        target["resolved_at"] = now() if resolved else ""
+        self.update_project(project["id"], advisor_comments=comments)
+        return target
 
     @staticmethod
     def prefix(project: dict) -> str:
@@ -618,6 +660,45 @@ def stage_material(store: Store, project: dict, stage_key: str) -> dict:
     return out
 
 
+PEDAGOGICAL_MODES = {
+    "tutor_socratico": {
+        "label": "Apoio inicial · Tutor Socrático",
+        "guardrail": (
+            "MODO TUTOR SOCRÁTICO (salvaguarda pedagógica ativa): NÃO entregue texto pronto nem substitua o "
+            "raciocínio do estudante. Comece fazendo 2 a 3 perguntas curtas orientadoras e pistas graduais sobre "
+            "esta etapa; peça primeiro a formulação ou escolha com as palavras do estudante e só avance após "
+            "ele(a) justificar o que decide aceitar, adaptar ou rejeitar."
+        ),
+    },
+    "intermediario": {
+        "label": "Intermediário · Feedback crítico",
+        "guardrail": (
+            "MODO INTERMEDIÁRIO: ofereça pistas estruturais e feedback crítico sobre coerência e uso de fontes, "
+            "sempre explicitando limitações e pedindo justificativa breve do estudante antes de consolidar a etapa."
+        ),
+    },
+    "autonomo": {
+        "label": "Autônomo · Revisão objetiva",
+        "guardrail": (
+            "MODO AUTÔNOMO: o estudante conduz a redação com mínima intervenção; limite-se a apontar lacunas "
+            "objetivas de coerência, aderência às fontes e formatação ABNT."
+        ),
+    },
+}
+ADVISOR_COMMENT_KINDS = {"elogio", "sugestao", "ajuste_obrigatorio"}
+MAX_ADVISOR_COMMENTS = 50
+
+
+def pedagogical_mode_of(project: dict) -> str:
+    val = str(project.get("pedagogical_mode") or "tutor_socratico").strip()
+    return val if val in PEDAGOGICAL_MODES else "tutor_socratico"
+
+
+def _apply_pedagogical_guardrail(brief_text: str, project: dict) -> str:
+    info = PEDAGOGICAL_MODES[pedagogical_mode_of(project)]
+    return f"[{info['label']}]\n{info['guardrail']}\n\n{brief_text}"
+
+
 def _state_summary(project: dict) -> list[dict]:
     stages = project.get("stages") or {}
     out = []
@@ -654,8 +735,11 @@ def project_state(store: Store, project: dict) -> dict:
         action = f"Próxima etapa: {nxt['titulo']} (chame proxima_etapa)."
     else:
         action = "Todas as etapas aceitas: chame compilar."
+    pm = pedagogical_mode_of(project)
     return {"projeto": project["id"], "titulo": project.get("title"), "status": status,
-            "tipo": mode(project), "etapas": _state_summary(project), "proxima_acao": action,
+            "tipo": mode(project), "modo_pedagogico": pm,
+            "modo_pedagogico_rotulo": PEDAGOGICAL_MODES[pm]["label"],
+            "etapas": _state_summary(project), "proxima_acao": action,
             "arquivos": project.get("files", []), "erro": project.get("error", "")}
 
 
@@ -689,7 +773,8 @@ def next_step(store: Store, uid: str, pid: str, head_id: str | None, model: str,
         head = issued = store.new_head(project, "redatora", None, client, model)
     state = (project.get("stages") or {}).get(stage_def["key"]) or {}
     out = {"etapa": stage_def["key"], "titulo": stage_def["titulo"], "cabeca": head["id"],
-           "instrucoes": flow.brief(stage_def, project.get("language", "pt-BR")),
+           "modo_pedagogico": pedagogical_mode_of(project),
+           "instrucoes": _apply_pedagogical_guardrail(flow.brief(stage_def, project.get("language", "pt-BR")), project),
            "material": stage_material(store, project, stage_def["key"])}
     if issued:
         out["aviso"] = (f"Esta conversa é a cabeça {head['id']}. Use cabeca=\"{head['id']}\" em todas as "

@@ -39,6 +39,9 @@ class _FakeDoc:
             raise RuntimeError("already exists")
         self._store[self._id] = dict(data)
 
+    def set(self, data: dict):
+        self._store[self._id] = dict(data)
+
     def update(self, patch: dict):
         if self._id not in self._store:
             raise KeyError(self._id)
