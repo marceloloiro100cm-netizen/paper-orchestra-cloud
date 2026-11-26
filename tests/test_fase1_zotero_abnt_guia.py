@@ -217,8 +217,8 @@ class AbntRefsUnitTests(unittest.TestCase):
                            "title": "Potencialidades e desafios", "year": "2025"},
             }},
         ]
-        # 3 autores narrativo ("e" e "&")
-        r1 = abnt_refs.check_citation_coherence("Segundo Silva, Oliveira e Silva (2025), há riscos.", lib)
+        # 3 autores narrativo ("e" e "&") inclusive precedido por advérbio/conector com vírgula
+        r1 = abnt_refs.check_citation_coherence("Complementarmente, Silva, Oliveira e Silva (2025) apontam riscos.", lib)
         self.assertEqual(r1["matched_count"], 1)
         self.assertEqual(r1["missing_in_library"], [])
         # Múltiplas citações no mesmo parêntese + prefixo cf.
