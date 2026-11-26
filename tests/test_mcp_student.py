@@ -44,10 +44,20 @@ class NextStepTest(unittest.TestCase):
         step = student.next_step(project(stages), "artigo", 3)
         self.assertIn("3 referência", step["texto"])
         self.assertIn(student.REF_FIX, step["pedido"])
+        self.assertIn(student.COMPILE_DRAFT, step["pedido_rascunho"])
+
+    def test_rascunho_explica_o_motivo_e_o_que_fazer(self):
+        keys = ["planejamento", "evidencias", "redacao", "revisao", "reescrita", "verificacao"]
+        p = {**project({k: ACCEPT for k in keys}, status="rascunho"), "error": "1 erro(s) de LaTeX."}
+        step = student.next_step(p, "artigo", 0)
+        self.assertIn("rascunho", step["titulo"])
+        self.assertIn("1 erro(s) de LaTeX", step["texto"])
+        self.assertIn("reabra a reescrita", step["pedido"])
+        self.assertIn(student.REF_FIX, student.next_step(p, "artigo", 2)["pedido"])
 
     def test_estados_do_servidor(self):
-        for status, words in (("preparando", "Aguarde"), ("compilando", "Gerando"), ("concluido", "PDF pronto"),
-                              ("falhou_preparo", "falhou")):
+        for status, words in (("preparando", "Aguarde"), ("compilando", "Gerando"), ("concluido", "PDF final pronto"),
+                              ("falhou_preparo", "falhou"), ("refazendo_referencias", "Refazendo")):
             self.assertIn(words, student.next_step(project(status=status), "artigo", 0)["titulo"])
 
     def test_revisao_sistematica(self):
@@ -64,25 +74,35 @@ class ProofsTest(unittest.TestCase):
             "verificacao": {"status": "aceita", "summary": {"vereditos": {"sustentada": 9, "parcial": 1, "sem_suporte": 0}}},
         }
         lines = student.proofs(stages, "artigo", {"kappa": 0.81})
-        self.assertIn("19 de 19 citações", lines[0])
+        self.assertIn("Evidências: 19 de 19 citações", lines[0])
         self.assertIn("cita 2 fontes", lines[1])
-        self.assertIn("nota 7.5 de 10", lines[2])
-        self.assertIn("9 sustentadas", lines[3])
-        self.assertIn("0.81", lines[4])
+        self.assertIn("não conferidas", lines[2])  # projeto anterior à checagem do texto final
+        self.assertIn("nota 7.5 de 10", lines[3])
+        self.assertIn("9 sustentadas", lines[4])
+        self.assertIn("0.81", lines[5])
+
+    def test_citacoes_do_texto_final(self):
+        stages = {"reescrita": {"status": "aceita", "summary": {
+            "fontes_citadas": ["a"], "citacoes_texto": {"total": 12, "conferidas": 11, "traduzidas": 1}}}}
+        lines = student.proofs(stages, "artigo")
+        self.assertIn("Texto final: 11 de 12 citações diretas conferidas", lines[1])
+        self.assertIn("1 marcada(s) como tradução", lines[1])
 
     def test_sem_etapas_aceitas(self):
         self.assertEqual(student.proofs({"evidencias": {"status": "recusada", "summary": {"total": 5}}}, "artigo"), [])
 
 
 class ReferencesTest(unittest.TestCase):
-    def test_so_as_do_arquivo(self):
+    def test_sugeridas_e_do_arquivo_pedem_confirmacao(self):
         refs = [{"key": "a", "how": "arquivo", "fields": {"title": "172633"}},
                 {"key": "b", "how": "doi", "fields": {"title": "Ok"}},
-                {"key": "c", "how": "corrigida_pelo_texto", "fields": {"title": "Ok"}}]
+                {"key": "c", "how": "corrigida_pelo_texto", "fields": {"title": "Ok"}},
+                {"key": "d", "how": "texto_do_pdf", "fields": {"title": "Department of Computer Science"}}]
         out = student.view(project(), "artigo", refs)
-        self.assertEqual([r["chave"] for r in out["referencias_a_conferir"]], ["a"])
+        self.assertEqual([(r["chave"], r["nivel"]) for r in out["referencias_a_conferir"]],
+                         [("a", "a_conferir"), ("d", "sugerida")])
         self.assertIn(student.REF_FIX, out["pedido_referencias"])
-        self.assertEqual(student.view(project(), "artigo", refs[1:])["pedido_referencias"], "")
+        self.assertEqual(student.view(project(), "artigo", refs[1:3])["pedido_referencias"], "")
 
 
 if __name__ == "__main__":

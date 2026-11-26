@@ -141,7 +141,7 @@ def seed_project(db, bucket, status="pronto"):
                         "object_path": f"library/{UID}/{item_id}/fonte{n}.pdf"})
         manifest.append({"id": item_id, "name": f"fonte{n}.pdf", "format": "pdf", "sha256": sha,
                          "key": key, "derived": derived, "chunks": 4})
-        refs.append({"type": "article", "key": key, "source_id": item_id,
+        refs.append({"type": "article", "key": key, "source_id": item_id, "how": "doi",
                      "fields": {"author": f"Autor{n}, Ana", "title": f"Estudo {n}", "year": "2024"}})
     db.collection("mcp_projects").document(pid).set({
         "id": pid, "owner_uid": UID, "title": "Gamificação no ensino", "question": "Q" * 30,
@@ -215,6 +215,66 @@ class FlowLogicTest(unittest.TestCase):
         self.assertEqual(flow.independence(writer, same)["nivel"], "outra_conversa")
         # Revisora não pode escrever.
         self.assertIsNotNone(flow.check_head(flow.stage("redacao"), reviewer, {}))
+
+    def test_reference_levels(self):
+        refs = [{"key": "a", "how": "doi"}, {"key": "b", "how": "corrigida_pelo_texto"},
+                {"key": "c", "how": "texto_do_pdf"}, {"key": "d", "how": "arquivo"}, {"key": "e"}]
+        self.assertEqual([flow.ref_level(r) for r in refs],
+                         ["confirmada", "confirmada", "sugerida", "a_conferir", "a_conferir"])
+        self.assertEqual([r["key"] for r in flow.pending_refs(refs)], ["c", "d", "e"])
+
+    def test_title_on_cover_heading_or_broken_lines_is_accepted(self):
+        title = "Tecnologias Digitais: desafios e possibilidades no ensino de ciências"
+        broken = "TECNOLOGIAS DIGITAIS: DESAFIOS E POSSI-\nBILIDADES NO ENSINO DE CIÊNCIAS\nJosiane Souza"
+        self.assertTrue(flow.title_in_text(title, broken))
+        spaced = "Tecnologias Digitais : desafios e possibilidades\nno ensino de ciencias nos anos finais"
+        self.assertTrue(flow.title_in_text(title, spaced))
+        self.assertFalse(flow.title_in_text("Gamificação no ensino superior de engenharia", broken))
+        fix = {"autores": ["Souza, Josiane"], "titulo": title, "ano": "2022", "tipo": "mastersthesis"}
+        fields, errors = flow.check_reference_fix(fix, broken, broken + " Brasília 2022")
+        self.assertEqual(errors, [], errors)
+
+    def test_final_quotes_are_checked_in_the_cited_source(self):
+        chunks = {"k1": [{"text": SOURCE_TEXT[0]}], "k2": [{"text": SOURCE_TEXT[1]}]}
+        get = lambda key: chunks.get(key, [])  # noqa: E731
+        keys = {"k1", "k2"}
+        good = ("Os dados indicam que ``A gamificação aumentou o engajamento dos estudantes em cursos "
+                "introdutórios'' \\cite{k1}.")
+        summary, errors = flow.check_final_quotes(good, keys, get)
+        self.assertEqual((summary["total"], summary["conferidas"], errors), (1, 1, []))
+        invented = "Segundo \\citeonline{k1}, ``a gamificação dobrou as notas finais de todos os alunos''."
+        self.assertTrue(flow.check_final_quotes(invented, keys, get)[1])
+        swapped = "Os autores dizem que ``a motivação intrínseca não se manteve depois'' \\cite{k1}."
+        errors = flow.check_final_quotes(swapped, keys, get)[1]
+        self.assertTrue(errors and "'k2'" in errors[0], errors)
+        orphan = "Há quem diga que ``A gamificação aumentou o engajamento dos estudantes''.\n\nOutro \\cite{k1}."
+        self.assertIn("sem \\cite", flow.check_final_quotes(orphan, keys, get)[1][0])
+        cut = "``A gamificação aumentou o engajamento [...] em cursos introdutórios de programação'' \\cite{k1}."
+        self.assertEqual(flow.check_final_quotes(cut, keys, get)[1], [])
+        translated = "``Gamification raised student engagement in programming courses'' (tradução nossa) \\cite{k1}."
+        summary, errors = flow.check_final_quotes(translated, keys, get)
+        self.assertEqual((summary["traduzidas"], errors), (1, []))
+        term = "A ideia de ``nativos digitais'' circula muito \\cite{k1}. % ``comentário que não é texto''"
+        self.assertEqual(flow.check_final_quotes(term, keys, get)[0]["total"], 0)
+
+    def test_validate_latex_refuses_invented_quote_only_with_sources(self):
+        chunks = {"k1": [{"text": SOURCE_TEXT[0]}]}
+        body = latex_body(["k1"], "``Uma frase que nenhuma fonte do projeto contém em lugar algum'' \\cite{k1}.")
+        self.assertTrue(flow.validate_latex(body, {"k1"}, 100, "abnt-artigo")["ok"])  # sem fontes: não confere
+        report = flow.validate_latex(body, {"k1"}, 100, "abnt-artigo", lambda k: chunks.get(k, []))
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["citacoes_texto"]["total"], 1)
+
+    def test_reopen_rewrite_resets_rewrite_and_verification(self):
+        stages = {k: {"status": "aceita", "version": 2, "attempts": 2, "head": {"id": "h"}, "passe": "X"}
+                  for k in flow.STAGE_KEYS}
+        out = flow.reopen_rewrite(stages)
+        self.assertEqual(flow.next_stage(out)["key"], "reescrita")
+        self.assertEqual(out["reescrita"], {"status": "pendente", "attempts": 2, "reaberta": 1, "versao_anterior": 2})
+        self.assertNotIn("passe", out["verificacao"])
+        self.assertEqual(out["revisao"]["status"], "aceita")
+        with self.assertRaises(ValueError):
+            flow.reopen_rewrite({**stages, "verificacao": {"status": "pendente"}})
 
     def test_tokens_are_hashed(self):
         token, digest = flow.new_token()
@@ -396,6 +456,80 @@ class McpServerTest(McpHarness):
         project = self.db.collection("mcp_projects").document(self.pid).get().to_dict()
         self.assertEqual(project["reference_fixes"][0]["chave"], key)
 
+    def _all_accepted(self):
+        stages = {k: {"status": "aceita", "version": 1, "attempts": 1,
+                      "head": {"id": "cab_w", "kind": "redatora", "model": "Claude"}} for k in flow.STAGE_KEYS}
+        heads = {"cab_w": {"id": "cab_w", "kind": "redatora", "model": "Claude"}}
+        self.db.collection("mcp_projects").document(self.pid).update({"stages": stages, "heads": heads})
+        self.bucket.blob(f"mcp/{UID}/{self.pid}/etapas/reescrita-v1.txt").upload_from_string(latex_body(self.keys))
+
+    def _set_ref_origin(self, key, how):
+        path = f"mcp/{UID}/{self.pid}/references.json"
+        refs = json.loads(self.bucket.objects[path])
+        for r in refs:
+            if r["key"] == key:
+                r["how"] = how
+        self.bucket.objects[path] = json.dumps(refs).encode()
+
+    def test_final_compile_is_blocked_by_unconfirmed_references(self):
+        self._all_accepted()
+        self._set_ref_origin(self.keys[0], "texto_do_pdf")
+        self._set_ref_origin(self.keys[1], "arquivo")
+        blocked, draft = self.run_calls([("compilar", {"projeto": self.pid}),
+                                         ("compilar", {"projeto": self.pid, "rascunho": True})])
+        self.assertTrue(blocked[0])
+        self.assertIn("2 referência(s)", blocked[1]["_texto"])
+        self.assertIn(self.keys[0], blocked[1]["_texto"])
+        self.assertFalse(draft[0], draft[1])
+        self.assertEqual(draft[1]["versao"], "rascunho")
+        project = self.db.collection("mcp_projects").document(self.pid).get().to_dict()
+        self.assertTrue(project["compile_rascunho"])
+        self.assertEqual(self.jobs[-1][2], "mcp_compile")
+
+    def test_rebuild_references_launches_side_job_and_blocks_meanwhile(self):
+        self._all_accepted()
+        self.db.collection("mcp_projects").document(self.pid).update({"status": "rascunho"})
+        started, busy = self.run_calls([("refazer_referencias", {"projeto": self.pid}),
+                                        ("compilar", {"projeto": self.pid})])
+        self.assertFalse(started[0], started[1])
+        self.assertEqual(self.jobs[-1][2], "mcp_refs")
+        project = self.db.collection("mcp_projects").document(self.pid).get().to_dict()
+        self.assertEqual((project["status"], project["status_antes"]), ("refazendo_referencias", "rascunho"))
+        self.assertTrue(busy[0])
+        self.assertIn("refazendo as referências", busy[1]["_texto"])
+
+    def test_reopen_rewrite_gives_previous_text_and_compile_problems(self):
+        self._all_accepted()
+        self.db.collection("mcp_projects").document(self.pid).update({
+            "status": "rascunho", "compile_report": {"motivos": ["1 erro(s) de LaTeX."],
+                                                     "erros_detalhe": ["Undefined control sequence (l.42 \\foo)"]}})
+        wrong, ok = self.run_calls([("reabrir_reescrita", {"projeto": self.pid, "cabeca": "cab_x"}),
+                                    ("reabrir_reescrita", {"projeto": self.pid, "cabeca": "cab_w"})])
+        self.assertTrue(wrong[0])
+        self.assertFalse(ok[0], ok[1])
+        [(err, step)] = self.run_calls([("proxima_etapa", {"projeto": self.pid, "cabeca": "cab_w"})])
+        self.assertFalse(err, step)
+        self.assertEqual(step["etapa"], "reescrita")
+        self.assertIn("Texto de apoio", step["material"]["texto_anterior"])
+        self.assertEqual(step["material"]["problemas_da_compilacao"]["erros_latex"],
+                         ["Undefined control sequence (l.42 \\foo)"])
+
+    def test_reference_fix_reopens_a_finished_pdf(self):
+        self._all_accepted()
+        self.db.collection("mcp_projects").document(self.pid).update({"status": "concluido"})
+        key = self.keys[0]
+        path = self.manifest[0]["derived"]
+        payload = json.loads(self.bucket.objects[path])
+        payload["chunks"][-1]["text"] += " Publicado em 2024."
+        self.bucket.objects[path] = json.dumps(payload).encode()
+        self.run_calls([("corrigir_referencia", {"projeto": self.pid, "chave": key, "cabeca": "cab_w",
+                                                  "autores": ["Gamificação, X"],
+                                                  "titulo": "A gamificação aumentou o engajamento",
+                                                  "ano": "2024", "tipo": "article"})])
+        project = self.db.collection("mcp_projects").document(self.pid).get().to_dict()
+        self.assertEqual(project["status"], "pronto")
+        self.assertIn("compilar de novo", project["error"])
+
     def test_other_users_project_is_invisible(self):
         other = self.store.create_token("o" * 28, "outra@example.org", "Outra")["token"]
         [(err, payload)] = self.run_calls([("estado_do_projeto", {"projeto": self.pid})], token=other)
@@ -430,6 +564,18 @@ class SiteRoutesTest(unittest.TestCase):
         self.assertNotIn("hash", listed[0])
         self.route("/tokens/{token_id}", "DELETE")(created["id"], self.user)
         self.assertIsNone(self.store.token_owner(created["token"]))
+
+    def test_rebuild_references_route_starts_job_once(self):
+        jobs = []
+        self.store.start_job = lambda *a: jobs.append(a)
+        pid, _, _ = seed_project(self.db, self.bucket, status="rascunho")
+        rebuild = self.route("/referencias/refazer", "POST")
+        self.assertEqual(rebuild(pid, self.user)["status"], "refazendo_referencias")
+        self.assertEqual(jobs[-1][2], "mcp_refs")
+        with self.assertRaises(fastapi.HTTPException):
+            rebuild(pid, self.user)  # já está refazendo
+        with self.assertRaises(fastapi.HTTPException):
+            rebuild(pid, {"uid": "o" * 28})
 
     def test_download_only_known_files_of_own_project(self):
         pid, _, _ = seed_project(self.db, self.bucket)

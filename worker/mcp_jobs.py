@@ -6,7 +6,10 @@
 - mcp_compile: junta o corpo aceito no quadro com o preâmbulo do modelo e a
   bibliografia oficial e compila com o TeX em modo restrito (sem shell, sem
   leitura fora do diretório), além de gerar o relatório de proveniência
-  (qual IA fez cada etapa e com que independência).
+  (qual IA fez cada etapa e com que independência). Versão final só com todas as
+  referências confirmadas e sem erro de LaTeX; senão sai RASCUNHO marcado.
+- mcp_refs: refaz só a bibliografia de um projeto existente, mantendo as chaves já
+  citadas e as correções feitas pela IA no próprio documento.
 """
 from __future__ import annotations
 
@@ -153,12 +156,27 @@ def place_prisma(body: str, figure: str) -> str:
     return body + "\n" + figure
 
 
-def assemble(project: dict, body: str, today: datetime | None = None) -> str:
+def draft_banner(reasons: list[str], language: str = "pt-BR") -> str:
+    """Aviso no topo do rascunho: o PDF não pode passar por versão final."""
+    head = "RASCUNHO" if language != "en" else "DRAFT"
+    lead = ("Não é a versão final do Scriptorium." if language != "en" else
+            "This is not the final Scriptorium version.")
+    items = " ".join(latex_escape(r) for r in reasons[:4])
+    return ("\\begin{center}\\fbox{\\parbox{0.92\\textwidth}{\\centering\\textbf{" + head + "}: " +
+            latex_escape(lead) + "\\\\ \\small " + items + "}}\\end{center}\n")
+
+
+def assemble(project: dict, body: str, today: datetime | None = None, draft: list[str] | None = None) -> str:
+    """draft: motivos do rascunho; com motivos, título e topo do PDF saem marcados."""
     if FORBIDDEN.search(body or "") or "^^" in (body or ""):
         raise ValueError("Corpo com comandos não permitidos")
     if project.get("tipo") == "revisao_sistematica" and project.get("prisma"):
         body = place_prisma(body, prisma_figure(project["prisma"], project.get("language", "pt-BR")))
-    values = {"title": latex_escape(project.get("title", "")),
+    title = project.get("title", "")
+    if draft:
+        title = ("RASCUNHO: " if project.get("language") != "en" else "DRAFT: ") + title
+        body = draft_banner(draft, project.get("language", "pt-BR")) + (body or "")
+    values = {"title": latex_escape(title),
               "author": "Autoria a preencher pelo pesquisador",
               "date": run_date(project.get("language", "pt-BR"), today),
               "babel": "english" if project.get("language") == "en" else "brazil"}
@@ -195,11 +213,28 @@ def compile_tex(workdir: Path, tex: str, name: str = "scriptorium", timeout: int
     log_path = workdir / f"{name}.log"
     log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
     report = {"citacoes_indefinidas": len(re.findall(r"Citation `[^']+' (?:on page \d+ )?undefined", log)),
-              "erros_latex": len(re.findall(r"^! ", log, flags=re.M)), "log_final": log[-3000:]}
+              "erros_latex": len(re.findall(r"^! ", log, flags=re.M)), "erros_detalhe": latex_errors(log),
+              "log_final": log[-3000:]}
     pdf = workdir / f"{name}.pdf"
     if not pdf.exists() or pdf.stat().st_size < 1000:
         return None, {**report, "status": "falhou", "motivo": "pdflatex não gerou o PDF"}
     return pdf, {**report, "status": "ok"}
+
+
+def latex_errors(log: str, limit: int = 5) -> list[str]:
+    """As linhas "! ..." do log com a linha do .tex onde o erro aconteceu (l.123 ...)."""
+    out, lines = [], (log or "").splitlines()
+    for n, line in enumerate(lines):
+        if line.startswith("! "):
+            where = next((l.strip() for l in lines[n + 1:n + 8] if re.match(r"l\.\d+", l.strip())), "")
+            out.append((line[2:].strip() + (f" ({where[:120]})" if where else ""))[:200])
+            if len(out) >= limit:
+                break
+    return out
+
+
+def pending_refs(refs: list[dict]) -> list[dict]:
+    return [r for r in refs or [] if bib_integrity.ref_level(r) != "confirmada"]
 
 
 def provenance(project: dict, refs: list[dict], manifest: list[dict]) -> dict:
@@ -221,7 +256,9 @@ def provenance(project: dict, refs: list[dict], manifest: list[dict]) -> dict:
         "modo": "sem API: IA do próprio pesquisador via MCP", "fluxo": project.get("flow_version"),
         "etapas": steps, "ias_usadas": ais,
         "fontes": [{"chave": m.get("key"), "nome": m.get("name"), "trechos": m.get("chunks")} for m in manifest],
-        "referencias_a_conferir": [r["key"] for r in refs if r.get("how") == "arquivo"],
+        "referencias_a_conferir": [r["key"] for r in pending_refs(refs)],
+        "referencias": [{"chave": r.get("key"), "confianca": bib_integrity.ref_level(r), "origem": r.get("how")}
+                        for r in refs],
         "revisao_sistematica": ({"prisma": project.get("prisma"), "concordancia": project.get("concordancia"),
                                  "sintese_editada_pelo_pesquisador": sorted((project.get("sintese_final") or {}).keys())}
                                 if project.get("tipo") == "revisao_sistematica" else None),
@@ -295,7 +332,8 @@ def prepare(data: dict, *, db, bucket, owner_uid: str, cache, get_json, update, 
     readable = [m for m in manifest if m["chunks"]]
     summary = {"fontes": len(sources), "lidas": len(readable), "trechos": sum(m["chunks"] for m in manifest),
                "falhas": failures, "sem_texto": [m["name"] for m in manifest if not m["chunks"]],
-               "referencias_a_conferir": [e["key"] for e in entries if e.get("how") == "arquivo"]}
+               "referencias_a_conferir": [e["key"] for e in pending_refs(entries)],
+               "consultas_openalex": _lookup_summary(entries)}
     status = "pronto" if readable else "falhou_preparo"
     fields = {"status": status, "prepare_summary": summary,
               "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -304,6 +342,14 @@ def prepare(data: dict, *, db, bucket, owner_uid: str, cache, get_json, update, 
     update(status="completed", stage="Fontes prontas para a IA do pesquisador",
            finished_at=datetime.now(timezone.utc).isoformat())
     return summary
+
+
+def _lookup_summary(entries: list[dict]) -> dict:
+    """Quantas fontes tiveram a consulta ao OpenAlex recusada (chave ausente, limite...)."""
+    statuses = [(e.get("consulta") or {}).get("status", "sem_consulta") for e in entries]
+    return {"recusadas": sum(s == "api_recusou" for s in statuses),
+            "parciais": sum(s == "parcial" for s in statuses),
+            "chave_configurada": bool(os.getenv("OPENALEX_API_KEY", "").strip())}
 
 
 def compile_project(data: dict, *, db, bucket, owner_uid: str, update, workdir: Path, compiler=compile_tex) -> dict:
@@ -318,12 +364,31 @@ def compile_project(data: dict, *, db, bucket, owner_uid: str, update, workdir: 
     body = bucket.blob(f"{prefix}/etapas/{final_key}-v{state['version']}.txt").download_as_bytes().decode("utf-8")
     refs = json.loads(bucket.blob(prefix + "/references.json").download_as_bytes())
     manifest = json.loads(bucket.blob(prefix + "/sources.json").download_as_bytes())
-    tex = assemble(project, body)
+    pending = pending_refs(refs)
+    reasons = []
+    if project.get("compile_rascunho"):
+        reasons.append("Rascunho pedido pelo pesquisador.")
+    if pending:
+        reasons.append(f"{len(pending)} referência(s) ainda não confirmada(s): "
+                       + ", ".join(r["key"] for r in pending[:8]) + ".")
     (workdir / "references.bib").write_text("".join(bib_integrity.render(e) for e in refs), encoding="utf-8")
     update(stage="Compilando o PDF")
-    pdf, report = compiler(workdir, tex)
+    pdf, report = compiler(workdir, assemble(project, body, draft=reasons or None))
+    problems = []
+    if report.get("erros_latex"):
+        problems.append(f"{report['erros_latex']} erro(s) de LaTeX.")
+    if report.get("citacoes_indefinidas"):
+        problems.append(f"{report['citacoes_indefinidas']} citação(ões) sem referência.")
+    if pdf and problems and not reasons:
+        # Saiu "limpo" de referências, mas com erro na compilação: refaz como rascunho.
+        reasons = problems
+        pdf, report = compiler(workdir, assemble(project, body, draft=reasons))
+    elif problems:
+        reasons += problems
+    final = bool(pdf) and not reasons
     record = provenance(project, refs, manifest)
-    record["compilacao"] = {k: v for k, v in report.items() if k != "log_final"}
+    record["compilacao"] = {**{k: v for k, v in report.items() if k != "log_final"},
+                            "versao": "final" if final else "rascunho", "motivos": reasons}
     files = []
     uploads = [("scriptorium.tex", workdir / "scriptorium.tex", "text/x-tex"),
                ("references.bib", workdir / "references.bib", "text/x-bibtex")]
@@ -339,12 +404,71 @@ def compile_project(data: dict, *, db, bucket, owner_uid: str, update, workdir: 
     files.append("proveniencia.json")
     now = datetime.now(timezone.utc).isoformat()
     if pdf:
-        ref.update({"status": "concluido", "files": files, "compiled_at": now, "updated_at": now,
-                    "compile_report": record["compilacao"], "error": ""})
-        update(status="completed", stage="PDF pronto", finished_at=now)
+        ref.update({"status": "concluido" if final else "rascunho", "files": files, "compiled_at": now,
+                    "updated_at": now, "compile_report": record["compilacao"],
+                    "error": "" if final else " ".join(reasons)})
+        update(status="completed", stage="PDF final pronto" if final else "Rascunho pronto", finished_at=now)
     else:
         ref.update({"status": "pronto", "files": files, "updated_at": now, "compile_report": record["compilacao"],
                     "error": "A compilação falhou: " + str(report.get("motivo", "")) +
                     ". O .tex foi salvo para conferência."})
         update(status="completed", stage="Compilação falhou; .tex salvo", finished_at=now)
     return record
+
+
+def rebuild_references(data: dict, *, db, bucket, owner_uid: str, cache, get_json, update, metadata) -> dict:
+    """Refaz só o BibTeX de um projeto existente, sem tocar no texto já aceito.
+
+    - A chave de cada fonte continua a mesma (o texto já cita essas chaves).
+    - Referência corrigida com corrigir_referencia (conferida no documento) é mantida.
+    - O resto é refeito com as regras atuais (DOI, OpenAlex com chave, texto da fonte),
+      mas nunca piora: se a consulta nova falhar, uma referência mais confiável fica.
+    """
+    ref, project = _project(db, data, owner_uid)
+    prefix = f"mcp/{owner_uid}/{project['id']}"
+    before = project.get("status_antes") or "pronto"
+    update(status="running", stage="Refazendo as referências", started_at=datetime.now(timezone.utc).isoformat())
+    manifest = json.loads(bucket.blob(prefix + "/sources.json").download_as_bytes())
+    old = json.loads(bucket.blob(prefix + "/references.json").download_as_bytes())
+    old_by_source = {e.get("source_id"): e for e in old}
+    fetch = lambda path: bucket.blob(path).download_as_bytes()  # noqa: E731
+    sources, texts, meta = [], {}, {}
+    by_id = {s.get("id"): s for s in project.get("sources") or []}
+    for entry in manifest:
+        source = by_id.get(entry.get("id"))
+        derived = str(entry.get("derived") or "")
+        if not source or not derived.startswith(f"library/{owner_uid}/derived/"):
+            continue
+        payload = json.loads(bucket.blob(derived).download_as_bytes())
+        texts[source["id"]] = bib_integrity.first_pages_text(payload)
+        try:
+            meta[source["id"]] = metadata(source, fetch, cache)
+        except Exception:  # noqa: BLE001 - metadado do PDF é só uma pista de título
+            meta[source["id"]] = {}
+        sources.append(source)
+    fresh = {e["source_id"]: e for e in bib_integrity.library_entries(sources, get_json, meta, texts)}
+    out, changed = [], []
+    for previous in old:
+        sid = previous.get("source_id")
+        new = fresh.get(sid)
+        rank = {"confirmada": 2, "sugerida": 1, "a_conferir": 0}
+        if (previous.get("how") == "corrigida_pelo_texto" or not new or
+                rank[bib_integrity.ref_level(new)] < rank[bib_integrity.ref_level(previous)]):
+            out.append(previous)
+            continue
+        new = {**new, "key": previous["key"]}  # a chave citada no texto não muda
+        if (new.get("fields"), new.get("how")) != (previous.get("fields"), previous.get("how")):
+            changed.append(previous["key"])
+        out.append(new)
+    bucket.blob(prefix + "/references.json").upload_from_string(
+        json.dumps(out, ensure_ascii=False), content_type="application/json")
+    bucket.blob(prefix + "/references.bib").upload_from_string(
+        "".join(bib_integrity.render(e) for e in out), content_type="text/plain; charset=utf-8")
+    summary = {"alteradas": changed, "referencias_a_conferir": [e["key"] for e in pending_refs(out)],
+               "consultas_openalex": _lookup_summary(list(fresh.values()))}
+    status = "pronto" if before in ("concluido", "rascunho") else before
+    note = "Referências refeitas: chame compilar de novo." if before in ("concluido", "rascunho") else ""
+    ref.update({"status": status, "refs_summary": summary, "error": note,
+                "updated_at": datetime.now(timezone.utc).isoformat()})
+    update(status="completed", stage="Referências refeitas", finished_at=datetime.now(timezone.utc).isoformat())
+    return summary

@@ -17,6 +17,7 @@ Este módulo é lógica pura (sem Firestore nem rede), para ser testável.
 """
 from __future__ import annotations
 
+import difflib
 import hashlib
 import json
 import re
@@ -24,6 +25,33 @@ import secrets
 import unicodedata
 
 FLOW_VERSION = "mcp-flow-1"
+
+# ------------------------------------------------------------------ confiança das referências
+# Achado do teste de 25/11/2026: uma correspondência errada do OpenAlex (Kitchenham
+# virou "Department of Computer Science, 2013") passava como oficial. Agora só é
+# "confirmada" a referência que veio de DOI registrado na importação ou que foi
+# conferida no próprio documento; busca por título fica "sugerida" até alguém
+# conferir. A lista é idêntica em worker/bib_integrity.py (teste impede divergência).
+REF_LEVELS = {
+    "doi": "confirmada",                    # DOI registrado na importação da fonte
+    "corrigida_pelo_texto": "confirmada",   # corrigir_referencia, conferida no documento
+    "doi_no_texto": "sugerida",             # DOI achado nas primeiras páginas
+    "texto_do_pdf": "sugerida",             # busca por título, confirmada pelo texto
+    "titulo_do_pdf": "sugerida",            # busca por título, sem texto para confirmar
+    "arquivo": "a_conferir",                # só o que o arquivo diz
+}
+REF_LEVEL_LABELS = {"confirmada": "confirmada", "sugerida": "sugerida, falta conferir",
+                    "a_conferir": "a conferir"}
+
+
+def ref_level(entry: dict) -> str:
+    """confirmada, sugerida ou a_conferir. Origem desconhecida conta como a_conferir."""
+    return REF_LEVELS.get((entry or {}).get("how") or "", "a_conferir")
+
+
+def pending_refs(refs: list[dict]) -> list[dict]:
+    """Referências que ainda impedem a versão final do PDF."""
+    return [r for r in refs or [] if ref_level(r) != "confirmada"]
 TOKEN_PREFIX = "scr_"
 MAX_CONTENT = 250_000
 MATERIAL_BUDGET = 90_000
@@ -74,8 +102,10 @@ COMMON_RULES = (
     "- Use somente as fontes do projeto. Para ler, chame buscar_trechos e ler_trecho.\n"
     "- Cite apenas com as chaves de referencias_do_projeto; nunca invente autor, ano, título ou página.\n"
     "- Quando as fontes não sustentarem algo, diga isso no texto em vez de completar de memória.\n"
-    "- Referência marcada a_conferir ou com título, autor ou ano errados: corrija com corrigir_referencia, "
-    "lendo a capa da fonte.\n"
+    "- Referência com confianca sugerida ou a_conferir, ou com título, autor ou ano errados: confirme ou "
+    "corrija com corrigir_referencia, lendo a capa da fonte. Sem isso o PDF só sai como rascunho.\n"
+    "- Toda citação direta (entre aspas) precisa estar, palavra por palavra, na fonte citada no mesmo "
+    "parágrafo; marque com \"tradução nossa\" a citação que você traduziu. Prefira paráfrase.\n"
     "- Entregue o resultado chamando entregar_etapa. Se a entrega voltar com erros, corrija e entregue de novo.\n"
 )
 
@@ -169,6 +199,26 @@ def next_stage(stages_state: dict, mode: str = "artigo") -> dict | None:
         if (stages_state.get(s["key"]) or {}).get("status") != "aceita":
             return s
     return None
+
+
+REOPEN = ("reescrita", "verificacao")
+
+
+def reopen_rewrite(stages_state: dict) -> dict:
+    """Reabre a reescrita e, por consequência, a verificação (o texto vai mudar).
+
+    Serve para corrigir um erro que só aparece na compilação (LaTeX, citação). As
+    tentativas anteriores ficam contadas, para as versões gravadas não se sobreporem;
+    o passe e a cabeça da verificação antiga deixam de valer.
+    """
+    if any((stages_state.get(k) or {}).get("status") != "aceita" for k in REOPEN):
+        raise ValueError("Só dá para reabrir a reescrita depois que ela e a verificação foram aceitas.")
+    out = dict(stages_state)
+    for key in REOPEN:
+        old = out.get(key) or {}
+        out[key] = {"status": "pendente", "attempts": old.get("attempts", 0),
+                    "reaberta": int(old.get("reaberta", 0)) + 1, "versao_anterior": old.get("version")}
+    return out
 
 
 # ------------------------------------------------------------------ cabeças
@@ -330,7 +380,69 @@ def validate_evidence(content: str, bib_keys: set[str], chunks_for_key) -> dict:
                    total=len(results), itens=results)
 
 
-def validate_latex(content: str, bib_keys: set[str], minimum: int, template: str) -> dict:
+# ------------------------------------------------------------------ citações do texto final
+# Achado do teste de 25/11/2026: só as evidências eram conferidas; as citações diretas
+# escritas na redação e na reescrita passavam sem conferência. Agora cada trecho entre
+# aspas com 4 ou mais palavras é procurado na fonte citada no mesmo parágrafo (termos
+# curtos entre aspas, como "nativos digitais", não contam como citação).
+QUOTE = re.compile(r"``(.+?)''|\u201c(.+?)\u201d|(?<![\w\\])\"(.+?)\"", re.S)
+ELLIPSIS = re.compile(r"\[\s*(?:\.\.\.|\u2026)\s*\]|\(\s*(?:\.\.\.|\u2026)\s*\)|\u2026|\.\.\.")
+TRANSLATED = re.compile(r"tradu[cç][aã]o\s+(nossa|livre|minha)|our\s+translation|translated\s+by", re.I)
+LATEX_CMD = re.compile(r"\\[A-Za-z]+\*?|[{}~]")
+
+
+def _plain_quote(text: str) -> str:
+    """Tira comandos LaTeX (\\emph, \\%, ~) antes de comparar com a fonte."""
+    return LATEX_CMD.sub(" ", (text or "").replace("\\%", "%").replace("\\&", "&"))
+
+
+def final_quotes(latex: str) -> list[dict]:
+    """Citações diretas do corpo, com as chaves citadas no mesmo parágrafo."""
+    out = []
+    body = re.sub(r"(?m)(?<!\\)%.*$", "", latex or "")  # comentários LaTeX não são texto
+    for paragraph in re.split(r"\n\s*\n", body):
+        keys = [k.strip() for group in CITE.findall(paragraph) for k in group.split(",") if k.strip()]
+        for match in QUOTE.finditer(paragraph):
+            raw = next(g for g in match.groups() if g is not None)
+            parts = [p for p in ELLIPSIS.split(_plain_quote(raw)) if len(normalize(p)) >= 15]
+            if not parts or len(normalize(" ".join(parts)).split()) < 4:
+                continue  # termo curto entre aspas ("nativos digitais"), não citação
+            after = paragraph[match.end():match.end() + 160]
+            out.append({"trecho": " ".join(raw.split())[:160], "partes": parts, "chaves": list(dict.fromkeys(keys)),
+                        "traduzida": bool(TRANSLATED.search(after))})
+    return out
+
+
+def check_final_quotes(latex: str, bib_keys: set[str], chunks_for_key) -> tuple[dict, list[str]]:
+    """Confere cada citação direta na fonte citada no parágrafo. Devolve (resumo, erros)."""
+    quotes = final_quotes(latex)
+    errors, checked, translated = [], 0, 0
+    for n, q in enumerate(quotes, 1):
+        if q["traduzida"]:
+            translated += 1
+            continue
+        keys = [k for k in q["chaves"] if k in bib_keys]
+        if not keys:
+            errors.append(f"Citação direta {n} (\u201c{q['trecho'][:80]}\u201d) sem \\cite no mesmo parágrafo.")
+            continue
+
+        def found_in(key: str) -> bool:
+            texts = [c.get("text", "") for c in chunks_for_key(key) or []]
+            return all(any(quote_in(part, t) for t in texts) for part in q["partes"])
+
+        if any(found_in(k) for k in keys):
+            checked += 1
+            continue
+        other = next((k for k in sorted(bib_keys) if k not in keys and found_in(k)), None)
+        where = (f" O trecho está na fonte '{other}': corrija a chave citada." if other else
+                 " Copie o trecho exatamente como está em ler_trecho, ou troque a citação direta por paráfrase.")
+        errors.append(f"Citação direta {n} (\u201c{q['trecho'][:80]}\u201d) não foi encontrada em "
+                      f"{', '.join(keys)}.{where}")
+    summary = {"total": len(quotes), "conferidas": checked, "traduzidas": translated}
+    return summary, errors
+
+
+def validate_latex(content: str, bib_keys: set[str], minimum: int, template: str, chunks_for_key=None) -> dict:
     errors = _size_errors(content, minimum)
     bad = sorted(set(m.group(0) for m in FORBIDDEN.finditer(content or "")))
     if bad:
@@ -352,8 +464,15 @@ def validate_latex(content: str, bib_keys: set[str], minimum: int, template: str
         errors.append("O texto não cita nenhuma fonte do projeto.")
     if (content or "").count("{") != (content or "").count("}"):
         errors.append("Chaves { } desbalanceadas no LaTeX.")
+    extra = {}
+    if chunks_for_key is not None:
+        quotes, problems = check_final_quotes(content, bib_keys, chunks_for_key)
+        errors += problems[:20]
+        if len(problems) > 20:
+            errors.append(f"... e mais {len(problems) - 20} citação(ões) diretas sem conferência.")
+        extra["citacoes_texto"] = quotes
     return _report(True, errors, secoes=sections, citacoes=len(keys),
-                   fontes_citadas=sorted(set(keys) & bib_keys))
+                   fontes_citadas=sorted(set(keys) & bib_keys), **extra)
 
 
 def validate_review(content: str) -> dict:
@@ -411,7 +530,7 @@ def validate(stage_key: str, content: str, *, bib_keys: set[str], chunks_for_key
     if stage_key == "evidencias":
         return validate_evidence(content, bib_keys, chunks_for_key)
     if stage_key in ("redacao", "reescrita"):
-        return validate_latex(content, bib_keys, BY_KEY[stage_key]["min"], template)
+        return validate_latex(content, bib_keys, BY_KEY[stage_key]["min"], template, chunks_for_key)
     if stage_key == "revisao":
         return validate_review(content)
     if stage_key == "verificacao":
@@ -431,11 +550,35 @@ def _has_word(word: str, plain: str) -> bool:
     return len(word) >= 3 and f" {word} " in f" {plain} "
 
 
+TITLE_SIMILARITY = 0.9
+
+
+def title_in_text(title: str, first_text: str) -> bool:
+    """Título nas primeiras páginas: trecho exato ou uma linha quase idêntica.
+
+    Achado do teste de 25/11/2026: o título de capas e cabeçalhos (guardado pelo
+    parser como título de seção, ou quebrado em linhas com hífen) não aparecia como
+    texto corrido, e correções verdadeiras eram recusadas. A comparação por linha
+    tolera essas diferenças sem aceitar um título que o documento não mostra.
+    """
+    wanted = normalize(title)
+    if wanted in normalize(first_text):
+        return True
+    lines = [normalize(l) for l in (first_text or "").splitlines()]
+    lines = [l for l in lines if l]
+    # Títulos longos costumam ocupar 2 ou 3 linhas na capa.
+    windows = lines + [" ".join(lines[i:i + 2]) for i in range(len(lines))] + \
+        [" ".join(lines[i:i + 3]) for i in range(len(lines))]
+    return any(abs(len(w) - len(wanted)) <= max(8, len(wanted) // 5) and
+               difflib.SequenceMatcher(None, w, wanted).ratio() >= TITLE_SIMILARITY for w in windows)
+
+
 def check_reference_fix(fix: dict, first_text: str, full_text: str) -> tuple[dict, list[str]]:
     """Confere uma correção de referência proposta pela IA no próprio texto da fonte.
 
-    Título e sobrenomes precisam estar nas primeiras páginas; ano, veículo e DOI,
-    em algum lugar do documento. Nada que o documento não mostre entra.
+    Título (exato ou quase idêntico a uma linha) e sobrenomes precisam estar nas
+    primeiras páginas; ano, veículo e DOI, em algum lugar do documento. Nada que o
+    documento não mostre entra.
     """
     errors = []
     first, full = normalize(first_text), normalize(full_text)
@@ -449,7 +592,7 @@ def check_reference_fix(fix: dict, first_text: str, full_text: str) -> tuple[dic
     title = " ".join(str(fix.get("titulo") or "").split())
     if len(normalize(title)) < 10:
         errors.append("Informe o título completo (mínimo de 10 caracteres).")
-    elif normalize(title) not in first:
+    elif not title_in_text(title, first_text):
         errors.append("O título não aparece nas primeiras páginas da fonte. Copie-o como está no documento.")
     authors = [" ".join(str(a).split()) for a in (fix.get("autores") or []) if str(a).strip()]
     if not authors:
@@ -511,7 +654,7 @@ def material(stage_key: str, project: dict, board: dict, references: list[dict])
     template = TEMPLATES.get(project.get("template"), TEMPLATES["abnt-artigo"])
     refs = [{"chave": r["key"], "fonte": r.get("source_id"), "titulo": (r.get("fields") or {}).get("title", ""),
              "ano": (r.get("fields") or {}).get("year", ""),
-             **({"a_conferir": True} if r.get("how") == "arquivo" else {})} for r in references]
+             "confianca": ref_level(r)} for r in references]
     base = {
         "projeto": project["id"], "titulo": project.get("title", ""), "pergunta": project.get("question", ""),
         "idioma": project.get("language", "pt-BR"), "modelo": template["nome"],

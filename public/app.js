@@ -1034,7 +1034,8 @@ async function loadAdvisor() {
 // Modo sem API (MCP): tokens pessoais e projetos escritos pela IA do pesquisador.
 const MCP_STAGE_LABELS = {pendente: 'pendente', recusada: 'devolvida para correção', aceita: 'aceita'};
 const MCP_STATUS = {preparando: 'Lendo as fontes', pronto: 'Em andamento', falhou_preparo: 'Falha na leitura das fontes',
-  compilando: 'Compilando o PDF', concluido: 'PDF pronto'};
+  compilando: 'Compilando o PDF', concluido: 'PDF final pronto', rascunho: 'Rascunho (não é a versão final)',
+  refazendo_referencias: 'Refazendo as referências'};
 function mcpMessage(text) { $('mcp-message').textContent = text; }
 // Comece aqui: três passos com estado. Some quando tudo foi feito.
 const startState = {fontes: false, ia: false, artigo: false};
@@ -1247,7 +1248,7 @@ function articleCard(p) {
   bar.append(fill); info.append(bar);
   const actions = document.createElement('div'); actions.className = 'actions'; actions.style.margin = '0';
   if ((p.arquivos || []).includes('scriptorium.pdf')) {
-    const pdf = el('button', 'Baixar PDF', 'btn'); pdf.type = 'button';
+    const pdf = el('button', p.status === 'concluido' ? 'Baixar PDF' : 'Baixar PDF (rascunho)', 'btn'); pdf.type = 'button';
     pdf.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/arquivos/scriptorium.pdf`, 'scriptorium.pdf'));
     actions.append(pdf);
   }
@@ -1262,17 +1263,33 @@ function articleCard(p) {
     next.append(el('strong', step.titulo), el('p', step.texto));
     if (step.detalhe) next.append(el('p', step.detalhe, 'subtle'));
     if (step.pedido) next.append(askBox(step.pedido));
+    if (step.pedido_rascunho) {
+      next.append(el('p', 'Para ler o texto antes, peça um rascunho (sai marcado como RASCUNHO):', 'subtle'));
+      next.append(askBox(step.pedido_rascunho));
+    }
     card.append(next);
   }
   const refs = p.referencias_a_conferir || [];
+  const busy = ['preparando', 'compilando', 'refazendo_referencias'].includes(p.status);
   if (refs.length && p.status !== 'concluido') {
     const box = document.createElement('details'); box.className = 'art-refs';
-    box.append(el('summary', `${refs.length} referência(s) para conferir antes do PDF`));
-    box.append(el('p', 'O Scriptorium não achou estes textos em bases confiáveis, então os dados vieram só do arquivo e podem estar errados. Peça à sua IA para corrigir pelo próprio documento:', 'subtle'));
+    box.append(el('summary', `${refs.length} referência(s) para confirmar antes do PDF final`));
+    box.append(el('p', '"Sugerida": achada por busca de título, pode ser de outra obra. "A conferir": os dados vieram só do arquivo. Peça à sua IA para confirmar ou corrigir cada uma pela capa do documento:', 'subtle'));
     box.append(askBox(p.pedido_referencias));
     const ul = document.createElement('ul');
-    for (const r of refs) ul.append(el('li', (r.titulo || r.chave) + (r.autor ? ` (${r.autor})` : '')));
-    box.append(ul); card.append(box);
+    for (const r of refs) ul.append(el('li', `${r.titulo || r.chave}${r.autor ? ` (${r.autor})` : ''}: ${r.nivel_texto || 'a conferir'}`));
+    box.append(ul);
+    if (!busy) {
+      const again = el('button', 'Refazer referências', 'btn alt'); again.type = 'button';
+      again.title = 'Monta de novo a bibliografia com as regras atuais, mantendo as chaves e as correções já feitas.';
+      again.addEventListener('click', async () => {
+        again.disabled = true;
+        try { await request(`/mcp-conta/projetos/${p.projeto}/referencias/refazer`, {method: 'POST'}); await loadMcpProjects(); }
+        catch (e) { again.disabled = false; box.append(el('p', e.message, 'warning')); }
+      });
+      const actions = document.createElement('div'); actions.className = 'actions'; actions.append(again); box.append(actions);
+    }
+    card.append(box);
   }
   if ((p.provas || []).length) {
     const ul = document.createElement('ul'); ul.className = 'art-proofs'; ul.setAttribute('aria-label', 'Já conferido pelo Scriptorium');

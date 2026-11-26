@@ -39,13 +39,19 @@ O modo com chave Gemini continua disponível para quem tiver créditos.
 | `referencias_do_projeto`, `ficha_da_fonte` | chaves oficiais e ficha sem IA |
 | `buscar_trechos`, `ler_trecho` | busca BM25 nos trechos e texto integral para citar |
 | `entregar_etapa` | entrega; volta com erros se não passar nas checagens |
-| `compilar` | PDF com a bibliografia oficial (worker, TeX restrito) |
+| `compilar` | PDF com a bibliografia oficial (worker, TeX restrito). Versão final só com todas as referências confirmadas e sem erro de LaTeX; `rascunho=true` (ou qualquer pendência) gera PDF marcado como RASCUNHO |
+| `corrigir_referencia` | confirma ou corrige autor, título, ano, tipo, veículo e DOI pelo próprio documento (título exato ou quase idêntico a uma linha ou título de seção das primeiras páginas); mantém a chave |
+| `refazer_referencias` | refaz a bibliografia com as regras atuais (worker, sem IA), mantendo as chaves citadas e as correções; nunca rebaixa uma referência |
+| `reabrir_reescrita` | reabre a reescrita e a verificação depois de aceitas, para corrigir um problema que só apareceu na compilação (a reescrita recebe o texto anterior e os erros de LaTeX) |
 
 ## Etapas e cabeças
 
 1. Planejamento (redatora): plano em Markdown que usa as chaves do projeto.
 2. Evidências (redatora): JSON com no mínimo 8 itens; cada `citacao_literal` é conferida no texto da fonte.
-3. Redação (redatora): corpo LaTeX com resumo, 3+ seções e só chaves existentes.
+3. Redação (redatora): corpo LaTeX com resumo, 3+ seções e só chaves existentes. Cada citação direta
+   (entre aspas, 4 ou mais palavras) precisa estar, palavra por palavra, numa fonte citada no mesmo
+   parágrafo; trecho com "[...]" é conferido por partes, e "tradução nossa" dispensa a conferência literal.
+   Se o trecho estiver em outra fonte, a entrega volta dizendo qual. O mesmo vale para a reescrita.
 4. **Revisão (revisora, conversa nova por passe)**: JSON com nota e problemas tipados.
 5. Reescrita (redatora): corpo LaTeX tratando a revisão.
 6. **Verificação (verificadora, conversa nova por passe)**: 10+ afirmações com veredito; citações conferidas.
@@ -81,6 +87,30 @@ revisão sistemática de uma colega do mestrado (só as ideias; nenhum código c
 - Site: na etapa Execuções e Auditorias, cada projeto abre etapas, concordância, PRISMA, matriz de
   extração (CSV) e a síntese por questão. O pesquisador pode gravar a **versão final** de cada
   resposta; ela substitui a da IA na redação e fica registrada na proveniência.
+
+## Confiança das referências e trava do PDF final
+
+Achado do teste de 25/11/2026: o PDF saiu "pronto" com 7 referências erradas e uma correspondência
+falsa do OpenAlex (Kitchenham virou "Department of Computer Science, 2013") sem aviso.
+
+| Origem (`how`) | Confiança | Quando |
+|---|---|---|
+| `doi` | confirmada | DOI registrado na importação da fonte |
+| `corrigida_pelo_texto` | confirmada | `corrigir_referencia`, conferida no documento |
+| `doi_no_texto`, `texto_do_pdf`, `titulo_do_pdf` | sugerida | busca no OpenAlex; pode ser outra obra |
+| `arquivo` | a conferir | só o que o arquivo diz |
+
+- A tabela é a mesma em `api/mcp_flow.py` e `worker/bib_integrity.py` (teste impede divergência).
+- `compilar` recusa a versão final com referência sugerida ou a conferir. O worker confere de novo e,
+  se houver pendência, erro de LaTeX ou citação sem referência, gera RASCUNHO (título e topo do PDF
+  marcados, motivos no estado do projeto). Com erro de LaTeX, compila de novo já marcado.
+- Cada referência guarda `consulta.status` (`ok`, `sem_resultado`, `api_recusou`, `parcial`,
+  `sem_consulta`): uma recusa do OpenAlex não se confunde mais com "obra não encontrada".
+- OpenAlex: desde 13/02/2026 a API exige chave. Rode uma vez, como administrador,
+  `PROJECT_ID=paperorchestra-mestrado bash scripts/setup-openalex-key.sh`: a chave vai para o Secret
+  Manager (`scriptorium-openalex`) e para o worker como `OPENALEX_API_KEY`. O deploy automático preserva.
+- Site: em Seus artigos, cada referência pendente mostra o nível; o botão "Refazer referências"
+  (`POST /api/mcp-conta/projetos/{id}/referencias/refazer`) faz o mesmo que `refazer_referencias`.
 
 ## Segurança do LaTeX
 

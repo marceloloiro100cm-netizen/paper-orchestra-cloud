@@ -36,7 +36,53 @@ PLACEHOLDER = re.compile(
     r"( de educa[cç][aã]o)?|revista de educa[cç][aã]o|revista de tecnologia|journal of education"
     r"|autor desconhecido|unknown|n/?a|s\.?\s?n\.?|xxx+|tbd)$", re.I)
 TITLE_MATCH = 0.86
-VERSION = "bib-integrity-2"
+VERSION = "bib-integrity-3"
+
+# Mesma tabela de api/mcp_flow.py (tests/test_mcp_jobs.py impede divergência):
+# só DOI registrado ou conferência no documento confirmam uma referência.
+REF_LEVELS = {
+    "doi": "confirmada",
+    "corrigida_pelo_texto": "confirmada",
+    "doi_no_texto": "sugerida",
+    "texto_do_pdf": "sugerida",
+    "titulo_do_pdf": "sugerida",
+    "arquivo": "a_conferir",
+}
+
+
+def ref_level(entry: dict) -> str:
+    return REF_LEVELS.get((entry or {}).get("how") or "", "a_conferir")
+
+
+class LookupLog:
+    """Registra o que aconteceu com as consultas ao OpenAlex de uma fonte.
+
+    Achado de 25/11/2026: qualquer erro (inclusive a API recusando a chamada sem
+    chave, exigida desde 13/02/2026) virava "sem correspondência", e não dava para
+    saber se a fonte não existia na base ou se a consulta nem tinha sido feita.
+    """
+
+    def __init__(self, get_json):
+        self.get_json, self.calls, self.refused, self.errors = get_json, 0, 0, []
+
+    def __call__(self, url: str):
+        self.calls += 1
+        try:
+            return self.get_json(url)
+        except Exception as exc:  # noqa: BLE001 - registrado e devolvido como "sem resposta"
+            self.refused += 1
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            self.errors.append(f"{type(exc).__name__}{f' {status}' if status else ''}")
+            return None
+
+    def status(self, found: bool) -> str:
+        if found:
+            return "ok"
+        if self.calls and self.refused == self.calls:
+            return "api_recusou"
+        if self.refused:
+            return "parcial"
+        return "sem_resultado" if self.calls else "sem_consulta"
 
 
 def fold(value: str) -> str:
@@ -254,19 +300,21 @@ def library_entries(sources: list[dict], get_json, pdf_meta=None, texts=None) ->
         text = (texts or {}).get(source.get("id")) or ""
         work, how = None, ""
         doi = canonical_doi(origin.get("doi") or "")
+        lookup = LookupLog(get_json)
+        get = lookup  # cada consulta é registrada; uma falha não interrompe as seguintes
         try:
             if doi:
-                work, how = get_json("https://api.openalex.org/works/doi:" + doi), "doi"
+                work, how = get("https://api.openalex.org/works/doi:" + doi), "doi"
             if not work and text:
                 for found in dois_in_text(text):
-                    candidate = get_json("https://api.openalex.org/works/doi:" + found)
+                    candidate = get("https://api.openalex.org/works/doi:" + found)
                     if candidate and confirmed_by_text(candidate, text):
                         work, how = candidate, "doi_no_texto"
                         break
             if not work:
                 for query in title_candidates(source, meta, text):
-                    found = get_json("https://api.openalex.org/works?per-page=5&search="
-                                     + re.sub(r"\s+", "+", clean_title(query)))
+                    found = get("https://api.openalex.org/works?per-page=5&search="
+                                + re.sub(r"\s+", "+", clean_title(query)))
                     results = (found or {}).get("results", [])
                     if text:
                         ok = [c for c in results if confirmed_by_text(c, text)]
@@ -289,10 +337,14 @@ def library_entries(sources: list[dict], get_json, pdf_meta=None, texts=None) ->
             # texto e o autor do metadado do PDF erravam (nome de pessoa como título,
             # autor do arquivo no lugar do autor da obra) e ficam para corrigir_referencia.
             title = meta.get("pdf_title") if len(meta.get("pdf_title") or "") > 15 else stem
-            fields = {"title": title, "note": "metadados a conferir: sem correspondência segura no OpenAlex"}
+            why = ("o OpenAlex recusou a consulta" if lookup.status(False) == "api_recusou"
+                   else "sem correspondência segura no OpenAlex")
+            fields = {"title": title, "note": f"metadados a conferir: {why}"}
             entry = {"type": "misc", "key": _key_for(fields, used), "fields": fields}
             how = "arquivo"
         entry["source_id"], entry["how"] = source.get("id"), how
+        entry["consulta"] = {"status": lookup.status(how != "arquivo"), "chamadas": lookup.calls,
+                             "erros": lookup.errors[:3]}
         out.append(entry)
     return out
 
