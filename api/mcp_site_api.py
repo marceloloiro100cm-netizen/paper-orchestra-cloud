@@ -302,11 +302,18 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
                 "",
                 f"- **Situação:** {'PDF final (todas as travas aprovadas)' if view['pdf_final'] else 'Rascunho / com pendências'}",
                 f"- **Tipo:** {mode(project)}",
+                f"- **Modo pedagógico:** {PEDAGOGICAL_MODES[pedagogical_mode_of(project)]['label']}",
                 "",
                 "## O que o Scriptorium conferiu",
             ]
             for p in view.get("provas") or ["Nenhuma etapa concluída ainda."]:
                 lines.append(f"- {p}")
+            adv_comments = list(project.get("advisor_comments") or [])
+            if adv_comments:
+                lines += ["", "## Apontamentos da orientação"]
+                for c in adv_comments:
+                    st_lbl = "Resolvido" if c.get("resolved") else "Pendente"
+                    lines.append(f"- [{st_lbl}] **{c.get('author') or 'Orientador(a)'}** ({c.get('stage') or 'Geral'} · {c.get('kind') or 'sugestao'}): {c.get('text') or ''}")
             pending = view.get("referencias_a_conferir") or []
             lines += ["", "## Pendências antes da versão final"]
             if pending:

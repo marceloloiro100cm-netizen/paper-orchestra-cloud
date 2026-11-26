@@ -204,6 +204,28 @@ class AbntRefsUnitTests(unittest.TestCase):
         self.assertTrue(res["abnt_references"][0].startswith("BASTANI"))
         self.assertTrue(res["abnt_references"][1].startswith("FREIRE"))
 
+    def test_citation_coherence_three_authors_multi_paren_and_prefixes(self):
+        lib = [
+            {"id": "1", "name": "Fan.pdf", "bib_entry": {
+                "type": "article", "key": "fan2025",
+                "fields": {"author": "Fan, Yizhou and Tang, L. and Le, H. and Shen, K.",
+                           "title": "Beware of metacognitive laziness", "year": "2025"},
+            }},
+            {"id": "2", "name": "Silva.pdf", "bib_entry": {
+                "type": "article", "key": "silva2025",
+                "fields": {"author": "Silva, Jimmy Naially and Oliveira, Rebeca Trajano and Silva, Elizabeth Maria da",
+                           "title": "Potencialidades e desafios", "year": "2025"},
+            }},
+        ]
+        # 3 autores narrativo ("e" e "&")
+        r1 = abnt_refs.check_citation_coherence("Segundo Silva, Oliveira e Silva (2025), há riscos.", lib)
+        self.assertEqual(r1["matched_count"], 1)
+        self.assertEqual(r1["missing_in_library"], [])
+        # Múltiplas citações no mesmo parêntese + prefixo cf.
+        r2 = abnt_refs.check_citation_coherence("Evidências (cf. FAN et al., 2025; SILVA; OLIVEIRA; SILVA, 2025).", lib)
+        self.assertEqual(r2["matched_count"], 2)
+        self.assertEqual(r2["missing_in_library"], [])
+
 
 class LibraryFase1ApiTests(unittest.TestCase):
     def setUp(self):

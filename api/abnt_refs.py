@@ -466,31 +466,52 @@ def export_library_references(items: Iterable[dict], fmt: str = "abnt") -> tuple
     return header + "\n\n".join(lines) + ("\n" if lines else ""), "text/plain; charset=utf-8", len(lines)
 
 
-_PAREN_CITE_RE = re.compile(
-    r"\(([A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þa-zà-öø-ÿ'\- ]{1,60}(?:;\s*[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þa-zà-öø-ÿ'\- ]{1,40}){0,2}(?:\s+et\s+al\.?)?),\s*((?:1[89]|20)\d{2}[a-z]?)(?:,\s*p\.?\s*[\d\-–]+)?\)"
+_PAREN_BLOCK_RE = re.compile(r"\(([^()]{4,260})\)")
+_PAREN_ITEM_RE = re.compile(
+    r"(?:^|;\s*)(?:(?:cf\.?|ver|veja|apud|e\.g\.|p\.?\s*ex\.?|vide)\s+)*"
+    r"([A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þa-zà-öø-ÿ'\- ]{1,60}(?:;\s*[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þa-zà-öø-ÿ'\- ]{1,50}){0,2}(?:\s+et\s+al\.?)?)"
+    r",\s*((?:1[89]|20)\d{2}[a-z]?)(?:,\s*p\.?\s*[\d\-–]+)?"
 )
 _NARR_CITE_RE = re.compile(
-    r"\b([A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]{2,30}(?:\s+(?:e|&)\s+[A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]{2,30}|\s+et\s+al\.?)?)\s*\(((?:1[89]|20)\d{2}[a-z]?)(?:,\s*p\.?\s*[\d\-–]+)?\)"
+    r"\b([A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]{1,30}"
+    r"(?:,\s*[A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]{1,30}){0,2}"
+    r"(?:\s+(?:e|&)\s+[A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]{1,30}|\s+et\s+al\.?)?)"
+    r"\s*\(((?:1[89]|20)\d{2}[a-z]?)(?:,\s*p\.?\s*[\d\-–]+)?\)"
 )
+_NON_AUTHOR_WORDS = {
+    "segundo", "conforme", "em", "de", "no", "na", "para", "entre", "sobre",
+    "como", "ano", "anos", "etapa", "fase", "versao", "versão", "artigo", "livro",
+}
 
 
 def extract_in_text_citations(text: str) -> list[dict]:
-    """Extrai citações autor-data (ABNT NBR 10520) em um texto acadêmico."""
+    """Extrai citações autor-data (ABNT NBR 10520:2023), inclusive múltiplas no mesmo parêntese e 3 autores."""
     found: list[dict] = []
     seen: set[tuple[str, str]] = set()
-    for regex in (_PAREN_CITE_RE, _NARR_CITE_RE):
-        for m in regex.finditer(text or ""):
-            raw_who = m.group(1).strip()
-            year = re.sub(r"[a-z]$", "", m.group(2).strip())
-            # Pega primeiro sobrenome para pareamento confiável
-            first = re.split(r"\s*;\s*|\s+et\s+al\.?|\s+e\s+|\s*&\s*", raw_who, maxsplit=1, flags=re.IGNORECASE)[0].strip()
-            norm_surname = _strip_accents(first).lower()
-            if not norm_surname or len(norm_surname) < 2:
-                continue
-            sig = (norm_surname, year)
-            if sig not in seen:
-                seen.add(sig)
-                found.append({"raw": m.group(0), "surname": norm_surname, "year": year})
+
+    def _add(raw_label: str, raw_who: str, year_raw: str):
+        year = re.sub(r"[a-z]$", "", year_raw.strip())
+        first = re.split(r"\s*[,;]\s*|\s+et\s+al\.?|\s+e\s+|\s*&\s*", raw_who.strip(), maxsplit=1, flags=re.IGNORECASE)[0].strip()
+        norm_surname = _strip_accents(first).lower()
+        if not norm_surname or len(norm_surname) < 2 or norm_surname in _NON_AUTHOR_WORDS:
+            return
+        sig = (norm_surname, year)
+        if sig not in seen:
+            seen.add(sig)
+            found.append({"raw": raw_label, "surname": norm_surname, "year": year})
+
+    for block in _PAREN_BLOCK_RE.finditer(text or ""):
+        inner = block.group(1).strip()
+        if not re.search(r"\b(?:1[89]|20)\d{2}\b", inner):
+            continue
+        # Extrai uma ou múltiplas citações dentro do mesmo parêntese: (FAN et al., 2025; SILVA; OLIVEIRA; SILVA, 2025)
+        for m in _PAREN_ITEM_RE.finditer(inner):
+            piece = m.group(0).lstrip("; ").strip()
+            _add(f"({piece})", m.group(1), m.group(2))
+
+    for m in _NARR_CITE_RE.finditer(text or ""):
+        _add(m.group(0), m.group(1), m.group(2))
+
     return found
 
 

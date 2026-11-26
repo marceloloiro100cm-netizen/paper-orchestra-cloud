@@ -545,6 +545,7 @@ h4 { font-size: 0.96rem; font-weight: 700; margin-bottom: 6px; color: var(--text
 .modal-scroll { max-height: 54vh; overflow: auto; padding-right: 4px; }
 .flow-map { display: flex; flex-direction: column; gap: 6px; }
 .flow-node { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-main, #D8E3F0); background: var(--bg-subtle, #EFF4FA); }
+.flow-node > .btn { white-space: nowrap; flex-shrink: 0; }
 .flow-node.ok { border-left: 4px solid var(--mpie-blue, #1466B8); background: var(--ok-bg, #E8F2FC); }
 .flow-node.partial { border-left: 4px solid var(--mpie-gold, #F4B93B); background: var(--warn-bg, #FFFBEB); }
 .flow-node.pending { border-left: 4px solid var(--border-main, #D8E3F0); }
@@ -1160,7 +1161,7 @@ function renderInputControl(field,v,context={}){
   const hintId=`hint-${id}`;const hint=context.rec?'':field.plainHint;
   let input='';
   if(typ==='select'){input=`<select id="${id}" ${att} aria-describedby="${hintId}"><option value="">Escolha uma opção…</option>${(field.options||[]).map(o=>`<option value="${esc(o)}" ${v===o?'selected':''}>${esc(o)}</option>`).join('')}</select>`;}
-  else if(typ==='textarea'){input=`<textarea id="${id}" ${att} rows="${context.rec?3:4}" aria-describedby="${hintId}" placeholder="${esc(lvl==='autonomo'?'Escreva aqui…':(field.placeholder||'Escreva aqui com suas palavras…'))}">${esc(v)}</textarea>`;}
+  else if(typ==='textarea'){const rows=context.rec?3:((key==='registroIA_M12'||key==='sec_referencias')?Math.min(14,Math.max(6,String(v||'').split('\n').length+1)):4);input=`<textarea id="${id}" ${att} rows="${rows}" aria-describedby="${hintId}" placeholder="${esc(lvl==='autonomo'?'Escreva aqui…':(field.placeholder||'Escreva aqui com suas palavras…'))}">${esc(v)}</textarea>`;}
   else{input=`<input id="${id}" ${att} type="${['date','month','number','text'].includes(typ)?typ:'text'}" value="${esc(v)}" aria-describedby="${hintId}" placeholder="${esc(lvl==='autonomo'?'':(field.placeholder||''))}">`;}
   const tools=[];
   if(typ==='textarea'&&key!=='sec_referencias')tools.push(`<button class="btn sm ghost" data-action="open-cite" data-target="${esc(id)}" type="button" title="Inserir citação ABNT da sua Biblioteca (atalho: digite /citar)">📚 Citar</button>`);
@@ -1207,7 +1208,7 @@ function renderPreencher(s){let body='';if(s.id===3){body=renderRepeat('searchBl
   const socraticCue=(supportLevel()==='inicial'&&s.guidingQuestions?.length)?`<div style="margin-top:6px"><strong>Pergunta socrática para guiar esta etapa:</strong> ${esc(s.guidingQuestions[0])}</div>`:'';
   return `<div class="section-max section-gap"><div class="notice"><strong>Escreva no seu tempo:</strong> tudo o que você digita fica salvo automaticamente. Você pode sair e voltar depois sem perder nada.${socraticCue}</div>${renderLegacy(s)}${body}<div class="action-footer"><button type="button" class="btn" data-action="examples">Ver exemplos prontos</button><button type="button" class="btn primary" data-action="tab" data-tab="conferir">Revisar e avançar →</button></div></div>`;}
 function renderConferir(s){const p=info(s.id);const items=s.criteria.map((c,i)=>{const k=`${s.id}:${i}`;return `<div class="check-card"><input type="checkbox" id="check-${s.id}-${i}" data-check="${esc(k)}" ${state.criteria[k]?'checked':''}><div><label for="check-${s.id}-${i}">${esc(c)}</label><textarea class="check-note" rows="2" data-evidence="${esc(k)}" aria-label="Anotação para o critério ${i+1}" placeholder="Anotação opcional (o que já está pronto ou o que falta revisar)…">${esc(state.evidence[k]||'')}</textarea></div></div>`;}).join('');
-const rev=state.reviews[s.id];const dec=(state.decisions||{})[s.id]||'';return `<div class="section-max section-gap"><div class="card warning"><span class="eyebrow">Revisão pessoal desta etapa</span><p class="small" style="margin:6px 0">Marque cada item abaixo quando sentir que ele está bem resolvido no seu texto. Você pode avançar e voltar quando quiser.</p><div class="status-steps">${['Em andamento','Preenchida','Conferida','Revisão da orientação'].map((q,i)=>`<span class="status-step ${(i===0&&p.count>0)||(i===1&&p.complete)||(i===2&&p.complete&&p.allChecked)||(i===3&&rev&&rev.result==='revisado')?'on':''}">${q}</span>`).join('')}</div></div><h3>Lista de conferência</h3><div class="small muted">Preenchido: ${p.count} de ${p.max} blocos · Marcados: ${s.criteria.filter((_,i)=>state.criteria[`${s.id}:${i}`]).length} de ${s.criteria.length}</div>${items}<div class="card white"><span class="eyebrow">Aprendizagem visível (opcional)</span><h3 style="margin-top:4px">Por que tomei estas decisões nesta etapa?</h3><p class="small muted">Explique em 2 ou 3 linhas por que escolheu este recorte, autor ou método. Isso fortalece sua autoria e ajuda na reunião de orientação e na banca.</p><textarea class="form-control" rows="3" data-decision="${s.id}" aria-label="Justificativa das decisões da etapa ${s.id}" placeholder="Ex.: escolhi este método porque permite acompanhar a turma real durante um semestre…">${esc(dec)}</textarea><details style="margin-top:12px"><summary class="small bold" style="cursor:pointer">Registrar decisão sobre sugestão de IA nesta etapa (Aceitei / Adaptei / Rejeitei) ▾</summary><div style="margin-top:10px;display:flex;flex-direction:column;gap:8px"><div class="flex"><select id="qAiPostura" class="form-control" style="max-width:200px"><option value="Adaptei">Adaptei a sugestão</option><option value="Aceitei">Aceitei a sugestão</option><option value="Rejeitei">Rejeitei a sugestão</option></select><input id="qAiTool" class="form-control" style="flex:1;min-width:180px" placeholder="Ferramenta (ex.: ChatGPT, Gemini, Scriptorium)"></div><textarea id="qAiWhy" rows="2" class="form-control" placeholder="Qual foi a sugestão e por que você decidiu aceitar, adaptar ou rejeitar?"></textarea><div class="flex"><button type="button" class="btn sm primary" data-action="quick-ai-decision">Salvar decisão no registro M12</button><span class="tiny muted">Alimenta automaticamente a Declaração IN IFRS 16/2026 (Etapa 8).</span></div></div></details></div><div class="card white"><h3>Comentário da orientação (opcional)</h3>${rev?.stale?'<div class="notice" style="margin-bottom:10px">Você editou esta etapa depois do último parecer registrado.</div>':''}<p class="small">${rev?'Último registro: '+esc(rev.reviewer)+' · '+esc(rev.date)+': '+esc(rev.comment):'Nenhum comentário registrado ainda.'}</p><button type="button" class="btn sm" data-action="review">Registrar comentário recebido</button></div><div class="action-footer"><button type="button" class="btn" data-action="snapshot">Guardar uma versão</button><div class="flex"><button type="button" class="btn" data-action="jump" data-stage="${Math.max(1,s.id-1)}" ${s.id===1?'disabled':''}>← Etapa anterior</button><button type="button" class="btn primary" data-action="jump" data-stage="${Math.min(8,s.id+1)}">${s.id===8?'Concluir revisão':'Ir para a Etapa '+Math.min(8,s.id+1)+' →'}</button></div></div></div>`;}
+const rev=state.reviews[s.id];const dec=(state.decisions||{})[s.id]||'';return `<div class="section-max section-gap"><div class="card warning"><span class="eyebrow">Revisão pessoal desta etapa</span><p class="small" style="margin:6px 0">Marque cada item abaixo quando sentir que ele está bem resolvido no seu texto. Você pode avançar e voltar quando quiser.</p><div class="status-steps">${['Em andamento','Preenchida','Conferida','Revisão da orientação'].map((q,i)=>`<span class="status-step ${(i===0&&p.count>0)||(i===1&&p.complete)||(i===2&&p.complete&&p.allChecked)||(i===3&&rev&&rev.result==='revisado')?'on':''}">${q}</span>`).join('')}</div></div><h3>Lista de conferência</h3><div class="small muted">Preenchido: ${p.count} de ${p.max} blocos · Marcados: ${s.criteria.filter((_,i)=>state.criteria[`${s.id}:${i}`]).length} de ${s.criteria.length}</div>${items}<div class="card white"><span class="eyebrow">Aprendizagem visível (opcional)</span><h3 style="margin-top:4px">Por que tomei estas decisões nesta etapa?</h3><p class="small muted">Explique em 2 ou 3 linhas por que escolheu este recorte, autor ou método. Isso fortalece sua autoria e ajuda na reunião de orientação e na banca.</p><textarea class="form-control" rows="3" data-decision="${s.id}" aria-label="Justificativa das decisões da etapa ${s.id}" placeholder="Ex.: escolhi este método porque permite acompanhar a turma real durante um semestre…">${esc(dec)}</textarea><details style="margin-top:12px"><summary class="small bold" style="cursor:pointer">Registrar decisão sobre sugestão de IA nesta etapa (Aceitei / Adaptei / Rejeitei)</summary><div style="margin-top:10px;display:flex;flex-direction:column;gap:8px"><div class="flex"><select id="qAiPostura" class="form-control" style="max-width:200px"><option value="Adaptei">Adaptei a sugestão</option><option value="Aceitei">Aceitei a sugestão</option><option value="Rejeitei">Rejeitei a sugestão</option></select><input id="qAiTool" class="form-control" style="flex:1;min-width:180px" placeholder="Ferramenta (ex.: ChatGPT, Gemini, Scriptorium)"></div><textarea id="qAiWhy" rows="2" class="form-control" placeholder="Qual foi a sugestão e por que você decidiu aceitar, adaptar ou rejeitar?"></textarea><div class="flex"><button type="button" class="btn sm primary" data-action="quick-ai-decision">Salvar decisão no registro M12</button><span class="tiny muted">Alimenta automaticamente a Declaração IN IFRS 16/2026 (Etapa 8).</span></div></div></details></div><div class="card white"><h3>Comentário da orientação (opcional)</h3>${rev?.stale?'<div class="notice" style="margin-bottom:10px">Você editou esta etapa depois do último parecer registrado.</div>':''}<p class="small">${rev?'Último registro: '+esc(rev.reviewer)+' · '+esc(rev.date)+': '+esc(rev.comment):'Nenhum comentário registrado ainda.'}</p><button type="button" class="btn sm" data-action="review">Registrar comentário recebido</button></div><div class="action-footer"><button type="button" class="btn" data-action="snapshot">Guardar uma versão</button><div class="flex"><button type="button" class="btn" data-action="jump" data-stage="${Math.max(1,s.id-1)}" ${s.id===1?'disabled':''}>← Etapa anterior</button><button type="button" class="btn primary" data-action="jump" data-stage="${Math.min(8,s.id+1)}">${s.id===8?'Concluir revisão':'Ir para a Etapa '+Math.min(8,s.id+1)+' →'}</button></div></div></div>`;}
 function buildGuidePlan(){
   const titulo=val('tituloFinal')||val('tituloProvisorio')||val('tema');
   const obs=recs('objectives').map((o,i)=>plain(o.texto)?`${i+1}. ${plain(o.texto)}`:'').filter(Boolean);
@@ -1298,7 +1299,7 @@ function audit(){const arr=[];const put=(lvl,title,text,step)=>arr.push({lvl,tit
   for(const s of STAGES)if(info(s.id).code==='empty')put('info',`Etapa ${s.id} não iniciada`,'É possível avançar livremente, mas ela precisa ser revisada antes da conclusão.',s.id);
   if(arr.length===0)put('good','Nenhuma pendência estrutural detectada','Isso não constitui validação científica. Confira a relevância, veracidade e coerência com a orientação.',8);
   return arr;}
-function auditHTML(){const list=audit();const high=list.filter(x=>x.lvl==='high').length;return `<div class="card warning"><strong>${high} pendência(s) estruturais de maior prioridade</strong><p class="small muted">Estas verificações analisam presença e padrões simples de texto. Não são uma avaliação semântica da pesquisa e não utilizam IA neste arquivo.</p></div><ul class="audit-list">${list.map(a=>`<li class="${a.lvl}"><strong>${esc(a.title)} ${badge('Etapa '+a.step)}</strong>${esc(a.text)} <button type="button" class="btn sm" data-action="jump" data-stage="${a.step}">Ir para etapa</button></li>`).join('')}</ul>`;}
+function auditHTML(){const list=audit();const high=list.filter(x=>x.lvl==='high').length;return `<div class="card warning"><strong>${list.length} apontamento(s) encontrado(s) · ${high} de maior prioridade</strong><p class="small muted">Estas verificações analisam presença e padrões simples de texto. Não são uma avaliação semântica da pesquisa e não utilizam IA neste arquivo.</p></div><ul class="audit-list">${list.map(a=>`<li class="${a.lvl}"><strong>${esc(a.title)} ${badge('Etapa '+a.step)}</strong>${esc(a.text)} <button type="button" class="btn sm" data-action="jump" data-stage="${a.step}">Ir para etapa</button></li>`).join('')}</ul>`;}
 function openAudit(){modal('Conferência de coerência: indicadores locais',`<div class="modal-scroll">${auditHTML()}</div>`,`<button type="button" class="btn" data-action="close-modal">Fechar</button>`);}
 const RUBRIC_DIMS=[
   {key:'problema',title:'1. Problema e Pergunta',levels:[
@@ -1434,16 +1435,26 @@ function analyzeGuideCitations(){
   const lib=(window.ScriptoriumBiblioteca?.listar()||[]).filter(i=>i&&i.abnt&&i.abnt.reference);
   const txt=extractGuideTextForCitations();
   const seen=new Set(), found=[];
-  const reP=/\(([A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þa-zà-öø-ÿ'\- ]{1,60}(?:;\s*[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þa-zà-öø-ÿ'\- ]{1,40}){0,2}(?:\s+et\s+al\.?)?),\s*((?:1[89]|20)\d{2}[a-z]?)(?:,\s*p\.?\s*[\d\-–]+)?\)/g;
-  const reN=/\b([A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]{2,30}(?:\s+(?:e|&)\s+[A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]{2,30}|\s+et\s+al\.?)?)\s*\(((?:1[89]|20)\d{2}[a-z]?)(?:,\s*p\.?\s*[\d\-–]+)?\)/g;
-  for(const rx of [reP,reN]){
-    let m;while((m=rx.exec(txt))!==null){
-      const first=m[1].split(/\s*;\s*|\s+et\s+al\.?|\s+e\s+|\s*&\s*/i)[0].trim();
-      const s=normalizeAscii(first), y=m[2].replace(/[a-z]$/,'');
-      const sig=`${s}|${y}`;
-      if(s.length>=2&&!seen.has(sig)){seen.add(sig);found.push({raw:m[0],surname:s,year:y});}
+  const nonAuthor=new Set(['segundo','conforme','em','de','no','na','para','entre','sobre','como','ano','anos','etapa','fase','versao','artigo','livro']);
+  const addCite=(rawLabel,rawWho,yearRaw)=>{
+    const first=rawWho.trim().split(/\s*[,;]\s*|\s+et\s+al\.?|\s+e\s+|\s*&\s*/i)[0].trim();
+    const s=normalizeAscii(first), y=yearRaw.replace(/[a-z]$/,'');
+    const sig=`${s}|${y}`;
+    if(s.length>=2&&!nonAuthor.has(s)&&!seen.has(sig)){seen.add(sig);found.push({raw:rawLabel,surname:s,year:y});}
+  };
+  const reBlock=/\(([^()]{4,260})\)/g;
+  const reItem=/(?:^|;\s*)(?:(?:cf\.?|ver|veja|apud|e\.g\.|p\.?\s*ex\.?|vide)\s+)*([A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þa-zà-öø-ÿ'\- ]{1,60}(?:;\s*[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þa-zà-öø-ÿ'\- ]{1,50}){0,2}(?:\s+et\s+al\.?)?),\s*((?:1[89]|20)\d{2}[a-z]?)(?:,\s*p\.?\s*[\d\-–]+)?/g;
+  let mb;while((mb=reBlock.exec(txt))!==null){
+    const inner=mb[1].trim();
+    if(!/\b(?:1[89]|20)\d{2}\b/.test(inner))continue;
+    reItem.lastIndex=0;
+    let mi;while((mi=reItem.exec(inner))!==null){
+      const piece=mi[0].replace(/^;\s*/,'').trim();
+      addCite(`(${piece})`,mi[1],mi[2]);
     }
   }
+  const reN=/\b([A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]{1,30}(?:,\s*[A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]{1,30}){0,2}(?:\s+(?:e|&)\s+[A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]{1,30}|\s+et\s+al\.?)?)\s*\(((?:1[89]|20)\d{2}[a-z]?)(?:,\s*p\.?\s*[\d\-–]+)?\)/g;
+  let mn;while((mn=reN.exec(txt))!==null){addCite(mn[0],mn[1],mn[2]);}
   const matchedIds=new Set(), matched=[], missing=[];
   for(const c of found){
     const hit=lib.find(it=>{const sy=itemSurnameYear(it);return sy.year===c.year&&(sy.surname===c.surname||sy.surname.endsWith(' '+c.surname));});
@@ -1505,9 +1516,13 @@ function openCitePicker(targetEl){
   const lib=window.ScriptoriumBiblioteca?.listar()||[];
   const roleNames={'':'Todos os papéis',marco_teorico:'Marco Teórico',metodo:'Método',evidencia:'Evidência',contraponto:'Contraponto'};
   if(!lib.length){
+    const logged=Boolean(window.ScriptoriumConta?.usuario());
+    const msg=logged
+      ?'Adicione PDFs, DOIs, BibTeX ou RIS na aba <strong>Biblioteca</strong> para citar com 1 clique e gerar referências ABNT automaticamente.'
+      :'A Biblioteca privada exige login com sua conta Google. O que você escreveu neste Guia já está salvo neste aparelho e continuará disponível quando você entrar.';
     modal('Citar da sua Biblioteca (ABNT)',
-      `<div class="card warning"><strong>Sua Biblioteca ainda não tem fontes carregadas.</strong><p class="small" style="margin:6px 0 0">Adicione PDFs, DOIs, BibTeX ou RIS na aba <strong>Biblioteca</strong> para citar com 1 clique e gerar referências ABNT automaticamente.</p></div>`,
-      `<button type="button" class="btn" data-action="close-modal">Fechar</button><button type="button" class="btn primary" data-action="open-library">Abrir Biblioteca →</button>`);
+      `<div class="card warning"><strong>${logged?'Sua Biblioteca ainda não tem fontes carregadas.':'Entre com Google para usar sua Biblioteca privada.'}</strong><p class="small" style="margin:6px 0 0">${msg}</p></div>`,
+      `<button type="button" class="btn" data-action="close-modal">Continuar no Guia</button><button type="button" class="btn primary" data-action="open-library">${logged?'Abrir Biblioteca →':'Ir para Login / Biblioteca →'}</button>`);
     return;
   }
   const body=`<div class="flex" style="margin-bottom:10px">
