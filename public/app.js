@@ -1446,28 +1446,62 @@ const MCP_STATUS = {preparando: 'Lendo as fontes', pronto: 'Em andamento', falho
   compilando: 'Compilando o PDF', concluido: 'PDF final pronto', rascunho: 'Rascunho (não é a versão final)',
   refazendo_referencias: 'Refazendo as referências'};
 function mcpMessage(text) { $('mcp-message').textContent = text; }
-// Comece aqui: três passos com estado. Some quando tudo foi feito.
+// Estado de progresso exibido dentro do modal "Como usar" (no cabeçalho, ao lado de Minha conta).
 const startState = {fontes: false, ia: false, artigo: false};
-const startKnown = new Set();
 function updateStart(part, value) {
-  if (part) { startState[part] = value; startKnown.add(part); }
-  const strip = $('start-strip'); if (!strip || API_MODE || startKnown.size < 3) return;
-  const steps = [['start-1', startState.fontes], ['start-2', startState.ia], ['start-3', startState.artigo]];
-  const current = steps.find(([, done]) => !done);
-  for (const [id, done] of steps) {
-    const li = $(id); li.classList.toggle('done', done); li.classList.toggle('current', current && current[0] === id);
-    li.querySelector('.start-n').textContent = done ? '✓' : id.slice(-1);
-    li.querySelector('button').setAttribute('aria-label', li.querySelector('b').textContent + (done ? ': feito' : current && current[0] === id ? ': próximo passo' : ''));
+  if (part) startState[part] = Boolean(value);
+  const map = [
+    ['howto-step-fontes', 'howto-badge-fontes', startState.fontes, '✓ Feito', 'Passo 2'],
+    ['howto-step-ia', 'howto-badge-ia', startState.ia, '✓ IA conectada', 'Opcional'],
+    ['howto-step-artigo', 'howto-badge-artigo', startState.artigo, '✓ Em andamento', 'Passo 4'],
+  ];
+  for (const [cardId, badgeId, done, doneTxt, idleTxt] of map) {
+    const card = $(cardId), badge = $(badgeId);
+    if (card) card.classList.toggle('done', done);
+    if (badge) badge.textContent = done ? doneTxt : idleTxt;
   }
-  strip.classList.toggle('hidden', !current);
+}
+function openHowToModal(open) {
+  const modal = $('welcome-tour'), btn = $('how-to-use-btn');
+  if (!modal) return;
+  modal.classList.toggle('hidden', !open);
+  if (btn) btn.setAttribute('aria-expanded', String(Boolean(open)));
+  if (open) updateStart();
 }
 function openConnect() {
+  openHowToModal(false);
+  if (!user) {
+    $('login-panel')?.classList.remove('hidden');
+    $('login-panel')?.scrollIntoView({behavior: 'smooth', block: 'center'});
+    return;
+  }
   const panel = $('account-panel');
   if (panel.classList.contains('as-modal')) setAccountPanelOpen(true);
   $('mcp-details').open = true;
   $('mcp-details').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
-document.querySelector('[data-start="2"]')?.addEventListener('click', openConnect);
+$('how-to-use-btn')?.addEventListener('click', () => {
+  const isOpen = !$('welcome-tour')?.classList.contains('hidden');
+  openHowToModal(!isOpen);
+});
+$('howto-open-connect')?.addEventListener('click', openConnect);
+for (const b of document.querySelectorAll('[data-howto-go]')) {
+  b.addEventListener('click', () => {
+    const step = b.dataset.howtoGo;
+    openHowToModal(false);
+    if (step === '4' && !user) {
+      location.hash = '#guia';
+      window.ScriptoriumNavegar?.('4');
+      return;
+    }
+    if (!user) {
+      $('login-panel')?.classList.remove('hidden');
+      $('login-panel')?.scrollIntoView({behavior: 'smooth', block: 'center'});
+      return;
+    }
+    window.ScriptoriumNavegar?.(step);
+  });
+}
 
 // Qual IA: mostra só os passos dela; a escolha fica neste navegador.
 const AI_KEY = 'scriptorium_minha_ia';
@@ -2587,7 +2621,11 @@ function setAccountPanelOpen(open) {
   const shown = panel.classList.contains('open');
   $('account-backdrop').classList.toggle('hidden', !shown);
   $('account-button').setAttribute('aria-expanded', String(shown));
-  if (shown) { panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); $('account-close').focus(); }
+  if (shown) {
+    panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true');
+    if (!startState.ia && $('mcp-details') && !$('mcp-details').classList.contains('hidden')) $('mcp-details').open = true;
+    $('account-close').focus();
+  }
   else { panel.removeAttribute('role'); panel.removeAttribute('aria-modal'); }
 }
 function updateAccountMode() {
@@ -2898,15 +2936,14 @@ for (const btn of document.querySelectorAll('[data-glossary]')) {
   });
 }
 function syncWelcomeTour(uid) {
-  const tour = $('welcome-tour'); if (!tour || !uid) return;
-  try {
-    const seen = localStorage.getItem('scriptorium_tour_seen_' + uid) === '1';
-    tour.classList.toggle('hidden', seen);
-  } catch (_) {}
+  // O guia "Como usar" agora fica sempre acessível pelo botão no cabeçalho (sem ocupar o topo das abas).
+  updateStart();
 }
-$('welcome-tour-dismiss')?.addEventListener('click', () => {
-  $('welcome-tour')?.classList.add('hidden');
-  if (user?.uid) { try { localStorage.setItem('scriptorium_tour_seen_' + user.uid, '1'); } catch (_) {} }
+$('welcome-tour-dismiss')?.addEventListener('click', () => openHowToModal(false));
+$('welcome-tour-ok')?.addEventListener('click', () => openHowToModal(false));
+$('welcome-tour')?.addEventListener('click', (e) => { if (e.target === $('welcome-tour')) openHowToModal(false); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('welcome-tour') && !$('welcome-tour').classList.contains('hidden')) openHowToModal(false);
 });
 
 async function loadAdvisorShareView() {

@@ -144,6 +144,8 @@ class Fase2BackendTests(unittest.TestCase):
         guia_js = (ROOT / "public" / "guia" / "guia.js").read_text(encoding="utf-8")
         self.assertIn('id="open-prisma-summary"', html)
         self.assertIn('id="new-proj-pedagogical"', html)
+        self.assertIn('id="how-to-use-btn"', html)
+        self.assertNotIn('id="start-strip"', html)
         self.assertIn("/library/prisma-summary", app_js)
         self.assertIn("/modo-pedagogico", app_js)
         self.assertIn("/comentarios", app_js)

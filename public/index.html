@@ -1100,6 +1100,17 @@
     .study-note-card { border: 1px solid var(--border-main); border-radius: 10px; padding: 10px 12px; background: var(--bg-surface); margin-bottom: 8px; }
     .study-note-quote { border-left: 3px solid var(--mpie-blue); padding-left: 10px; margin: 6px 0; font-style: italic; font-size: 0.86rem; color: var(--text-secondary); }
     .study-note-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-top: 6px; font-size: 0.78rem; }
+    .welcome-tour.as-modal { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(7, 10, 15, 0.56); }
+    .welcome-tour.as-modal.hidden { display: none; }
+    .welcome-tour-dialog { width: min(760px, 96vw); max-height: 88vh; overflow-y: auto; background: var(--bg-surface); border: 1px solid var(--border-main); border-radius: 18px; padding: 22px 24px; box-shadow: 0 20px 55px rgba(0, 0, 0, 0.35); }
+    .howto-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+    .howto-card { border: 1px solid var(--border-main); border-radius: 12px; padding: 13px 14px; background: var(--bg-subtle); display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+    .howto-card.done { border-color: var(--ok-border); background: var(--ok-bg); }
+    .howto-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .howto-badge { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--bg-surface); border: 1px solid var(--border-main); color: var(--text-secondary); white-space: nowrap; }
+    .howto-card.done .howto-badge { background: var(--mpie-blue); color: #fff; border-color: var(--mpie-blue); }
+    .howto-card p { margin: 0; font-size: 0.84rem; color: var(--text-secondary); line-height: 1.48; }
+    @media (max-width: 680px) { .howto-steps { grid-template-columns: 1fr; } }
     @media (max-width: 780px) {
       .ref-check-grid, .study-grid { grid-template-columns: 1fr; }
       .ref-check-form { grid-template-columns: 1fr; }
@@ -1184,6 +1195,17 @@
     .glossary-btn:hover, .glossary-btn[aria-expanded="true"] { border-color: var(--mpie-blue); background: var(--mpie-blue-soft); }
     .glossary-pop { margin-top: 8px; padding: 11px 14px; border-radius: 11px; border: 1px solid var(--ok-border); background: var(--mpie-blue-soft); color: var(--text-primary); font-size: 0.88rem; line-height: 1.5; }
     .advisor-box { margin-top: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-main); background: var(--bg-subtle); }
+    .welcome-tour.as-modal { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(7, 10, 15, 0.56); }
+    .welcome-tour.as-modal.hidden { display: none; }
+    .welcome-tour-dialog { width: min(760px, 96vw); max-height: 88vh; overflow-y: auto; background: var(--bg-surface); border: 1px solid var(--border-main); border-radius: 18px; padding: 22px 24px; box-shadow: 0 20px 55px rgba(0, 0, 0, 0.35); }
+    .howto-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+    .howto-card { border: 1px solid var(--border-main); border-radius: 12px; padding: 13px 14px; background: var(--bg-subtle); display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+    .howto-card.done { border-color: var(--ok-border); background: var(--ok-bg); }
+    .howto-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .howto-badge { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--bg-surface); border: 1px solid var(--border-main); color: var(--text-secondary); white-space: nowrap; }
+    .howto-card.done .howto-badge { background: var(--mpie-blue); color: #fff; border-color: var(--mpie-blue); }
+    .howto-card p { margin: 0; font-size: 0.84rem; color: var(--text-secondary); line-height: 1.48; }
+    @media (max-width: 680px) { .howto-steps { grid-template-columns: 1fr; } }
     @media (max-width: 780px) { .tour-grid { grid-template-columns: 1fr; } }
 
     .agent-detail { margin-top: 12px; padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-main); border-radius: 12px; }
@@ -1440,6 +1462,11 @@
           <span aria-hidden="true">📘</span>
           <span class="guide-label">Guia de escrita</span>
         </a>
+        <button type="button" id="how-to-use-btn" class="theme-btn" aria-haspopup="dialog"
+                aria-controls="welcome-tour" aria-expanded="false" aria-label="Como usar o Scriptorium" title="Como usar o Scriptorium passo a passo">
+          <span aria-hidden="true">❓</span>
+          <span class="guide-label">Como usar</span>
+        </button>
         <button type="button" id="account-button" class="theme-btn account-btn hidden" aria-haspopup="dialog"
                 aria-controls="account-panel" aria-expanded="false" title="Minha conta">
           <span class="account-dot" id="account-dot" aria-hidden="true"></span>
@@ -1770,50 +1797,7 @@
           </details>
         </div>
       </section>
-      <!-- Onda 3: Tour acolhedor de 3 passos (sem jargão) para novos estudantes -->
-      <section class="panel welcome-tour hidden" id="welcome-tour" aria-labelledby="welcome-tour-title">
-        <div class="panel-header" style="margin-bottom:6px">
-          <div>
-            <h2 id="welcome-tour-title" style="font-size:1.2rem">Bem-vindo(a) ao Scriptorium: 3 passos simples</h2>
-            <p class="subtle" style="margin:4px 0 0">Você não precisa saber programação nem LaTeX. Siga este caminho no seu ritmo:</p>
-          </div>
-          <button type="button" class="btn alt" id="welcome-tour-dismiss">Entendi, começar agora</button>
-        </div>
-        <div class="tour-grid">
-          <div class="tour-card">
-            <strong>1. Planeje com suas palavras</strong>
-            <p>Abra o <b>Guia de escrita</b> (sem IA) para definir tema, problema, pergunta e objetivos com ajuda passo a passo.</p>
-          </div>
-          <div class="tour-card">
-            <strong>2. Guarde seus PDFs na Biblioteca</strong>
-            <p>Envie os artigos e livros que você leu. O Scriptorium confere as capas para nenhuma referência ser inventada.</p>
-          </div>
-          <div class="tour-card">
-            <strong>3. Monte seu artigo, dissertação ou TCC</strong>
-            <p>Leve seu plano para <b>Seus textos</b>, acompanhe as conferências e baixe em <b>Word (.docx)</b> ou <b>PDF ABNT</b> para a orientação.</p>
-          </div>
-        </div>
-        <div class="glossary-bar" aria-label="Dúvidas sobre termos acadêmicos">
-          <span class="subtle" style="font-size:0.8rem">Algum termo parece técnico? Toque para ver em 2 linhas:</span>
-          <button type="button" class="glossary-btn" data-glossary="doi" aria-expanded="false">? O que é DOI</button>
-          <button type="button" class="glossary-btn" data-glossary="bibtex" aria-expanded="false">? O que é BibTeX</button>
-          <button type="button" class="glossary-btn" data-glossary="parafrase" aria-expanded="false">? Paráfrase vs. citação</button>
-          <button type="button" class="glossary-btn" data-glossary="proveniencia" aria-expanded="false">? O que é Proveniência</button>
-          <button type="button" class="glossary-btn" data-glossary="word" aria-expanded="false">? Por que Word (.docx)</button>
-        </div>
-        <div id="glossary-pop" class="glossary-pop hidden" role="status" aria-live="polite"></div>
-      </section>
-
-      <!-- Comece aqui: os três passos do modo sem API, com estado. app.js esconde quando tudo está feito. -->
-      <section class="start-strip hidden" id="start-strip" data-sem-api-only aria-labelledby="start-title">
-        <h2 id="start-title">Comece aqui</h2>
-        <ol>
-          <li id="start-1"><button type="button" data-start="1" data-go-step="1"><span class="start-n" aria-hidden="true">1</span><span><b>Envie suas fontes</b><small>PDF, DOCX ou .bib, na biblioteca</small></span></button></li>
-          <li id="start-2"><button type="button" data-start="2"><span class="start-n" aria-hidden="true">2</span><span><b>Conecte sua IA</b><small>Claude, ChatGPT ou Gemini</small></span></button></li>
-          <li id="start-3"><button type="button" data-start="3" data-go-step="3"><span class="start-n" aria-hidden="true">3</span><span><b>Peça o artigo</b><small>e acompanhe em Seus artigos</small></span></button></li>
-        </ol>
-      </section>
-      <!-- Navegação em 3 etapas (Estúdio Editorial) -->
+      <!-- Navegação em 3 etapas limpas (sem faixa redundante "Comece aqui" acima das abas) -->
       <nav class="stepper" aria-label="Etapas do fluxo de pesquisa">
         <button type="button" class="step-btn active" data-step="1">
           <span class="step-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></span>
@@ -1832,8 +1816,8 @@
         <button type="button" class="step-btn" data-step="3">
           <span class="step-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
           <span>
-            <span class="step-title" data-sem-api-only>Seus artigos</span><span class="step-title" data-modo-api>Execuções e Auditorias</span>
-            <span class="step-sub" id="step-sub-3">Escritos pela sua IA, conferidos aqui</span>
+            <span class="step-title" data-sem-api-only>Seus textos</span><span class="step-title" data-modo-api>Execuções e Auditorias</span>
+            <span class="step-sub" id="step-sub-3">Artigos, dissertações e TCCs</span>
           </span>
         </button>
         <button type="button" class="step-btn" data-step="4">
@@ -2261,6 +2245,61 @@
       <div id="guia-host"><p class="subtle" id="guia-loading">Carregando o guia…</p></div>
     </section>
   </main>
+
+  <!-- Modal "Como usar" (acessível no cabeçalho ao lado de Minha conta — substitui a barra "Comece aqui") -->
+  <div class="welcome-tour as-modal hidden" id="welcome-tour" role="dialog" aria-modal="true" aria-labelledby="welcome-tour-title">
+    <div class="welcome-tour-dialog">
+      <div class="panel-header" style="margin-bottom:8px">
+        <div>
+          <h2 id="welcome-tour-title" style="font-size:1.25rem;margin:0">Como usar o Scriptorium MPIE</h2>
+          <p class="subtle" style="margin:4px 0 0">Um fluxo único para planejar, organizar fontes ABNT e construir seu trabalho sem programação nem LaTeX.</p>
+        </div>
+        <button type="button" class="btn alt" id="welcome-tour-dismiss" aria-label="Fechar Como usar" style="padding:5px 10px">✕</button>
+      </div>
+      <div class="howto-steps">
+        <div class="howto-card" id="howto-step-guia">
+          <div>
+            <div class="howto-card-head"><strong>1. Planeje com suas palavras</strong><span class="howto-badge">Sem IA</span></div>
+            <p style="margin-top:6px">Use o <b>Guia de escrita</b> (8 etapas) para estruturar tema, problema, pergunta, objetivos, método e autoavaliação (Rubrica 0–15).</p>
+          </div>
+          <div><button type="button" class="btn alt" data-howto-go="4" style="padding:6px 11px;font-size:.8rem">Abrir Guia de escrita →</button></div>
+        </div>
+        <div class="howto-card" id="howto-step-fontes">
+          <div>
+            <div class="howto-card-head"><strong>2. Organize e fiche suas fontes</strong><span class="howto-badge" id="howto-badge-fontes">Passo 2</span></div>
+            <p style="margin-top:6px">Envie PDFs ou importe por DOI, BibTeX, RIS ou Zotero. Faça fichamentos por página e cite no Guia digitando <code>/citar</code>.</p>
+          </div>
+          <div><button type="button" class="btn alt" data-howto-go="1" style="padding:6px 11px;font-size:.8rem">Abrir Suas fontes →</button></div>
+        </div>
+        <div class="howto-card" id="howto-step-ia">
+          <div>
+            <div class="howto-card-head"><strong>3. Conecte sua IA em Minha conta</strong><span class="howto-badge" id="howto-badge-ia">Opcional</span></div>
+            <p style="margin-top:6px">Quer apoio de Claude, ChatGPT ou Gemini no modo <b>Tutor Socrático</b>? A conexão fica sempre em <b>Minha conta → Conectar sua IA</b>.</p>
+          </div>
+          <div><button type="button" class="btn alt" id="howto-open-connect" style="padding:6px 11px;font-size:.8rem">Conectar IA em Minha conta →</button></div>
+        </div>
+        <div class="howto-card" id="howto-step-artigo">
+          <div>
+            <div class="howto-card-head"><strong>4. Acompanhe e envie à orientação</strong><span class="howto-badge" id="howto-badge-artigo">Passo 4</span></div>
+            <p style="margin-top:6px">Em <b>Seus textos</b>, acompanhe as conferências, baixe PDF ABNT ou <b>Word (.docx)</b> e gere o link para apontamentos da orientação.</p>
+          </div>
+          <div><button type="button" class="btn alt" data-howto-go="3" style="padding:6px 11px;font-size:.8rem">Abrir Seus textos →</button></div>
+        </div>
+      </div>
+      <div class="glossary-bar" aria-label="Dúvidas sobre termos acadêmicos" style="margin-top:12px">
+        <span class="subtle" style="font-size:0.8rem">Algum termo parece técnico? Toque para ver em 2 linhas:</span>
+        <button type="button" class="glossary-btn" data-glossary="doi" aria-expanded="false">? O que é DOI</button>
+        <button type="button" class="glossary-btn" data-glossary="bibtex" aria-expanded="false">? O que é BibTeX</button>
+        <button type="button" class="glossary-btn" data-glossary="parafrase" aria-expanded="false">? Paráfrase vs. citação</button>
+        <button type="button" class="glossary-btn" data-glossary="proveniencia" aria-expanded="false">? O que é Proveniência</button>
+        <button type="button" class="glossary-btn" data-glossary="word" aria-expanded="false">? Por que Word (.docx)</button>
+      </div>
+      <div id="glossary-pop" class="glossary-pop hidden" role="status" aria-live="polite"></div>
+      <div class="actions" style="justify-content:flex-end;margin-top:14px">
+        <button type="button" class="btn" id="welcome-tour-ok">Entendi, voltar ao trabalho</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal: Configurar nomes das colunas Kanban -->
   <div id="config-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="cfg-title">
