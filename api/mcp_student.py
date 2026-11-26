@@ -16,15 +16,26 @@ def _quoted(title: str) -> str:
     return f"“{title[:90]}{'…' if len(title) > 90 else ''}”" if title else "o meu projeto"
 
 
-def references_to_check(refs: list[dict]) -> list[dict]:
+def references_to_check(refs: list[dict], sources: list[dict] | None = None) -> list[dict]:
     """Referências que ainda não foram confirmadas: sugeridas por busca ou só do arquivo."""
+    formats = {s.get("id"): s.get("format") for s in (sources or []) if isinstance(s, dict)}
     out = []
     for r in flow.pending_refs(refs):
         fields = r.get("fields") or {}
         level = flow.ref_level(r)
-        out.append({"chave": r.get("key", ""), "titulo": str(fields.get("title", ""))[:160],
-                    "autor": str(fields.get("author", ""))[:120], "nivel": level,
-                    "nivel_texto": flow.REF_LEVEL_LABELS[level]})
+        sid = r.get("source_id") or ""
+        venue = (fields.get("journal") or fields.get("booktitle") or fields.get("school")
+                 or fields.get("publisher") or fields.get("institution") or fields.get("howpublished") or "")
+        out.append({
+            "chave": r.get("key", ""), "source_id": sid, "tipo": r.get("type") or "article",
+            "titulo": str(fields.get("title", ""))[:200], "autor": str(fields.get("author", ""))[:200],
+            "ano": str(fields.get("year", ""))[:10], "veiculo": str(venue)[:160],
+            "doi": str(fields.get("doi", ""))[:120],
+            "nivel": level, "nivel_texto": flow.REF_LEVEL_LABELS[level],
+            "origem": r.get("how") or "arquivo",
+            "tem_capa": formats.get(sid) == "pdf" if formats else True,
+            "proposta_pendente": r.get("proposta_pendente"),
+        })
     return out
 
 
@@ -34,8 +45,9 @@ def proofs(stages: dict, mode: str, kappa: dict | None = None) -> list[str]:
     ev = (stages.get("evidencias") or {})
     s = ev.get("summary") or {}
     if ev.get("status") == "aceita" and s.get("total"):
+        para = f" ({s['parafrases']} paráfrase(s) ancorada(s))" if s.get("parafrases") else ""
         lines.append(f"Evidências: {s.get('conferidas', 0)} de {s['total']} citações encontradas, palavra por "
-                     "palavra, no texto das fontes")
+                     f"palavra, no texto das fontes{para}")
     for key in ("reescrita", "redacao"):
         st = stages.get(key) or {}
         s = st.get("summary") or {}
@@ -49,19 +61,32 @@ def proofs(stages: dict, mode: str, kappa: dict | None = None) -> list[str]:
                 extra = f"; {quotes['traduzidas']} marcada(s) como tradução" if quotes.get("traduzidas") else ""
                 lines.append(f"Texto final: {quotes.get('conferidas', 0)} de {quotes['total']} citações diretas "
                              f"conferidas na fonte citada{extra}")
+            q = s.get("qualidade") or {}
+            if q.get("excesso_citacao_direta"):
+                lines.append(f"Atenção de estilo: {q['citacoes_diretas_por_mil_palavras']} citações diretas por mil palavras (prefira mais paráfrases)")
+            rr = s.get("respostas_revisao") or {}
+            if rr.get("altos_total"):
+                lines.append(f"Resposta à revisão: {rr.get('altos_respondidos', 0)} de {rr['altos_total']} problema(s) grave(s) respondido(s)")
             break
     rv = stages.get("revisao") or {}
     s = rv.get("summary") or {}
     if rv.get("status") == "aceita" and s.get("problemas") is not None:
         p = s["problemas"]
-        lines.append(f"Revisão feita em outra conversa: nota {s.get('nota_geral', 0):g} de 10, "
-                     f"{p.get('alta', 0)} problema(s) grave(s) apontado(s)")
+        ind = rv.get("independencia") or {}
+        who = "Autoverificação (mesmo modelo em conversa nova)" if ind.get("autoverificacao") else "Revisão feita em outra conversa"
+        crit = s.get("criterios") or {}
+        crit_txt = (" · critérios: " + ", ".join(f"{k.replace('_', ' ')} {v:g}" for k, v in crit.items())) if crit else ""
+        lines.append(f"{who}: nota {s.get('nota_geral', 0):g} de 10, "
+                     f"{p.get('alta', 0)} problema(s) grave(s) apontado(s){crit_txt}")
     vf = stages.get("verificacao") or {}
     s = vf.get("summary") or {}
     if vf.get("status") == "aceita" and s.get("vereditos"):
         v = s["vereditos"]
-        lines.append(f"Afirmações verificadas nas fontes: {v.get('sustentada', 0)} sustentadas, "
-                     f"{v.get('parcial', 0)} parciais, {v.get('sem_suporte', 0)} sem suporte")
+        ind = vf.get("independencia") or {}
+        tag = " (autoverificação — mesmo modelo)" if ind.get("autoverificacao") else ""
+        srv = f", {s['sorteadas_pelo_servidor']} sorteada(s) pelo servidor" if s.get("sorteadas_pelo_servidor") else ""
+        lines.append(f"Afirmações verificadas nas fontes{tag}: {v.get('sustentada', 0)} sustentadas, "
+                     f"{v.get('parcial', 0)} parciais, {v.get('sem_suporte', 0)} sem suporte{srv}")
     if kappa and kappa.get("kappa") is not None:
         lines.append(f"Triagem feita duas vezes, às cegas: concordância (kappa) de {kappa['kappa']:.2f}")
     return lines
@@ -124,11 +149,15 @@ def next_step(project: dict, mode: str, to_check: int) -> dict:
     returned = state.get("status") == "recusada"
     if nxt.get("nova_conversa"):
         code = state.get("passe")
+        writer_head = next(((stages.get(k) or {}).get("head") for k in ("reescrita", "redacao", "triagem")
+                            if (stages.get(k) or {}).get("head")), None)
+        suggested = flow.recommend_other_family((writer_head or {}).get("model", ""))
         why = "Quem escreveu não revisa o próprio texto. "
         if code:
             return {"titulo": f"{nxt['titulo']}: abra uma conversa nova",
-                    "texto": why + "Abra uma conversa nova, de preferência em outra IA conectada ao Scriptorium, e cole o pedido abaixo.",
-                    "pedido": f"Use o Scriptorium: abrir_passe com o código {code}", "passe": code}
+                    "texto": why + f"Abra uma conversa nova — de preferência em outra IA ({suggested}) conectada ao Scriptorium — e cole o pedido abaixo.",
+                    "pedido": f"Use o Scriptorium: abrir_passe com o código {code}", "passe": code,
+                    "ia_recomendada": suggested}
         return {"titulo": f"Próximo: {nxt['titulo']}",
                 "texto": why + "Volte à conversa do projeto e peça para continuar; a IA vai entregar um passe para abrir em outra conversa.",
                 "pedido": f"Use o Scriptorium: continue o projeto {title}."}
@@ -139,9 +168,11 @@ def next_step(project: dict, mode: str, to_check: int) -> dict:
 
 
 def view(project: dict, mode: str, refs: list[dict], kappa: dict | None = None) -> dict:
-    to_check = references_to_check(refs)
+    to_check = references_to_check(refs, project.get("sources"))
+    all_done = flow.next_stage(project.get("stages") or {}, mode) is None
     return {"proximo_passo": next_step(project, mode, len(to_check)),
             "pdf_final": final_pdf(project, len(to_check)),
+            "pode_compilar": all_done and project.get("status") not in ("preparando", "compilando", "refazendo_referencias"),
             "provas": proofs(project.get("stages") or {}, mode, kappa),
             "referencias_a_conferir": to_check,
             "pedido_referencias": (f"Use o Scriptorium: {REF_FIX} do projeto {_quoted(project.get('title'))}."

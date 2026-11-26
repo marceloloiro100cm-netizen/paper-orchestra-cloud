@@ -33,15 +33,55 @@ FLOW_VERSION = "mcp-flow-1"
 # conferida no próprio documento; busca por título fica "sugerida" até alguém
 # conferir. A lista é idêntica em worker/bib_integrity.py (teste impede divergência).
 REF_LEVELS = {
-    "doi": "confirmada",                    # DOI registrado na importação da fonte
-    "corrigida_pelo_texto": "confirmada",   # corrigir_referencia, conferida no documento
-    "doi_no_texto": "sugerida",             # DOI achado nas primeiras páginas
-    "texto_do_pdf": "sugerida",             # busca por título, confirmada pelo texto
-    "titulo_do_pdf": "sugerida",            # busca por título, sem texto para confirmar
-    "arquivo": "a_conferir",                # só o que o arquivo diz
+    "doi": "confirmada",                      # DOI registrado na importação da fonte
+    "corrigida_pelo_texto": "confirmada",     # corrigir_referencia, conferida no documento
+    "confirmada_pelo_pesquisador": "confirmada",  # confirmada em 1 clique pelo pesquisador
+    "confirmada_duas_fontes": "confirmada",   # concordância de 2 bases independentes
+    "ficha_da_biblioteca": "confirmada",      # herdada da ficha confirmada na biblioteca
+    "doi_no_texto": "sugerida",               # DOI achado nas primeiras páginas
+    "texto_do_pdf": "sugerida",               # busca por título, confirmada pelo texto
+    "titulo_do_pdf": "sugerida",              # busca por título, sem texto para confirmar
+    "crossref": "sugerida",                   # busca por título só na Crossref
+    "oasisbr": "sugerida",                    # busca por título só na BDTD/Oasisbr (IBICT)
+    "proposta_ia": "sugerida",                # proposta da IA aguardando confirmação em 1 clique
+    "arquivo": "a_conferir",                  # só o que o arquivo diz
 }
 REF_LEVEL_LABELS = {"confirmada": "confirmada", "sugerida": "sugerida, falta conferir",
                     "a_conferir": "a conferir"}
+
+KEY_STOPWORDS = {
+    "a", "o", "as", "os", "um", "uma", "uns", "umas", "de", "do", "da", "dos", "das",
+    "em", "no", "na", "nos", "nas", "para", "por", "com", "sem", "sobre", "entre",
+    "que", "como", "mais", "menos", "muito", "eles", "elas", "este", "esta", "esse", "essa",
+    "the", "of", "and", "to", "in", "for", "on", "with", "by", "an", "at", "from", "into",
+    "using", "towards", "toward", "study", "analysis", "review", "estudo", "analise",
+}
+
+
+def stable_bib_key(fields: dict, used: set[str] | None = None) -> str:
+    """Item 6: chave legível e estável (sobrenome + ano + primeira palavra forte do título)."""
+    used = used if used is not None else set()
+    author = str((fields or {}).get("author") or "")
+    first = re.split(r"\s+and\s+", author, maxsplit=1)[0].strip()
+    if "," in first:
+        first = first.split(",", 1)[0]
+    else:
+        first = first.split()[-1] if first.split() else ""
+    who = re.sub(r"[^a-z]", "", normalize(first))
+    year = re.sub(r"[^0-9]", "", str((fields or {}).get("year") or ""))[:4]
+    words = re.findall(r"[a-z]{3,}", normalize(str((fields or {}).get("title") or "")))
+    word = next((w[:16] for w in words if w not in KEY_STOPWORDS and len(w) >= 4), "")
+    if not word:
+        word = next((w[:16] for w in words if w not in KEY_STOPWORDS), words[0][:16] if words else "")
+    base = (f"{who}{year}{word}" if who else (f"{word}{year}" if word else f"doc{year or 'ref'}"))
+    base = re.sub(r"[^a-z0-9]", "", base) or "docref"
+    if base[0].isdigit():
+        base = "ref" + base
+    key, n = base, 2
+    while key in used:
+        key, n = f"{base}_{n}", n + 1
+    used.add(key)
+    return key
 
 
 def ref_level(entry: dict) -> str:
@@ -117,7 +157,9 @@ STAGES = [
             "Você é a cabeça PLANEJADORA. Leia as fichas das fontes (ficha_da_fonte) e faça buscas "
             "exploratórias. Entregue, em Markdown, o plano do texto: a pergunta reformulada, o argumento "
             "central e, para cada seção do modelo, o que ela vai sustentar e quais chaves de referência "
-            "vai usar. Termine com uma lista de lacunas: o que as fontes NÃO cobrem."),
+            "vai usar. Termine com duas listas: (1) Lacunas do corpus (o que as fontes NÃO cobrem) e "
+            "(2) Lacunas teóricas (autores clássicos ou referenciais relevantes ausentes do corpus que o "
+            "pesquisador pode importar por DOI)."),
     },
     {
         "key": "evidencias", "titulo": "Levantamento de evidências", "cabeca": "redatora",
@@ -125,9 +167,9 @@ STAGES = [
         "instrucoes": (
             "Você é a cabeça LEITORA. Para cada afirmação que o texto vai fazer, encontre o trecho que a "
             "sustenta (buscar_trechos, depois ler_trecho). Entregue um JSON: lista de objetos com "
-            "\"afirmacao\", \"chave\", \"chunk_id\" e \"citacao_literal\" (20 a 600 caracteres copiados "
-            "EXATAMENTE do trecho, sem reescrever). O Scriptorium confere cada citação no texto da fonte; "
-            "as que não baterem voltam para correção. Mínimo de 8 evidências."),
+            "\"afirmacao\", \"chave\", \"chunk_id\" e, para citações diretas, \"citacao_literal\" (20 a 600 "
+            "caracteres copiados EXATAMENTE do trecho). Para paráfrases, informe \"tipo\": \"parafrase\" "
+            "junto de um \"chunk_id\" real da fonte (evita excesso de citação direta). Mínimo de 8 evidências."),
     },
     {
         "key": "redacao", "titulo": "Redação", "cabeca": "redatora", "nova_conversa": False,
@@ -136,6 +178,7 @@ STAGES = [
             "Você é a cabeça REDATORA. Escreva o corpo do texto em LaTeX a partir do plano e das "
             "evidências aceitas: comece pelo ambiente de resumo indicado e siga com \\section{...} para "
             "cada seção do modelo. Cite com \\cite{chave} (ou \\citeonline{chave} no modelo ABNT). "
+            "Prefira paráfrases com autoria analítica (teto orientativo: até 8 citações diretas por mil palavras). "
             "Entregue só o corpo: sem preâmbulo, \\documentclass, \\usepackage, \\begin{document}, "
             "\\bibliography, macros (\\def, \\newcommand) nem \\input/\\include; o Scriptorium monta o "
             "documento e a bibliografia."),
@@ -146,8 +189,9 @@ STAGES = [
         "instrucoes": (
             "Você é a cabeça REVISORA, independente de quem escreveu: não teve acesso à conversa da "
             "redação e deve ser cética. Leia o rascunho e confira nas fontes (buscar_trechos) as "
-            "afirmações mais importantes. Entregue um JSON com \"nota_geral\" (0 a 10), \"resumo\" e "
-            "\"problemas\": lista de objetos com \"trecho\" (cópia curta do rascunho), \"tipo\" "
+            "afirmações mais importantes. Entregue um JSON com \"criterios\" (notas de 0 a 10 separadas para "
+            "\"argumento\", \"uso_das_fontes\", \"metodo\", \"estrutura\" e \"estilo\"), \"nota_geral\" (0 a 10), "
+            "\"resumo\" e \"problemas\": lista de objetos com \"trecho\" (cópia curta do rascunho), \"tipo\" "
             "(sem_suporte, citacao_errada, logica, lacuna, clareza, estrutura), \"gravidade\" (alta, "
             "media, baixa) e \"sugestao\". Aponte problemas reais; não elogie por elogiar."),
     },
@@ -156,18 +200,21 @@ STAGES = [
         "formato": "latex", "min": 6000,
         "instrucoes": (
             "Você é a cabeça REDATORA de novo. Reescreva o corpo em LaTeX tratando cada problema da "
-            "revisão (corrija ou, se discordar, justifique num comentário LaTeX % no ponto). Mesmas "
-            "regras de formato da redação."),
+            "revisão (ver problemas_numerados: P1, P2...). Todo problema de gravidade ALTA precisa de "
+            "resposta obrigatória: informe em respostas_revisao (lista JSON [{id, acao, justificativa}]) ou "
+            "em comentários LaTeX no formato '% [P1] tratado: ...' (ou '% [P1] mantido: ...'). "
+            "Mesmas regras de formato da redação."),
     },
     {
         "key": "verificacao", "titulo": "Verificação de afirmações", "cabeca": "verificadora",
         "nova_conversa": True, "formato": "json", "min": 200,
         "instrucoes": (
-            "Você é a cabeça VERIFICADORA, independente da redação e da revisão. Escolha as afirmações "
-            "do texto final que dependem de fontes (no mínimo 10, priorizando as citadas) e confira "
-            "cada uma. Entregue um JSON: lista de objetos com \"afirmacao\", \"chave\", \"veredito\" "
-            "(sustentada, parcial, sem_suporte), \"chunk_id\" e \"citacao_literal\" do trecho da fonte "
-            "(obrigatória quando o veredito não for sem_suporte). O Scriptorium confere as citações."),
+            "Você é a cabeça VERIFICADORA, independente da redação e da revisão. Verifique TODAS as "
+            "afirmações sorteadas pelo servidor em material.afirmacoes_sorteadas (mantendo o campo \"id\", "
+            "como \"A1\"), complementando até no mínimo 10 afirmações citadas se houver menos sorteadas. "
+            "Entregue um JSON: lista de objetos com \"id\" (quando sorteada), \"afirmacao\", \"chave\", "
+            "\"veredito\" (sustentada, parcial, sem_suporte), \"chunk_id\" e \"citacao_literal\" do trecho "
+            "da fonte (obrigatória quando o veredito não for sem_suporte). O Scriptorium confere as citações."),
     },
 ]
 STAGE_KEYS = [s["key"] for s in STAGES]
@@ -249,19 +296,32 @@ def _family(model: str) -> str:
     return text.split()[0] if text.split() else ""
 
 
+def recommend_other_family(model: str) -> str:
+    """Item 11: recomenda outra família de IA para reduzir viés de autopreferência."""
+    fam = _family(model)
+    if fam == "claude":
+        return "Gemini ou ChatGPT"
+    if fam == "gemini":
+        return "Claude ou ChatGPT"
+    if fam == "gpt":
+        return "Claude ou Gemini"
+    return "outra família de IA (ex.: Claude, Gemini ou ChatGPT)"
+
+
 def independence(writer: dict | None, reviewer: dict | None) -> dict:
-    """Quão independente é a cabeça avaliadora em relação à redatora."""
+    """Quão independente é a cabeça avaliadora em relação à redatora (Item 11)."""
     if not writer or not reviewer:
-        return {"nivel": "indeterminada", "explicacao": "Faltam dados de uma das cabeças."}
+        return {"nivel": "indeterminada", "autoverificacao": False, "explicacao": "Faltam dados de uma das cabeças."}
     if writer.get("id") == reviewer.get("id"):
-        return {"nivel": "mesma_cabeca", "explicacao": "A mesma cabeça escreveu e avaliou."}
+        return {"nivel": "mesma_cabeca", "autoverificacao": True, "explicacao": "A mesma cabeça escreveu e avaliou."}
     fw, fr = _family(writer.get("model", "")), _family(reviewer.get("model", ""))
     cw, cr = (writer.get("client") or "").lower(), (reviewer.get("client") or "").lower()
     if (fw and fr and fw != fr) or (cw and cr and cw != cr):
-        return {"nivel": "outra_ia", "explicacao":
-                f"Avaliada por outra IA ({reviewer.get('model') or reviewer.get('client')})."}
-    return {"nivel": "outra_conversa", "explicacao":
-            "Conversa nova com a mesma IA: sem a memória da redação, mas com o mesmo modelo."}
+        return {"nivel": "outra_ia", "autoverificacao": False, "explicacao":
+                f"Avaliada por outra família de IA ({reviewer.get('model') or reviewer.get('client')})."}
+    return {"nivel": "outra_conversa", "autoverificacao": True, "explicacao":
+            "Autoverificação: conversa nova com a mesma família de modelo (sem memória da redação, mas sujeita ao "
+            "viés de autopreferência). Recomenda-se usar " + recommend_other_family(writer.get("model", "")) + "."}
 
 
 # ------------------------------------------------------------------ texto
@@ -375,9 +435,32 @@ def validate_evidence(content: str, bib_keys: set[str], chunks_for_key) -> dict:
         data = data.get("evidencias") or data.get("itens") or []
     if not isinstance(data, list) or len(data) < 8:
         return _report(False, errors + ["Entregue uma lista JSON com no mínimo 8 evidências."])
-    results, problems = _quote_check(data, bib_keys, chunks_for_key, lambda e: True)
+
+    def _is_anchored_paraphrase(entry) -> bool:
+        return (isinstance(entry, dict)
+                and str(entry.get("tipo") or "").strip().lower() == "parafrase"
+                and not str(entry.get("citacao_literal") or "").strip())
+
+    results, problems = _quote_check(data, bib_keys, chunks_for_key,
+                                     lambda e: not _is_anchored_paraphrase(e))
+    # Item 14: paráfrase ancorada precisa apontar para um chunk_id real da fonte citada.
+    paraphrases = 0
+    for entry, result in zip(data, results):
+        if not _is_anchored_paraphrase(entry):
+            continue
+        key = result["chave"]
+        cid = str(entry.get("chunk_id") or "").strip()
+        if key not in bib_keys:
+            continue
+        chunks = chunks_for_key(key) or []
+        if cid and any(c.get("chunk_id") == cid for c in chunks):
+            result.update(citacao_conferida=True, tipo="parafrase", chunk_id=cid)
+            paraphrases += 1
+        else:
+            problems.append(f"Item {result['n']}: paráfrase sem chunk_id real da fonte '{key}'. "
+                            "Informe o chunk_id retornado por ler_trecho.")
     return _report(True, errors + problems, conferidas=sum(r["citacao_conferida"] for r in results),
-                   total=len(results), itens=results)
+                   parafrases=paraphrases, total=len(results), itens=results)
 
 
 # ------------------------------------------------------------------ citações do texto final
@@ -442,7 +525,145 @@ def check_final_quotes(latex: str, bib_keys: set[str], chunks_for_key) -> tuple[
     return summary, errors
 
 
-def validate_latex(content: str, bib_keys: set[str], minimum: int, template: str, chunks_for_key=None) -> dict:
+RESULT_VERBS = re.compile(
+    r"\b(aument\w*|reduz\w*|diminu\w*|demonstr\w*|comprov\w*|evidenci\w*|super\w*|indic\w*|"
+    r"revel\w*|corrobor\w*|conclu\w*|observ\w*|constat\w*|encontr\w*|melhor\w*|pior\w*|"
+    r"significativ\w*|correla[cç]\w*|efeito|impacto|taxa|m[eé]dia|mediana|desvio|"
+    r"increased|decreased|reduced|demonstrated|showed|found|revealed|improved|significant)\b",
+    re.I,
+)
+NUMERIC_SIGNAL = re.compile(
+    r"\d+(?:[.,]\d+)?\s*%|\b(?:n|p|r|t|f|z|k|kappa)\s*[<>=]\s*\d|\b\d+[.,]\d+\b|"
+    r"(?<!\d)(?:[1-9]\d{0,2})\s+(?:alunos?|estudantes?|professores?|docentes?|participantes?|"
+    r"artigos?|estudos?|fontes?|escolas?|turmas?|sess[oõ]es|semanas?|meses|pontos?|itens?|"
+    r"students?|teachers?|studies|papers|articles|participants?)\b",
+    re.I,
+)
+REVIEW_CRITERIA = ("argumento", "uso_das_fontes", "metodo", "estrutura", "estilo")
+
+
+def quality_report(latex: str, bib_keys: set[str]) -> dict:
+    """Item 15: indicadores objetivos sem IA (citações diretas/1000 palavras, seções curtas, uso das fontes)."""
+    body = re.sub(r"(?m)(?<!\\)%.*$", "", latex or "")
+    plain_text = re.sub(r"\\[A-Za-z]+\*?(?:\[[^\]]*\])?(?:\{[^}]*\})?", " ", body)
+    words = len(re.findall(r"[A-Za-zÀ-ÿ0-9]+", plain_text))
+    quotes = final_quotes(latex)
+    per_1k = round(len(quotes) * 1000 / max(words, 1), 1)
+    sections = re.split(r"\\section\*?\{([^}]*)\}", body)
+    short_sections = []
+    for i in range(1, len(sections), 2):
+        sec_name = sections[i].strip()
+        sec_body = sections[i + 1] if i + 1 < len(sections) else ""
+        paras = [p.strip() for p in re.split(r"\n\s*\n", sec_body)
+                 if p.strip() and not p.strip().startswith(("\\subsection", "\\begin{figure}", "\\end{"))]
+        if len(paras) <= 1:
+            short_sections.append(sec_name)
+    counts = {k: 0 for k in sorted(bib_keys)}
+    for k in cited_keys(body):
+        if k in counts:
+            counts[k] += 1
+    return {
+        "palavras": words,
+        "citacoes_diretas": len(quotes),
+        "citacoes_diretas_por_mil_palavras": per_1k,
+        "excesso_citacao_direta": per_1k > 8.0,
+        "secoes_um_paragrafo": short_sections,
+        "citacoes_por_fonte": counts,
+        "fontes_citadas_uma_vez": sorted(k for k, c in counts.items() if c == 1),
+    }
+
+
+def extract_claims_to_verify(latex: str, bib_keys: set[str], limit: int = 12) -> list[dict]:
+    """Item 9: servidor extrai frases com \\cite e sorteia com prioridade para números e verbos de resultado."""
+    body = re.sub(r"(?m)(?<!\\)%.*$", "", latex or "")
+    body = re.sub(r"\\begin\{(?:resumo|abstract)\}.*?\\end\{(?:resumo|abstract)\}", " ", body, flags=re.S)
+    body = re.sub(r"\\(?:sub)*section\*?\{[^}]*\}", "\n\n", body)
+    numeric, result_verbs, others = [], [], []
+    seen = set()
+    for para in re.split(r"\n\s*\n", body):
+        for sent in re.split(r"(?<=[.!?])\s+(?=[A-ZÀ-Ý\\``“\"])", para.strip()):
+            keys = [k for k in cited_keys(sent) if k in bib_keys]
+            if not keys:
+                continue
+            clean = " ".join(_plain_quote(sent).split())
+            if len(clean) < 35:
+                continue
+            sig = normalize(clean)[:120]
+            if sig in seen:
+                continue
+            seen.add(sig)
+            item = {"afirmacao": clean[:420], "chaves": list(dict.fromkeys(keys))}
+            # Remove anos de 4 dígitos típicos de citação antes de testar sinal numérico.
+            no_years = re.sub(r"\b(?:19|20)\d{2}\b", "", clean)
+            if NUMERIC_SIGNAL.search(no_years):
+                numeric.append({**item, "prioridade": "numero"})
+            elif RESULT_VERBS.search(clean):
+                result_verbs.append({**item, "prioridade": "resultado"})
+            else:
+                others.append({**item, "prioridade": "citacao"})
+    selected = list(numeric)
+    for pool in (result_verbs, others):
+        if len(selected) >= limit:
+            break
+        need = limit - len(selected)
+        if len(pool) <= need:
+            selected.extend(pool)
+        else:
+            # Amostragem determinística distribuída pelo texto inteiro.
+            step = len(pool) / need
+            selected.extend(pool[int(i * step)] for i in range(need))
+    return [{"id": f"A{n}", **item} for n, item in enumerate(selected, 1)]
+
+
+def numbered_review_problems(review_content: str) -> list[dict]:
+    """Item 10: numera os problemas da revisão (P1, P2...) para resposta obrigatória na reescrita."""
+    try:
+        data = parse_json(review_content)
+    except ValueError:
+        return []
+    if not isinstance(data, dict) or not isinstance(data.get("problemas"), list):
+        return []
+    out = []
+    for n, p in enumerate(data["problemas"], 1):
+        if isinstance(p, dict):
+            out.append({"id": f"P{n}", "tipo": p.get("tipo", ""), "gravidade": p.get("gravidade", ""),
+                        "trecho": str(p.get("trecho", ""))[:200], "sugestao": str(p.get("sugestao", ""))[:400]})
+    return out
+
+
+def parse_review_responses(latex: str, responses_raw: str | list | None = None) -> dict[str, dict]:
+    """Extrai respostas aos problemas P1, P2... tanto de JSON quanto de comentários LaTeX '% [P1] ...'."""
+    found: dict[str, dict] = {}
+    if responses_raw:
+        try:
+            items = responses_raw if isinstance(responses_raw, list) else parse_json(str(responses_raw))
+            if isinstance(items, dict):
+                items = items.get("respostas") or items.get("itens") or []
+            if isinstance(items, list):
+                for entry in items:
+                    if not isinstance(entry, dict):
+                        continue
+                    pid = str(entry.get("id") or "").strip().upper()
+                    note = str(entry.get("justificativa") or entry.get("mudanca") or entry.get("resposta") or "").strip()
+                    acao = str(entry.get("acao") or "tratado").strip().lower()
+                    if re.fullmatch(r"P\d+", pid) and len(note) >= 6:
+                        found[pid] = {"id": pid, "acao": acao, "justificativa": note[:400]}
+        except ValueError:
+            pass
+    for match in re.finditer(
+        r"(?m)(?<!\\)%\s*\[?\s*(?:revis[aã]o[,:\s-]*)?(?:problema\s*)?(P\d+|\d+)\s*\]?(?:\s+[A-Za-zÀ-ÿ_-]{2,20})?\s*[:\-–]\s*(.+)$",
+        latex or "", flags=re.I,
+    ):
+        raw_id = match.group(1).upper()
+        pid = raw_id if raw_id.startswith("P") else f"P{raw_id}"
+        note = match.group(2).strip()
+        if pid not in found and len(note) >= 6:
+            found[pid] = {"id": pid, "acao": "comentario_tex", "justificativa": note[:400]}
+    return found
+
+
+def validate_latex(content: str, bib_keys: set[str], minimum: int, template: str, chunks_for_key=None, *,
+                   review_problems: list[dict] | None = None, review_responses=None) -> dict:
     errors = _size_errors(content, minimum)
     bad = sorted(set(m.group(0) for m in FORBIDDEN.finditer(content or "")))
     if bad:
@@ -464,13 +685,25 @@ def validate_latex(content: str, bib_keys: set[str], minimum: int, template: str
         errors.append("O texto não cita nenhuma fonte do projeto.")
     if (content or "").count("{") != (content or "").count("}"):
         errors.append("Chaves { } desbalanceadas no LaTeX.")
-    extra = {}
+    extra = {"qualidade": quality_report(content, bib_keys)}
     if chunks_for_key is not None:
         quotes, problems = check_final_quotes(content, bib_keys, chunks_for_key)
         errors += problems[:20]
         if len(problems) > 20:
             errors.append(f"... e mais {len(problems) - 20} citação(ões) diretas sem conferência.")
         extra["citacoes_texto"] = quotes
+    # Item 10: na reescrita, todo problema de gravidade alta precisa de resposta explícita.
+    if review_problems:
+        responses = parse_review_responses(content, review_responses)
+        high = [p for p in review_problems if p.get("gravidade") == "alta"]
+        missing_high = [p["id"] for p in high if p["id"] not in responses]
+        if missing_high:
+            errors.append("Problema(s) de gravidade ALTA da revisão sem resposta na reescrita: "
+                          + ", ".join(missing_high)
+                          + ". Informe respostas_revisao=[{\"id\":\"P1\",\"acao\":\"corrigido\",\"justificativa\":\"...\"}] "
+                            "ou comentários LaTeX '% [P1] corrigido: ...'.")
+        extra["respostas_revisao"] = {"respondidos": sorted(responses), "total_problemas": len(review_problems),
+                                      "altos_total": len(high), "altos_respondidos": len(high) - len(missing_high)}
     return _report(True, errors, secoes=sections, citacoes=len(keys),
                    fontes_citadas=sorted(set(keys) & bib_keys), **extra)
 
@@ -484,12 +717,26 @@ def validate_review(content: str) -> dict:
     if not isinstance(data, dict):
         return _report(False, errors + ["A revisão deve ser um objeto JSON."])
     problems = data.get("problemas")
+    # Item 11 (pág. 10): notas separadas por critério reduzem viés de autopreferência.
+    criteria_scores = {}
+    raw_criteria = data.get("criterios")
+    if isinstance(raw_criteria, dict):
+        for name in REVIEW_CRITERIA:
+            if name in raw_criteria:
+                try:
+                    val = float(raw_criteria[name])
+                except (TypeError, ValueError):
+                    val = -1
+                if not 0 <= val <= 10:
+                    errors.append(f"Critério '{name}' deve ter nota de 0 a 10.")
+                else:
+                    criteria_scores[name] = round(val, 2)
     try:
         grade = float(data.get("nota_geral"))
     except (TypeError, ValueError):
-        grade = -1
+        grade = round(sum(criteria_scores.values()) / len(criteria_scores), 2) if criteria_scores else -1
     if not 0 <= grade <= 10:
-        errors.append("Informe nota_geral de 0 a 10.")
+        errors.append("Informe nota_geral de 0 a 10 (e criterios: argumento, uso_das_fontes, metodo, estrutura, estilo).")
     if not isinstance(problems, list) or not problems:
         errors.append("Liste os problemas encontrados (problemas: [...]).")
         problems = []
@@ -500,10 +747,12 @@ def validate_review(content: str) -> dict:
             errors.append(f"Problema {n}: precisa de tipo, gravidade (alta, media, baixa) e sugestao.")
     counts = {g: sum(1 for p in problems if isinstance(p, dict) and p.get("gravidade") == g)
               for g in ("alta", "media", "baixa")}
-    return _report(True, errors, nota_geral=grade, problemas=counts)
+    extra = {"criterios": criteria_scores} if criteria_scores else {}
+    return _report(True, errors, nota_geral=grade, problemas=counts, **extra)
 
 
-def validate_verification(content: str, bib_keys: set[str], chunks_for_key) -> dict:
+def validate_verification(content: str, bib_keys: set[str], chunks_for_key,
+                          assigned_claims: list[dict] | None = None) -> dict:
     errors = _size_errors(content, BY_KEY["verificacao"]["min"])
     try:
         data = parse_json(content)
@@ -511,30 +760,53 @@ def validate_verification(content: str, bib_keys: set[str], chunks_for_key) -> d
         return _report(False, errors + ["O conteúdo não é um JSON válido."])
     if isinstance(data, dict):
         data = data.get("verificacoes") or data.get("itens") or []
-    if not isinstance(data, list) or len(data) < 10:
-        return _report(False, errors + ["Entregue uma lista JSON com no mínimo 10 afirmações verificadas."])
+    min_count = max(10, len(assigned_claims or [])) if not assigned_claims else min(10, len(assigned_claims))
+    if not isinstance(data, list) or len(data) < min_count:
+        return _report(False, errors + [f"Entregue uma lista JSON com no mínimo {min_count} afirmações verificadas."])
     verdicts = ("sustentada", "parcial", "sem_suporte")
     for n, e in enumerate(data, 1):
         if isinstance(e, dict) and e.get("veredito") not in verdicts:
             errors.append(f"Item {n}: veredito deve ser sustentada, parcial ou sem_suporte.")
+    # Item 9: conferir que todas as afirmações sorteadas pelo servidor foram julgadas.
+    if assigned_claims:
+        answered_ids = {str(e.get("id") or "").strip().upper() for e in data if isinstance(e, dict)}
+        answered_texts = [normalize(str(e.get("afirmacao") or "")) for e in data if isinstance(e, dict)]
+        missing_assigned = []
+        for claim in assigned_claims:
+            cid = str(claim.get("id") or "").upper()
+            cnorm = normalize(claim.get("afirmacao") or "")
+            by_id = cid and cid in answered_ids
+            by_text = len(cnorm) >= 20 and any(cnorm[:40] in t or t[:40] in cnorm for t in answered_texts if len(t) >= 20)
+            if not (by_id or by_text):
+                missing_assigned.append(cid or claim.get("afirmacao", "")[:40])
+        if missing_assigned:
+            errors.append("Faltou verificar afirmação(ões) sorteada(s) pelo servidor: "
+                          + ", ".join(missing_assigned[:12])
+                          + ". Verifique todas as de material.afirmacoes_sorteadas mantendo o campo \"id\".")
     results, problems = _quote_check(
         data, bib_keys, chunks_for_key,
         lambda e: isinstance(e, dict) and e.get("veredito") in ("sustentada", "parcial"))
     tally = {v: sum(1 for e in data if isinstance(e, dict) and e.get("veredito") == v) for v in verdicts}
-    return _report(True, errors + problems, vereditos=tally, itens=results)
+    return _report(True, errors + problems, vereditos=tally,
+                   sorteadas_pelo_servidor=len(assigned_claims or []), itens=results)
 
 
-def validate(stage_key: str, content: str, *, bib_keys: set[str], chunks_for_key, template: str) -> dict:
+def validate(stage_key: str, content: str, *, bib_keys: set[str], chunks_for_key, template: str,
+             review_problems: list[dict] | None = None, review_responses=None,
+             assigned_claims: list[dict] | None = None) -> dict:
     if stage_key == "planejamento":
         return validate_plan(content, bib_keys)
     if stage_key == "evidencias":
         return validate_evidence(content, bib_keys, chunks_for_key)
-    if stage_key in ("redacao", "reescrita"):
+    if stage_key == "redacao":
         return validate_latex(content, bib_keys, BY_KEY[stage_key]["min"], template, chunks_for_key)
+    if stage_key == "reescrita":
+        return validate_latex(content, bib_keys, BY_KEY[stage_key]["min"], template, chunks_for_key,
+                              review_problems=review_problems, review_responses=review_responses)
     if stage_key == "revisao":
         return validate_review(content)
     if stage_key == "verificacao":
-        return validate_verification(content, bib_keys, chunks_for_key)
+        return validate_verification(content, bib_keys, chunks_for_key, assigned_claims=assigned_claims)
     raise ValueError("Etapa desconhecida")
 
 
@@ -623,6 +895,42 @@ def check_reference_fix(fix: dict, first_text: str, full_text: str) -> tuple[dic
     return fields, []
 
 
+def check_reference_proposal(fix: dict) -> tuple[dict, list[str]]:
+    """Item 7: valida só o formato/segurança de uma proposta de referência (para confirmação humana em 1 clique)."""
+    errors = []
+    for name, value in (fix or {}).items():
+        values = value if isinstance(value, list) else [value]
+        if any(re.search(r"[{}\\@]", str(v or "")) for v in values):
+            errors.append(f"{name}: não use chaves, barra invertida nem @.")
+    kind = (fix or {}).get("tipo") or "misc"
+    if kind not in REF_TYPES:
+        errors.append("tipo inválido. Use: " + ", ".join(REF_TYPES))
+    title = " ".join(str((fix or {}).get("titulo") or "").split())
+    if len(normalize(title)) < 6:
+        errors.append("Informe o título completo (mínimo de 6 caracteres).")
+    raw_authors = (fix or {}).get("autores") or []
+    if isinstance(raw_authors, str):
+        raw_authors = [a.strip() for a in re.split(r"\s*;\s*|\s+and\s+", raw_authors) if a.strip()]
+    authors = [" ".join(str(a).split()) for a in raw_authors if str(a).strip()]
+    if not authors:
+        errors.append("Informe ao menos um autor no formato 'Sobrenome, Nome'.")
+    year = str((fix or {}).get("ano") or "").strip()
+    if not re.fullmatch(r"(1[5-9]|20)\d{2}", year):
+        errors.append("Ano inválido (use 4 dígitos, ex.: 2024).")
+    venue = " ".join(str((fix or {}).get("veiculo") or "").split())
+    doi = str((fix or {}).get("doi") or "").strip().lower()
+    if doi and not re.fullmatch(r"10\.\d{4,9}/\S+", doi):
+        errors.append("Formato de DOI inválido (ex.: 10.1234/exemplo).")
+    if errors:
+        return {}, errors
+    fields = {"author": " and ".join(authors[:20]), "title": title, "year": year}
+    if venue:
+        fields[REF_TYPES[kind]] = venue
+    if doi:
+        fields["doi"] = doi
+    return fields, []
+
+
 def render_reference(entry: dict) -> str:
     fields = entry["fields"]
     names = [k for k in REF_ORDER if fields.get(k)] + sorted(
@@ -674,9 +982,14 @@ def material(stage_key: str, project: dict, board: dict, references: list[dict])
     if stage_key == "revisao":
         return {**base, "rascunho": _clip(get("redacao"), MATERIAL_BUDGET)}
     if stage_key == "reescrita":
-        return {**base, "rascunho": _clip(get("redacao"), 70_000), "revisao": _clip(get("revisao"), 30_000)}
+        rev_text = get("revisao")
+        return {**base, "rascunho": _clip(get("redacao"), 70_000), "revisao": _clip(rev_text, 30_000),
+                "problemas_numerados": numbered_review_problems(rev_text)}
     if stage_key == "verificacao":
-        return {**base, "texto_final": _clip(get("reescrita") or get("redacao"), MATERIAL_BUDGET)}
+        final_text = get("reescrita") or get("redacao")
+        bib_keys = {r["key"] for r in references if r.get("key")}
+        return {**base, "texto_final": _clip(final_text, MATERIAL_BUDGET),
+                "afirmacoes_sorteadas": extract_claims_to_verify(final_text, bib_keys)}
     raise ValueError("Etapa desconhecida")
 
 

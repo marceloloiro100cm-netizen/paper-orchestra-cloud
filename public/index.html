@@ -99,6 +99,9 @@
     }
     button, input, textarea, select { font: inherit; }
     button { cursor: pointer; }
+    a { color: var(--mpie-blue-text); text-decoration: underline; text-underline-offset: 2px; }
+    a:hover { color: var(--mpie-blue-hover); }
+    a.theme-btn, a.btn { text-decoration: none; }
 
     /* Cabeçalho fixo com símbolo Pena-Circuito livre e botão Modo Black */
     header {
@@ -1072,6 +1075,29 @@
     .art-refs { margin-top: 8px; }
     .art-refs summary { cursor: pointer; color: var(--warn-text); font-size: .86rem; font-weight: 600; }
     .art-refs ul { margin: 6px 0; padding-left: 18px; font-size: .84rem; color: var(--text-secondary); }
+    /* Item 6 & 7: cartão visual simples para conferir referência ao lado da capa do PDF. */
+    .ref-check-list { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+    .ref-check-card { background: var(--bg-subtle); border: 1px solid var(--border-main); border-radius: 14px; padding: 14px 16px; }
+    .ref-check-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .ref-check-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(220px, 0.9fr); gap: 14px; align-items: start; margin-top: 10px; }
+    .ref-check-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+    .ref-check-form .full { grid-column: 1 / -1; }
+    .ref-check-form label { margin: 2px 0 3px; font-size: 0.78rem; }
+    .ref-check-form input, .ref-check-form select { padding: 8px 10px; font-size: 0.86rem; }
+    .ref-cover-box { background: var(--bg-surface); border: 1px solid var(--border-main); border-radius: 12px; padding: 10px; text-align: center; }
+    .ref-cover-box img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border-soft); margin-top: 8px; display: block; margin-inline: auto; }
+    .ref-proposal-banner { background: var(--mpie-gold-soft); border: 1px solid var(--warn-border); color: var(--warn-text); border-radius: 10px; padding: 9px 12px; font-size: 0.82rem; margin-bottom: 10px; }
+    .lib-ref-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; background: var(--ok-bg); color: var(--ok-text); border: 1px solid var(--ok-border); margin-left: 6px; }
+    .lib-ref-pill.pending { background: var(--mpie-gold-soft); color: var(--mpie-gold-text); border-color: var(--warn-border); }
+    @media (max-width: 780px) {
+      .ref-check-grid { grid-template-columns: 1fr; }
+      .ref-check-form { grid-template-columns: 1fr; }
+    }
+    /* Retomada automática da sessão sem piscar a tela de login. */
+    #session-restoring { display: flex; align-items: center; gap: 12px; }
+    .session-spinner { width: 20px; height: 20px; border-radius: 50%; border: 3px solid var(--border-main); border-top-color: var(--mpie-blue); animation: scrSpin 0.8s linear infinite; flex-shrink: 0; }
+    @keyframes scrSpin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .session-spinner { animation: none; } }
     .art-empty code { display: block; margin: 8px 0; padding: 8px 10px; border-radius: 9px; background: var(--bg-subtle); white-space: pre-wrap; }
     /* Histórico anterior recolhido; cada item mostra o essencial. */
     .history-details > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -1400,7 +1426,7 @@
           <span aria-hidden="true">👤</span>
           <span class="account-label">Minha conta</span>
         </button>
-        <button type="button" id="theme-toggle" class="theme-btn" aria-pressed="false">
+        <button type="button" id="theme-toggle" class="theme-btn" aria-pressed="false" aria-label="Ativar modo escuro">
           <span id="theme-icon" aria-hidden="true">🌙</span>
           <span id="theme-label">Modo Black</span>
         </button>
@@ -1410,15 +1436,43 @@
   </header>
 
   <main>
+    <section id="session-restoring" class="panel hidden" role="status" aria-live="polite">
+      <span class="session-spinner" aria-hidden="true"></span>
+      <div>
+        <strong style="display:block;font-size:.98rem">Retomando sua conta…</strong>
+        <span class="subtle" id="session-restoring-detail">Você não precisa entrar de novo. Estamos abrindo sua biblioteca e seus artigos.</span>
+      </div>
+    </section>
+
     <section id="login-panel" class="panel">
       <h2>Acesso ao laboratório</h2>
-      <p class="subtle">Seus projetos e manuscritos permanecem armazenados no Google Cloud. Entre com a conta Google autorizada.</p>
-      <p class="subtle">Perdido no processo de escrita? O <a href="/#guia" data-go-step="4">Guia de escrita</a> mostra, em oito etapas, como construir um artigo do tema à submissão.</p>
+      <p class="subtle">Seus projetos e manuscritos permanecem armazenados com segurança na sua conta. Entre uma vez com o Google e permaneça conectado neste aparelho.</p>
+      <p class="subtle">Quer organizar as ideias primeiro? O <a href="/#guia" data-go-step="4">Guia de escrita</a> mostra, em oito etapas simples, como construir um artigo do tema à submissão — mesmo sem fazer login.</p>
+      <div class="check" style="max-width:460px">
+        <input id="keep-signed-in" type="checkbox" checked>
+        <label for="keep-signed-in">Manter minha conta conectada neste aparelho <span class="switch-sub">Desmarque apenas se estiver em um computador compartilhado (ex.: laboratório).</span></label>
+      </div>
       <div class="actions">
         <button id="login" class="btn">Entrar com Google</button>
       </div>
       <p id="auth-status" class="subtle" style="margin-top:10px"></p>
     </section>
+    <script>
+      // Evita piscar a tela de login quando já há sessão salva neste navegador.
+      (function () {
+        try {
+          var raw = localStorage.getItem('scriptorium_session_cache_v1');
+          if (!raw) return;
+          var s = JSON.parse(raw);
+          if (s && s.uid && s.email) {
+            document.getElementById('login-panel').classList.add('hidden');
+            document.getElementById('session-restoring').classList.remove('hidden');
+            document.getElementById('session-restoring-detail').textContent =
+              'Entrando automaticamente como ' + s.email + '…';
+          }
+        } catch (_) {}
+      })();
+    </script>
 
     <div id="workspace" class="hidden">
       <div id="account-backdrop" class="hidden"></div>
@@ -2042,12 +2096,14 @@
         if (isBlack) {
           root.setAttribute('data-theme', 'black');
           toggle.setAttribute('aria-pressed', 'true');
+          toggle.setAttribute('aria-label', 'Ativar modo claro');
           icon.textContent = '☀️';
           label.textContent = 'Modo Claro';
           if (themeMeta) themeMeta.setAttribute('content', '#070A0F');
         } else {
           root.removeAttribute('data-theme');
           toggle.setAttribute('aria-pressed', 'false');
+          toggle.setAttribute('aria-label', 'Ativar modo escuro');
           icon.textContent = '🌙';
           label.textContent = 'Modo Black';
           if (themeMeta) themeMeta.setAttribute('content', '#1466B8');
@@ -2079,7 +2135,7 @@
         guideRequested = true;
         const host = document.getElementById('guia-host');
         const script = document.createElement('script');
-        script.src = '/guia/guia.js?v=integrado-1';
+        script.src = '/guia/guia.js?v=redesign-20261125';
         script.onload = function () {
           const loading = document.getElementById('guia-loading');
           if (loading) loading.remove();
@@ -2096,6 +2152,7 @@
         stepNum = String(stepNum);
         if (stepNum === '4') loadGuide();
         try {
+          if (['1', '3', '4'].includes(stepNum)) localStorage.setItem('scriptorium_last_step', stepNum);
           const hash = stepNum === '4' ? '#guia' : '';
           if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
         } catch (_) {}
@@ -2107,6 +2164,7 @@
         });
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
+      window.ScriptoriumNavegar = setStep;
 
       document.querySelectorAll('[data-step], [data-go-step]').forEach(function (btn) {
         btn.addEventListener('click', function (event) {
@@ -2114,7 +2172,14 @@
           setStep(btn.getAttribute('data-step') || btn.getAttribute('data-go-step'));
         });
       });
-      if (location.hash === '#guia') setStep('4');
+      if (location.hash === '#guia') {
+        setStep('4');
+      } else {
+        try {
+          const savedStep = localStorage.getItem('scriptorium_last_step');
+          if (savedStep === '3' || savedStep === '4') setStep(savedStep);
+        } catch (_) {}
+      }
 
       // Espelha o contador de fontes selecionadas no subtítulo da Etapa 01
       const selCount = document.getElementById('selected-count');
@@ -2663,6 +2728,6 @@
     })();
   </script>
   <script src="/config.js"></script>
-  <script type="module" src="/app.js?v=revisao-20261125b"></script>
+  <script type="module" src="/app.js?v=p1-sessao-20261125"></script>
 </body>
 </html>

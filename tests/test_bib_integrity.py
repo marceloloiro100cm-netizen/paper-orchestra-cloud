@@ -65,7 +65,7 @@ class InlineBibTest(unittest.TestCase):
         official = bi.library_entries(
             [{"id": "s1", "name": "Pischetola 2018.pdf", "origin": {"doi": "10.22456/1679-1916.85929"}}],
             lambda url: WORK)
-        self.assertEqual(official[0]["key"], "fonte_pischetola2018")
+        self.assertEqual(official[0]["key"], "pischetola2018nascem")
         out = bi.repair(TEX, BIB, official)
         keys = [e["key"] for e in out["entries"]]
         self.assertEqual(keys, ["Ptzsch2019", "Kitchenham2007", "Pischetola2018", "Brasil2021"])
@@ -115,7 +115,7 @@ class OfficialEntriesTest(unittest.TestCase):
                                      lambda url: results, {}, {"p": text})
         self.assertEqual(entries[0]["how"], "texto_do_pdf")
         self.assertEqual(entries[0]["fields"]["year"], "2001")
-        self.assertEqual(entries[0]["key"], "fonte_prensky2001")
+        self.assertEqual(entries[0]["key"], "prensky2001digital")
 
     def test_doi_printed_in_text_needs_confirmation(self):
         own = {"title": "Ambientes virtuais de aprendizagem no ensino médio", "publication_year": 2021,
