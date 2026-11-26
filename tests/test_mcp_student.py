@@ -56,9 +56,20 @@ class NextStepTest(unittest.TestCase):
         self.assertIn(student.REF_FIX, student.next_step(p, "artigo", 2)["pedido"])
 
     def test_estados_do_servidor(self):
-        for status, words in (("preparando", "Aguarde"), ("compilando", "Gerando"), ("concluido", "PDF final pronto"),
+        for status, words in (("preparando", "Aguarde"), ("compilando", "Gerando"), ("concluido", "antes da conferência"),
                               ("falhou_preparo", "falhou"), ("refazendo_referencias", "Refazendo")):
             self.assertIn(words, student.next_step(project(status=status), "artigo", 0)["titulo"])
+
+    def test_concluido_antes_das_travas_nao_e_versao_final(self):
+        old = project(status="concluido")  # sem compile_report.versao: compilado antes de 26/11/2026
+        step = student.next_step(old, "artigo", 7)
+        self.assertIn("antes da conferência", step["titulo"])
+        self.assertIn("7 referência", step["texto"])
+        self.assertIn("refaça as referências", step["pedido"])
+        self.assertFalse(student.view(old, "artigo", [])["pdf_final"])
+        new = {**old, "compile_report": {"versao": "final"}}
+        self.assertEqual(student.next_step(new, "artigo", 0)["titulo"], "PDF final pronto")
+        self.assertTrue(student.view(new, "artigo", [])["pdf_final"])
 
     def test_revisao_sistematica(self):
         step = student.next_step(project(), "revisao_sistematica", 0)

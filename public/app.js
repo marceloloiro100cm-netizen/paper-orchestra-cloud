@@ -1248,7 +1248,7 @@ function articleCard(p) {
   bar.append(fill); info.append(bar);
   const actions = document.createElement('div'); actions.className = 'actions'; actions.style.margin = '0';
   if ((p.arquivos || []).includes('scriptorium.pdf')) {
-    const pdf = el('button', p.status === 'concluido' ? 'Baixar PDF' : 'Baixar PDF (rascunho)', 'btn'); pdf.type = 'button';
+    const pdf = el('button', p.pdf_final ? 'Baixar PDF' : 'Baixar PDF (rascunho)', 'btn'); pdf.type = 'button';
     pdf.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/arquivos/scriptorium.pdf`, 'scriptorium.pdf'));
     actions.append(pdf);
   }
@@ -1271,7 +1271,7 @@ function articleCard(p) {
   }
   const refs = p.referencias_a_conferir || [];
   const busy = ['preparando', 'compilando', 'refazendo_referencias'].includes(p.status);
-  if (refs.length && p.status !== 'concluido') {
+  if (refs.length && !p.pdf_final) {
     const box = document.createElement('details'); box.className = 'art-refs';
     box.append(el('summary', `${refs.length} referência(s) para confirmar antes do PDF final`));
     box.append(el('p', '"Sugerida": achada por busca de título, pode ser de outra obra. "A conferir": os dados vieram só do arquivo. Peça à sua IA para confirmar ou corrigir cada uma pela capa do documento:', 'subtle'));
