@@ -481,6 +481,10 @@ _NARR_CITE_RE = re.compile(
 _NON_AUTHOR_WORDS = {
     "segundo", "conforme", "em", "de", "no", "na", "para", "entre", "sobre",
     "como", "ano", "anos", "etapa", "fase", "versao", "versão", "artigo", "livro",
+    "complementarmente", "adicionalmente", "paralelamente", "analogamente",
+    "semelhantemente", "igualmente", "portanto", "contudo", "todavia", "entretanto",
+    "assim", "logo", "ademais", "outrossim", "finalmente", "inicialmente",
+    "primeiramente", "posteriormente", "atualmente", "recentemente", "ainda",
 }
 
 
@@ -491,14 +495,21 @@ def extract_in_text_citations(text: str) -> list[dict]:
 
     def _add(raw_label: str, raw_who: str, year_raw: str):
         year = re.sub(r"[a-z]$", "", year_raw.strip())
-        first = re.split(r"\s*[,;]\s*|\s+et\s+al\.?|\s+e\s+|\s*&\s*", raw_who.strip(), maxsplit=1, flags=re.IGNORECASE)[0].strip()
+        # Remove advérbio/conector inicial seguido de vírgula (ex.: "Complementarmente, Silva, Oliveira e Silva")
+        who = raw_who.strip()
+        label = raw_label
+        lead = re.match(r"^([A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ'\-]+),\s+(.+)$", who)
+        if lead and _strip_accents(lead.group(1)).lower() in _NON_AUTHOR_WORDS:
+            who = lead.group(2).strip()
+            label = re.sub(r"^" + re.escape(lead.group(1)) + r",\s+", "", label)
+        first = re.split(r"\s*[,;]\s*|\s+et\s+al\.?|\s+e\s+|\s*&\s*", who, maxsplit=1, flags=re.IGNORECASE)[0].strip()
         norm_surname = _strip_accents(first).lower()
         if not norm_surname or len(norm_surname) < 2 or norm_surname in _NON_AUTHOR_WORDS:
             return
         sig = (norm_surname, year)
         if sig not in seen:
             seen.add(sig)
-            found.append({"raw": raw_label, "surname": norm_surname, "year": year})
+            found.append({"raw": label, "surname": norm_surname, "year": year})
 
     for block in _PAREN_BLOCK_RE.finditer(text or ""):
         inner = block.group(1).strip()
