@@ -243,6 +243,11 @@ def run_mcp(data: dict) -> None:
                          get_json=openalex_json, update=update, derive=derive_source,
                          metadata=source_metadata)
         return
+    if data["mode"] == "mcp_refs":
+        from coverage_facets import source_metadata
+        mcp_jobs.rebuild_references(data, db=client, bucket=bucket, owner_uid=OWNER_UID, cache=DerivedCache(),
+                                    get_json=openalex_json, update=update, metadata=source_metadata)
+        return
     with tempfile.TemporaryDirectory(prefix="mcp_tex_") as tmp:
         mcp_jobs.compile_project(data, db=client, bucket=bucket, owner_uid=OWNER_UID, update=update,
                                  workdir=Path(tmp))
@@ -312,11 +317,18 @@ def run_retrieval_eval(data: dict) -> None:
 
 
 def openalex_json(url: str) -> dict:
+    """GET no OpenAlex. Desde 13/02/2026 a API exige chave (gratuita) em todas as chamadas:
+    sem OPENALEX_API_KEY o orçamento diário é só de teste e as buscas passam a ser recusadas.
+    A chave vem do Secret Manager (scripts/setup-openalex-key.sh) e nunca vai para o log."""
     import requests
     from reference_verification import USER_AGENT
-    response = requests.get(url, timeout=20, headers={"User-Agent": USER_AGENT})
+    params = {"api_key": OPENALEX_KEY} if OPENALEX_KEY else None
+    response = requests.get(url, params=params, timeout=20, headers={"User-Agent": USER_AGENT})
     response.raise_for_status()
     return response.json()
+
+
+OPENALEX_KEY = os.getenv("OPENALEX_API_KEY", "").strip()
 
 
 def check_bibliography(output: Path, pdf: Path, official: list[dict]) -> tuple[Path, dict]:
@@ -368,7 +380,7 @@ def main():
         # M21: fichamento sob demanda de um documento da biblioteca.
         run_reading_notes(data)
         return
-    if data.get("mode") in ("mcp_prepare", "mcp_compile"):
+    if data.get("mode") in ("mcp_prepare", "mcp_compile", "mcp_refs"):
         # Modo sem API: a IA do pesquisador escreve via MCP; aqui só leitura e compilação.
         run_mcp(data)
         return

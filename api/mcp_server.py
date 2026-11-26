@@ -39,13 +39,15 @@ MCP_PATH = "/api/mcp"
 MAX_ACTIVE_TOKENS = 5
 MAX_PROJECT_SOURCES = 20
 MAX_ACTIVE_JOBS = 2
+BUSY = ("preparando", "compilando", "refazendo_referencias")
 FORMATS = {"pdf", "docx", "txt"}
 ID = re.compile(r"[0-9a-f]{32}")
 INSTRUCTIONS = (
     "Scriptorium: escrita acadêmica com as fontes do pesquisador, sem API paga. Você (a IA) lê e "
     "escreve; o Scriptorium guarda as fontes, entrega trechos e confere cada entrega. Fluxo: "
-    "listar_fontes -> criar_projeto -> proxima_etapa (repetir) -> compilar. Se uma referência vier "
-    "com título, autor ou ano errados, corrija com corrigir_referencia antes de compilar. Guarde o identificador de "
+    "listar_fontes -> criar_projeto -> proxima_etapa (repetir) -> compilar. Referências com confiança "
+    "sugerida ou a_conferir, ou com título, autor ou ano errados, se confirmam ou corrigem com "
+    "corrigir_referencia antes de compilar: sem isso o PDF só sai como rascunho. Guarde o identificador de "
     "cabeça que proxima_etapa devolver e use-o em todas as chamadas desta conversa. Quando uma etapa "
     "pedir conversa nova, entregue o PASSE ao pesquisador e pare: a etapa será feita em outra conversa."
 )
@@ -133,7 +135,7 @@ class Store:
     # --------------------------------------------------------------- projetos
     def _active_jobs(self, uid: str) -> int:
         docs = self.db.collection("mcp_projects").where("owner_uid", "==", uid).stream()
-        return sum(1 for d in docs if d.to_dict().get("status") in ("preparando", "compilando"))
+        return sum(1 for d in docs if d.to_dict().get("status") in BUSY)
 
     def _launch(self, uid: str, pid: str, mode: str, sources: list[dict], title: str) -> str:
         job_id = uuid.uuid4().hex
@@ -184,13 +186,15 @@ class Store:
 
     def _reconcile(self, record: dict) -> dict:
         """Trabalho do worker que morreu sem atualizar o projeto não fica preso."""
-        job_key = {"preparando": "prepare_job", "compilando": "compile_job"}.get(record.get("status"))
+        job_key = {"preparando": "prepare_job", "compilando": "compile_job",
+                   "refazendo_referencias": "refs_job"}.get(record.get("status"))
         if not job_key or not record.get(job_key):
             return record
         snap = self.db.collection("research_jobs").document(record[job_key]).get()
         job = snap.to_dict() if snap.exists else {}
         if job.get("status") == "failed":
-            status = "falhou_preparo" if job_key == "prepare_job" else "pronto"
+            status = {"prepare_job": "falhou_preparo", "compile_job": "pronto"}.get(
+                job_key, record.get("status_antes") or "pronto")
             fields = {"status": status, "error": job.get("error", "Falha no servidor"), "updated_at": now()}
             self.db.collection("mcp_projects").document(record["id"]).update(fields)
             return {**record, **fields}
@@ -224,6 +228,9 @@ class Store:
         if status == "falhou_preparo":
             raise Falha("A leitura das fontes falhou: " + str(project.get("error", "")) +
                         ". Crie o projeto de novo ou troque as fontes.")
+        if status == "refazendo_referencias":
+            raise Falha("O Scriptorium está refazendo as referências do projeto (um ou dois minutos). "
+                        "Tente de novo daqui a pouco com estado_do_projeto.")
 
     def references(self, project: dict) -> list[dict]:
         return self._json(self.prefix(project) + "/references.json", []) or []
@@ -306,8 +313,8 @@ class Store:
         return card
 
     def correct_reference(self, project: dict, key: str, head_id: str, fix: dict) -> dict:
-        if project.get("status") in ("compilando",):
-            raise Falha("Aguarde a compilação terminar para corrigir referências.")
+        if project.get("status") in BUSY:
+            raise Falha("Aguarde o trabalho em andamento terminar para corrigir referências.")
         head = (project.get("heads") or {}).get(head_id or "")
         if not head:
             raise Falha("Cabeça desconhecida. Use o identificador recebido em proxima_etapa ou abrir_passe.")
@@ -317,8 +324,9 @@ class Store:
         if not entry or not source:
             raise Falha(f"Chave '{key}' não está neste projeto. Veja referencias_do_projeto.")
         chunks = self.payload(project, source).get("chunks") or []
-        early = [c.get("text", "") for c in chunks if (c.get("pages") or [1])[0] <= 4]
-        first = "\n".join(early) if early else "\n".join(c.get("text", "") for c in chunks[:15])
+        early = [c for c in chunks if (c.get("pages") or [1])[0] <= 4] or chunks[:15]
+        # O título da capa costuma virar título de seção no parser: entra junto do texto.
+        first = "\n".join("\n".join(list(c.get("heading_path") or []) + [c.get("text", "")]) for c in early)
         full = "\n".join(c.get("text", "") for c in chunks)
         fields, errors = flow.check_reference_fix(fix, first, full)
         if errors:
@@ -335,11 +343,26 @@ class Store:
                         "ia": head.get("model") or head.get("client", ""),
                         "antes": {k: before.get(k, "") for k in ("author", "title", "year")}})
         fields_update = {"reference_fixes": history}
-        if project.get("status") == "concluido":
-            fields_update["error"] = "Referências corrigidas depois do PDF: chame compilar de novo."
+        if project.get("status") in ("concluido", "rascunho"):
+            # O PDF já gerado não tem a correção: volta a "pronto" (os arquivos continuam lá).
+            fields_update.update(status="pronto", error="Referências corrigidas depois do PDF: chame compilar de novo.")
         self.update_project(project["id"], **fields_update)
-        return {"chave": key, "corrigida": True, "tipo": entry["type"], **fields,
+        return {"chave": key, "corrigida": True, "tipo": entry["type"], **fields, "confianca": "confirmada",
                 "aviso": "Chave mantida: o texto já entregue continua válido."}
+
+    def rebuild_references(self, uid: str, pid: str) -> dict:
+        """Refaz só a bibliografia (worker, sem IA), mantendo as chaves já citadas no texto."""
+        project = self.project(uid, pid)
+        if project.get("status") in BUSY or project.get("status") == "falhou_preparo":
+            raise Falha("Este projeto não está pronto para refazer as referências agora.")
+        if self._active_jobs(uid) >= MAX_ACTIVE_JOBS:
+            raise Falha("Já há trabalhos em andamento no servidor. Aguarde terminarem.")
+        job = self._launch(uid, pid, "mcp_refs", [], f"Referências MCP: {project.get('title', '')}")
+        self.update_project(pid, status="refazendo_referencias", status_antes=project.get("status"),
+                            refs_job=job, error="")
+        return {"status": "refazendo_referencias",
+                "instrucao": "Consulte estado_do_projeto em um ou dois minutos. As chaves já usadas no texto "
+                             "continuam as mesmas, e as correções feitas com corrigir_referencia são mantidas."}
 
     # ------------------------------------------------------------------ quadro
     def stage_content(self, project: dict, key: str, version: int) -> tuple[str, dict]:
@@ -417,8 +440,19 @@ def stage_material(store: Store, project: dict, stage_key: str) -> dict:
     board = store.board(project)
     refs = store.references(project)
     if mode(project) == review.MODE:
-        return review.material(stage_key, project, board, refs, review_context(store, project, board))
-    return flow.material(stage_key, project, board, refs)
+        out = review.material(stage_key, project, board, refs, review_context(store, project, board))
+    else:
+        out = flow.material(stage_key, project, board, refs)
+    state = (project.get("stages") or {}).get(stage_key) or {}
+    if stage_key == "reescrita" and state.get("versao_anterior"):
+        # Reescrita reaberta: a IA parte do texto que já tinha sido aceito.
+        previous, _ = store.stage_content(project, "reescrita", state["versao_anterior"])
+        report = project.get("compile_report") or {}
+        out = {**out, "texto_anterior": flow._clip(previous, 70_000),
+               "problemas_da_compilacao": {"motivos": report.get("motivos", []),
+                                           "erros_latex": report.get("erros_detalhe", [])},
+               "dica": "Corrija só o necessário no texto_anterior; a verificação será refeita."}
+    return out
 
 
 def _state_summary(project: dict) -> list[dict]:
@@ -443,8 +477,13 @@ def project_state(store: Store, project: dict) -> dict:
         action = "A leitura das fontes falhou: " + str(project.get("error", ""))
     elif status == "compilando":
         action = "Compilando o PDF. Consulte de novo em um ou dois minutos."
+    elif status == "refazendo_referencias":
+        action = "Refazendo as referências. Consulte de novo em um ou dois minutos."
     elif status == "concluido":
-        action = "PDF pronto: baixe no site, na etapa Seus artigos."
+        action = "PDF final pronto: baixe no site, na etapa Seus artigos."
+    elif status == "rascunho" and not nxt:
+        action = ("Saiu só um RASCUNHO: " + str(project.get("error", "")) + " Corrija as referências com "
+                  "corrigir_referencia (ou reabra a reescrita com reabrir_reescrita) e chame compilar de novo.")
     elif nxt:
         action = f"Próxima etapa: {nxt['titulo']} (chame proxima_etapa)."
     else:
@@ -580,13 +619,22 @@ def deliver(store: Store, uid: str, pid: str, stage_key: str, content: str, head
             "independencia": state.get("independencia"), "instrucao": after}
 
 
-def compile_project(store: Store, uid: str, pid: str) -> dict:
+def compile_project(store: Store, uid: str, pid: str, draft: bool = False) -> dict:
     project = store.project(uid, pid)
     store.ready(project)
     if project.get("status") == "compilando":
         raise Falha("A compilação já está em andamento.")
     if flow.next_stage(project.get("stages") or {}, mode(project)) is not None:
         raise Falha("Ainda há etapas por aceitar. Veja estado_do_projeto.")
+    pending = flow.pending_refs(store.references(project))
+    if pending and not draft:
+        # Trava da versão final (achado do teste de 25/11/2026: o PDF saiu "pronto" com 7
+        # referências erradas). O rascunho continua possível, com marca d'água.
+        listed = "; ".join(f"{r['key']} ({flow.REF_LEVEL_LABELS[flow.ref_level(r)]})" for r in pending[:12])
+        raise Falha(f"{len(pending)} referência(s) ainda não confirmada(s): {listed}. Leia a capa de cada "
+                    "fonte (ficha_da_fonte, ler_trecho) e confirme ou corrija com corrigir_referencia; depois "
+                    "chame compilar de novo. Para ver o texto agora, chame compilar com rascunho=true: o PDF sai "
+                    "marcado como RASCUNHO.")
     if store._active_jobs(uid) >= MAX_ACTIVE_JOBS:
         raise Falha("Já há trabalhos em andamento no servidor. Aguarde terminarem.")
     snapshot = {}
@@ -595,8 +643,27 @@ def compile_project(store: Store, uid: str, pid: str) -> dict:
         ctx = review_context(store, project)
         snapshot = {"prisma": ctx.get("prisma"), "concordancia": ctx.get("kappa")}
     job = store._launch(uid, pid, "mcp_compile", [], f"Compilação MCP: {project.get('title', '')}")
-    store.update_project(pid, status="compilando", compile_job=job, error="", **snapshot)
-    return {"status": "compilando", "instrucao": "Consulte estado_do_projeto em um ou dois minutos."}
+    store.update_project(pid, status="compilando", compile_job=job, error="", compile_rascunho=bool(draft),
+                         **snapshot)
+    return {"status": "compilando", "versao": "rascunho" if draft else "final",
+            "instrucao": "Consulte estado_do_projeto em um ou dois minutos."}
+
+
+def reopen_rewrite(store: Store, uid: str, pid: str, head_id: str) -> dict:
+    project = store.project(uid, pid)
+    store.ready(project)
+    if project.get("status") in BUSY:
+        raise Falha("Aguarde o trabalho em andamento terminar.")
+    head = (project.get("heads") or {}).get(head_id or "") or {}
+    if head.get("kind") != "redatora":
+        raise Falha("Só a cabeça redatora reabre a reescrita. Use o identificador recebido em proxima_etapa.")
+    try:
+        stages = flow.reopen_rewrite(project.get("stages") or {})
+    except ValueError as exc:
+        raise Falha(str(exc)) from None
+    store.update_project(pid, stages=stages, status="pronto", error="")
+    return {"reaberta": True, "instrucao": "Chame proxima_etapa: a reescrita volta com o texto anterior e os "
+                                           "problemas da compilação. Depois, a verificação será refeita."}
 
 
 # ================================================================== servidor
@@ -764,10 +831,26 @@ def build_server(store: Store, public_url: str) -> MCPServer:
         return await run(partial(store.correct_reference, project, chave, cabeca, fix))
 
     @server.tool()
-    async def compilar(projeto: str) -> dict:
-        """Depois de todas as etapas aceitas, monta o LaTeX com a bibliografia oficial e gera o PDF (sem IA)."""
+    async def compilar(projeto: str, rascunho: bool = False) -> dict:
+        """Depois de todas as etapas aceitas, monta o LaTeX com a bibliografia oficial e gera o PDF (sem IA).
+        A versão final exige todas as referências confirmadas (corrigir_referencia) e sai sem erro de
+        LaTeX; com rascunho=true, ou se algo faltar, o PDF sai marcado como RASCUNHO."""
         uid = _uid()
-        return await run(partial(compile_project, store, uid, projeto))
+        return await run(partial(compile_project, store, uid, projeto, rascunho))
+
+    @server.tool()
+    async def refazer_referencias(projeto: str) -> dict:
+        """Refaz a bibliografia oficial do projeto com as regras atuais (DOI, OpenAlex, texto da fonte), sem IA.
+        Mantém as chaves já citadas e as correções feitas com corrigir_referencia."""
+        uid = _uid()
+        return await run(partial(store.rebuild_references, uid, projeto))
+
+    @server.tool()
+    async def reabrir_reescrita(projeto: str, cabeca: str) -> dict:
+        """Reabre a reescrita (e a verificação) de um projeto já aceito, para corrigir um problema que só
+        apareceu na compilação, como um erro de LaTeX. Só a cabeça redatora pode reabrir."""
+        uid = _uid()
+        return await run(partial(reopen_rewrite, store, uid, projeto, cabeca))
 
     return server
 

@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import mcp_flow as flow
 
-REF_FIX = "corrija as referências marcadas para conferir"
+REF_FIX = "confirme ou corrija as referências marcadas para conferir"
+COMPILE_DRAFT = "compile como rascunho"
 
 
 def _quoted(title: str) -> str:
@@ -16,14 +17,14 @@ def _quoted(title: str) -> str:
 
 
 def references_to_check(refs: list[dict]) -> list[dict]:
-    """Referências montadas só com o que estava no arquivo (sem correspondência segura)."""
+    """Referências que ainda não foram confirmadas: sugeridas por busca ou só do arquivo."""
     out = []
-    for r in refs or []:
-        if r.get("how") != "arquivo":
-            continue
+    for r in flow.pending_refs(refs):
         fields = r.get("fields") or {}
+        level = flow.ref_level(r)
         out.append({"chave": r.get("key", ""), "titulo": str(fields.get("title", ""))[:160],
-                    "autor": str(fields.get("author", ""))[:120]})
+                    "autor": str(fields.get("author", ""))[:120], "nivel": level,
+                    "nivel_texto": flow.REF_LEVEL_LABELS[level]})
     return out
 
 
@@ -33,13 +34,21 @@ def proofs(stages: dict, mode: str, kappa: dict | None = None) -> list[str]:
     ev = (stages.get("evidencias") or {})
     s = ev.get("summary") or {}
     if ev.get("status") == "aceita" and s.get("total"):
-        lines.append(f"{s.get('conferidas', 0)} de {s['total']} citações encontradas, palavra por palavra, no texto das fontes")
+        lines.append(f"Evidências: {s.get('conferidas', 0)} de {s['total']} citações encontradas, palavra por "
+                     "palavra, no texto das fontes")
     for key in ("reescrita", "redacao"):
         st = stages.get(key) or {}
         s = st.get("summary") or {}
         if st.get("status") == "aceita" and s.get("fontes_citadas") is not None:
             n = len(s.get("fontes_citadas") or [])
             lines.append(f"O texto cita {n} fonte{'s' if n != 1 else ''} do projeto, sempre pelas chaves das referências")
+            quotes = s.get("citacoes_texto")
+            if quotes is None:
+                lines.append("Citações diretas do texto final: não conferidas (projeto anterior a esta checagem)")
+            elif quotes.get("total"):
+                extra = f"; {quotes['traduzidas']} marcada(s) como tradução" if quotes.get("traduzidas") else ""
+                lines.append(f"Texto final: {quotes.get('conferidas', 0)} de {quotes['total']} citações diretas "
+                             f"conferidas na fonte citada{extra}")
             break
     rv = stages.get("revisao") or {}
     s = rv.get("summary") or {}
@@ -72,15 +81,28 @@ def next_step(project: dict, mode: str, to_check: int) -> dict:
                 "detalhe": str(project.get("error", ""))[:300]}
     if status == "compilando":
         return {"titulo": "Gerando o PDF", "texto": "Leva um ou dois minutos. Atualize esta página em seguida."}
+    if status == "refazendo_referencias":
+        return {"titulo": "Refazendo as referências",
+                "texto": "Leva um ou dois minutos. As chaves já citadas no texto continuam as mesmas."}
     if status == "concluido":
-        return {"titulo": "PDF pronto",
-                "texto": "Baixe o PDF, leia com calma e confira as referências antes de levar à orientação."}
+        return {"titulo": "PDF final pronto",
+                "texto": "Todas as referências foram confirmadas e o PDF saiu sem erro de LaTeX. Leia com calma "
+                         "antes de levar à orientação."}
     nxt = flow.next_stage(stages, mode)
+    if status == "rascunho" and nxt is None:
+        why = str(project.get("error", "")).strip()
+        ask = (f"Use o Scriptorium: {REF_FIX} do projeto {title} e depois compile de novo." if to_check else
+               f"Use o Scriptorium: reabra a reescrita do projeto {title} para corrigir os problemas da compilação.")
+        return {"titulo": "Saiu um rascunho, ainda não é a versão final",
+                "texto": "O PDF está marcado como RASCUNHO. " + (why or "Há pendências antes da versão final."),
+                "pedido": ask}
     if nxt is None:
         if to_check:
-            return {"titulo": "Confira as referências e gere o PDF",
-                    "texto": f"Todas as etapas foram aceitas. Antes do PDF, peça à sua IA para corrigir as {to_check} referência(s) marcadas.",
-                    "pedido": f"Use o Scriptorium: {REF_FIX} do projeto {title} e depois compile o PDF."}
+            return {"titulo": "Confirme as referências e gere o PDF",
+                    "texto": f"Todas as etapas foram aceitas. A versão final só sai depois que as {to_check} "
+                             "referência(s) marcadas forem confirmadas. Se quiser ler o texto antes, peça um rascunho.",
+                    "pedido": f"Use o Scriptorium: {REF_FIX} do projeto {title} e depois compile o PDF.",
+                    "pedido_rascunho": f"Use o Scriptorium: {COMPILE_DRAFT} o projeto {title}."}
         return {"titulo": "Gere o PDF", "texto": "Todas as etapas foram aceitas.",
                 "pedido": f"Use o Scriptorium: compile o projeto {title}."}
     state = stages.get(nxt["key"]) or {}

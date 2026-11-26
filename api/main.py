@@ -128,7 +128,7 @@ app.include_router(make_oa_import_router(db, bucket, current_user))
 
 AWAITING_SOURCES = "awaiting_source_approval"
 # Execuções à parte: não aparecem na lista de pesquisas nem ocupam a vaga de pesquisa.
-SIDE_MODES = {"reading_notes", "retrieval_eval", "mcp_prepare", "mcp_compile"}
+SIDE_MODES = {"reading_notes", "retrieval_eval", "mcp_prepare", "mcp_compile", "mcp_refs"}
 
 
 class CheckpointDecision(BaseModel):

@@ -77,6 +77,15 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
         except Falha:
             raise HTTPException(404, "Projeto não encontrado.") from None
 
+    @router.post("/projetos/{project_id}/referencias/refazer", status_code=202)
+    def rebuild_references(project_id: str, user: dict = dependency):
+        """Refaz a bibliografia do projeto com as regras atuais, mantendo chaves e correções."""
+        owned(project_id, user)
+        try:
+            return store.rebuild_references(user["uid"], project_id)
+        except Falha as exc:
+            raise HTTPException(409, str(exc)) from None
+
     @router.get("/projetos/{project_id}/detalhe")
     def detail(project_id: str, user: dict = dependency):
         project = owned(project_id, user)
