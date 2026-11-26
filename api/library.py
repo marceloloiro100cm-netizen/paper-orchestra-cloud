@@ -6,6 +6,7 @@ Somente o backend autenticado pode ler ou alterar metadados e objetos.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import uuid
 from datetime import datetime, timezone
@@ -221,7 +222,7 @@ def make_library_router(db, bucket, verify_user: Callable):
         derived_removed = 0
         if sha and not shared and re.fullmatch(r"[0-9a-f]{64}", sha):
             for blob in bucket.list_blobs(prefix=f"library/{uid}/derived/"):
-                if blob.name.endswith(f"/{sha}.json"):
+                if blob.name.endswith(f"/{sha}.json") or f"/covers/{sha}_p" in blob.name:
                     blob.delete()
                     derived_removed += 1
         collection.document(item_id).delete()
@@ -229,10 +230,30 @@ def make_library_router(db, bucket, verify_user: Callable):
 
     @router.get("/items/{item_id}/cover")
     def render_cover(item_id: str, page: int = Query(default=1, ge=1, le=5), user: dict = dependencies):
-        """Item 7: renderiza a capa (pág. 1..5) do PDF da biblioteca para confirmação em 1 clique."""
+        """Item 7 + Onda 1 (G3): renderiza e cacheia no GCS a capa (pág. 1..5) do PDF."""
         item = owned(item_id, user)
         if item.get("status") != "active" or item.get("format") != "pdf":
             raise HTTPException(404, "Capa disponível apenas para arquivos PDF ativos.")
+        uid = user["uid"]
+        sha = item.get("sha256") or ""
+        cache_prefix = f"library/{uid}/derived/covers/{sha}_p{page}" if re.fullmatch(r"[0-9a-f]{64}", sha) else ""
+        if cache_prefix:
+            cached_png = bucket.blob(cache_prefix + ".png")
+            if cached_png.exists():
+                png = cached_png.download_as_bytes()
+                meta_blob = bucket.blob(cache_prefix + ".json")
+                meta = {}
+                if meta_blob.exists():
+                    try:
+                        meta = json.loads(meta_blob.download_as_bytes())
+                    except ValueError:
+                        meta = {}
+                return Response(
+                    content=png, media_type="image/png",
+                    headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff",
+                             "X-Scriptorium-Page": str(meta.get("page", page)),
+                             "X-Scriptorium-Pages-Total": str(meta.get("total", page))},
+                )
         blob = bucket.blob(item["object_path"])
         if not blob.exists():
             raise HTTPException(404, "Arquivo indisponível no armazenamento.")
@@ -243,9 +264,16 @@ def make_library_router(db, bucket, verify_user: Callable):
             target = min(page, doc.page_count)
             png = doc[target - 1].get_pixmap(dpi=115, alpha=False).tobytes("png")
             total = doc.page_count
+        if cache_prefix:
+            try:
+                bucket.blob(cache_prefix + ".png").upload_from_string(png, content_type="image/png")
+                bucket.blob(cache_prefix + ".json").upload_from_string(
+                    json.dumps({"page": target, "total": total}), content_type="application/json")
+            except Exception:
+                pass
         return Response(
             content=png, media_type="image/png",
-            headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+            headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff",
                      "X-Scriptorium-Page": str(target), "X-Scriptorium-Pages-Total": str(total)},
         )
 

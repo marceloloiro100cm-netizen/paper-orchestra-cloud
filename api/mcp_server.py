@@ -35,6 +35,11 @@ import library_search as search
 import mcp_flow as flow
 import mcp_review as review
 
+try:
+    from google.api_core.exceptions import NotFound as _GcsNotFound
+except Exception:  # pragma: no cover
+    _GcsNotFound = ()
+
 MCP_PATH = "/api/mcp"
 MAX_ACTIVE_TOKENS = 5
 MAX_PROJECT_SOURCES = 20
@@ -69,6 +74,7 @@ class Store:
                  is_allowed: Callable[[dict], bool]):
         self.db, self.bucket, self.start_job, self.is_allowed = db, bucket, start_job, is_allowed
         self._payloads: dict[str, dict] = {}
+        self._refs_cache: dict[str, tuple[str, float, list[dict]]] = {}
         self._on_revoke: list[Callable[[str], None]] = []
 
     # ---------------------------------------------------------------- tokens
@@ -204,11 +210,15 @@ class Store:
             return {**record, **fields}
         return record
 
-    def projects(self, uid: str) -> list[dict]:
-        docs = [d.to_dict() for d in self.db.collection("mcp_projects").where("owner_uid", "==", uid).stream()]
+    def projects(self, uid: str, limit: int = 50) -> list[dict]:
+        query = self.db.collection("mcp_projects").where("owner_uid", "==", uid)
+        if hasattr(query, "limit"):
+            query = query.limit(limit)
+        docs = [d.to_dict() for d in query.stream()]
         return sorted(docs, key=lambda d: d.get("created_at", ""), reverse=True)
 
     def update_project(self, pid: str, **fields) -> None:
+        self._refs_cache.pop(pid, None)
         self.db.collection("mcp_projects").document(pid).update({**fields, "updated_at": now()})
 
     @staticmethod
@@ -217,10 +227,12 @@ class Store:
 
     def _json(self, path: str, default=None):
         blob = self.bucket.blob(path)
-        if not blob.exists():
+        try:
+            raw = blob.download_as_bytes()
+        except (_GcsNotFound, KeyError, FileNotFoundError):
             return default
         try:
-            return json.loads(blob.download_as_bytes())
+            return json.loads(raw)
         except ValueError:
             return default
 
@@ -237,7 +249,17 @@ class Store:
                         "Tente de novo daqui a pouco com estado_do_projeto.")
 
     def references(self, project: dict) -> list[dict]:
-        return self._json(self.prefix(project) + "/references.json", []) or []
+        pid = project.get("id") or ""
+        stamp = str(project.get("updated_at") or "")
+        cached = self._refs_cache.get(pid)
+        if cached and cached[0] == stamp and time.monotonic() - cached[1] < 60:
+            return json.loads(json.dumps(cached[2]))
+        data = self._json(self.prefix(project) + "/references.json", []) or []
+        if pid and stamp:
+            if len(self._refs_cache) > 128:
+                self._refs_cache.clear()
+            self._refs_cache[pid] = (stamp, time.monotonic(), json.loads(json.dumps(data)))
+        return data
 
     def manifest(self, project: dict) -> list[dict]:
         return self._json(self.prefix(project) + "/sources.json", []) or []

@@ -1172,8 +1172,6 @@
     .agent-waiting, .agent-disabled { color: var(--text-muted); }
     .agent-failed { color: var(--err-text); }
     .scientific-warning { display: block; color: var(--mpie-gold-text) !important; margin: 10px 0 !important; font-weight: 600; }
-    .scientific-audit-report, .neon-report { margin: 14px 0; padding: 15px; border: 1px solid var(--border-main); border-radius: 12px; background: var(--bg-surface); }
-    .scientific-audit-report p, .neon-report p, .neon-report li { margin: 7px 0 10px; font-size: 0.86rem; color: var(--text-secondary); }
     /* M07: avisos editoriais (retratação, retirada, expressão de preocupação). */
     .scientific-audit-report p.editorial-alert { color: var(--danger-text); font-weight: 600; }
     /* M05/M08: relatório de citações e evidências. */
@@ -1184,8 +1182,6 @@
     .review-control select, .review-control input { font-size: 0.82rem; padding: 4px 6px; max-width: 100%; }
     .review-control small { flex-basis: 100%; }
     .evidence-report small { display: block; margin: 2px 0 8px; color: var(--text-secondary); }
-    .neon-report h4 { font-size: 0.9rem; margin: 12px 0 5px; color: var(--text-primary); }
-    .neon-report ul { padding-left: 20px; }
     .audit-finding { padding: 10px 0; border-top: 1px solid var(--border-soft); }
     .audit-finding small { display: block; color: var(--text-muted); margin-top: 6px; overflow-wrap: anywhere; }
     .reference-item { border-top: 1px solid var(--border-soft); padding: 10px 0; max-width: 100%; overflow-wrap: anywhere; }
@@ -1558,9 +1554,9 @@
               <button class="btn" type="button" id="mcp-create-token">Gerar chave</button>
             </div>
             <div id="mcp-new-token" class="hidden" role="status">
-              <p class="warning"><strong>Copie agora:</strong> a chave não aparece de novo. Não compartilhe; quem tiver o endereço vê as suas fontes.</p>
+              <p class="warning"><strong>Copie agora e mantenha em segredo:</strong> a chave não aparece de novo. Nunca cole este endereço em chats, relatórios ou capturas de tela — se vazar, clique em <strong>Revogar</strong> imediatamente.</p>
               <div data-ai-only="claude chatgpt">
-                <label for="mcp-url-token">Seu endereço de conexão</label>
+                <label for="mcp-url-token">Seu endereço de conexão (use apenas no campo oficial de conector da IA)</label>
                 <div class="gemini-key-row">
                   <input id="mcp-url-token" type="text" readonly spellcheck="false" />
                   <button class="btn alt" type="button" data-copy="mcp-url-token">Copiar</button>

@@ -8,6 +8,7 @@ import io
 import json
 import re
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -80,7 +81,12 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
 
     @router.get("/projetos")
     def list_projects(user: dict = dependency):
-        return {"projetos": [for_student(p) for p in store.projects(user["uid"])]}
+        projects = store.projects(user["uid"])
+        if len(projects) <= 1:
+            return {"projetos": [for_student(p) for p in projects]}
+        # Onda 1 (G1): evita N leituras sequenciais no GCS quando há vários projetos.
+        with ThreadPoolExecutor(max_workers=min(6, len(projects))) as pool:
+            return {"projetos": list(pool.map(for_student, projects))}
 
     @router.get("/projetos/{project_id}")
     def get_project(project_id: str, user: dict = dependency):
@@ -107,7 +113,7 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
     @router.get("/projetos/{project_id}/referencias/{key}/capa")
     def reference_cover(project_id: str, key: str, page: int = Query(default=1, ge=1, le=5),
                         user: dict = dependency):
-        """Item 7: renderiza a capa (pág. 1..5) do PDF da fonte para confirmação em 1 clique."""
+        """Item 7 + Onda 1 (G3): renderiza e cacheia no GCS a capa (pág. 1..5) do PDF."""
         project = owned(project_id, user)
         refs = store.references(project)
         entry = next((r for r in refs if r.get("key") == key), None)
@@ -118,6 +124,19 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
         path = str(source.get("object_path", ""))
         if not path.startswith(f"library/{user['uid']}/{source['id']}/"):
             raise HTTPException(404, "Fonte indisponível.")
+        sha = str(source.get("sha256") or "")
+        cache_prefix = (f"library/{user['uid']}/derived/covers/{sha}_p{page}"
+                        if re.fullmatch(r"[0-9a-f]{64}", sha) else "")
+        if cache_prefix:
+            cached_png = store.bucket.blob(cache_prefix + ".png")
+            if cached_png.exists():
+                png = cached_png.download_as_bytes()
+                meta = store._json(cache_prefix + ".json", {}) or {}
+                return Response(content=png, media_type="image/png", headers={
+                    "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff",
+                    "X-Scriptorium-Page": str(meta.get("page", page)),
+                    "X-Scriptorium-Pages-Total": str(meta.get("total", page)),
+                })
         blob = store.bucket.blob(path)
         if not blob.exists():
             raise HTTPException(404, "Arquivo original não encontrado.")
@@ -128,8 +147,15 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
             target = min(page, doc.page_count)
             png = doc[target - 1].get_pixmap(dpi=115, alpha=False).tobytes("png")
             total = doc.page_count
+        if cache_prefix:
+            try:
+                store.bucket.blob(cache_prefix + ".png").upload_from_string(png, content_type="image/png")
+                store.bucket.blob(cache_prefix + ".json").upload_from_string(
+                    json.dumps({"page": target, "total": total}), content_type="application/json")
+            except Exception:
+                pass
         return Response(content=png, media_type="image/png", headers={
-            "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff",
             "X-Scriptorium-Page": str(target), "X-Scriptorium-Pages-Total": str(total),
         })
 

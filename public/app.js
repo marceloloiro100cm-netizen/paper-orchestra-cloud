@@ -878,19 +878,53 @@ function compactHistoryItem(entry, info) {
   info.append(more);
 }
 
+// Onda 1 (G8): polling inteligente — pausa quando a aba está oculta ou sem tarefas ativas.
+let lastJobsBusy = false;
+let lastMcpBusy = false;
+const BUSY_JOB_STATUSES = new Set(['queued', 'running']);
+const BUSY_MCP_STATUSES = new Set(['preparando', 'compilando', 'refazendo_referencias']);
+
+function stopSmartPolling() {
+  if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
+}
+
+function syncSmartPolling() {
+  stopSmartPolling();
+  if (!user || document.hidden) return;
+  if (!lastJobsBusy && !lastMcpBusy) return;
+  refreshInterval = setInterval(() => {
+    if (!user || document.hidden) { stopSmartPolling(); return; }
+    if (lastJobsBusy) loadJobs();
+    if (lastMcpBusy) loadMcpProjects();
+  }, 12000);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopSmartPolling();
+  } else if (user && canWork()) {
+    if (lastJobsBusy) loadJobs();
+    if (lastMcpBusy) loadMcpProjects();
+    syncSmartPolling();
+  }
+});
+
 async function loadJobs() {
   if (!user) return;
   const area = $('research-list');
   try {
     const r = await request('/jobs');
     const data = await r.json();
+    const items = data.items || [];
+    lastJobsBusy = items.some(e => BUSY_JOB_STATUSES.has(e.status));
+    syncSmartPolling();
     area.replaceChildren();
     const historyPanel = $('history-panel');
-    if (!API_MODE) historyPanel.classList.toggle('hidden', !data.items.length);
+    if (!API_MODE) historyPanel.classList.toggle('hidden', !items.length);
     else $('history-details').open = true;
-    $('history-title').textContent = API_MODE ? 'Histórico de pesquisas' : `Pesquisas anteriores (${data.items.length})`;
-    if (!data.items.length) { area.textContent = 'Nenhuma pesquisa criada até o momento.'; return; }
-    for (const entry of data.items) {
+    $('history-title').textContent = API_MODE ? 'Histórico de pesquisas' : `Pesquisas anteriores (${items.length})`;
+    if (!items.length) { area.textContent = 'Nenhuma pesquisa criada até o momento.'; return; }
+    for (const entry of items) {
       const item = document.createElement('div'); item.className='item';
       const info = document.createElement('div');
       const title = document.createElement('strong'); title.textContent = entry.title; info.append(title);
@@ -1572,6 +1606,8 @@ async function loadMcpProjects() {
   let projects = [];
   try { projects = (await (await request('/mcp-conta/projetos')).json()).projetos || []; }
   catch (e) { if (!box.children.length) box.replaceChildren(el('p', e.message, 'subtle')); return; }
+  lastMcpBusy = projects.some(p => BUSY_MCP_STATUSES.has(p.status));
+  syncSmartPolling();
   if (user) writeUiCache(user.uid, { mcpProjects: projects });
   renderMcpProjectsList(projects);
 }
@@ -2070,8 +2106,7 @@ $('retry-access').addEventListener('click', async () => {
   await loadAccountAccess();
   if (canWork()) {
     await Promise.all([loadJobs(), loadLibrary(), loadCapabilities(), loadAdvisor(), loadMcp()]);
-    if (refreshInterval) clearInterval(refreshInterval);
-    refreshInterval = setInterval(loadJobs, 12000);
+    syncSmartPolling();
   }
 });
 
@@ -2143,8 +2178,7 @@ $('retry-api-version').addEventListener('click', async () => {
     await loadAccountAccess();
     if (canWork() && (API_MODE ? !accountAccess.legacy_backend : true)) {
       await Promise.all([loadJobs(), loadLibrary(), loadCapabilities(), loadAdvisor(), loadMcp()]);
-      if (refreshInterval) clearInterval(refreshInterval);
-      refreshInterval = setInterval(loadJobs, 12000);
+      syncSmartPolling();
     }
   } finally {
     button.disabled = false;
@@ -2200,9 +2234,12 @@ onAuthStateChanged(auth, async (current) => {
     await loadAccountAccess(cachedAccess);
     if (canWork()) {
       await Promise.all([loadJobs(), loadLibrary(), loadCapabilities(), loadAdvisor(), loadMcp()]);
-      refreshInterval = setInterval(loadJobs, 12000);
+      syncSmartPolling();
     }
   } else {
+    lastJobsBusy = false;
+    lastMcpBusy = false;
+    stopSmartPolling();
     if (authInitialized) clearSessionCache();
     accountAccess = null;
     window.ScriptoriumProjetos?.definir([]);
