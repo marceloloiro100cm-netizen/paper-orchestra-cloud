@@ -2461,6 +2461,89 @@ async function loadAdvisorShareView() {
   }
   return true;
 }
+// Onda 4: avaliação ética do estudo piloto (TCLE + Escala SUS + Transferência sem IA)
+let pilotItemsRendered = false;
+function renderSusQuestions(items) {
+  const host = $('pilot-sus-list'); if (!host || pilotItemsRendered) return;
+  host.replaceChildren();
+  (items || []).forEach((text, idx) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--border-main);border-radius:10px;background:var(--bg-surface)';
+    const lbl = document.createElement('label');
+    lbl.htmlFor = `pilot-sus-${idx}`; lbl.style.cssText = 'margin:0;flex:1;min-width:220px;font-weight:500;font-size:0.86rem';
+    lbl.textContent = `${idx + 1}. ${text}`;
+    const sel = document.createElement('select');
+    sel.id = `pilot-sus-${idx}`; sel.dataset.susIdx = String(idx); sel.style.width = 'auto'; sel.style.minWidth = '150px';
+    for (const [val, label] of [['', 'Escolha (1 a 5)…'], ['1', '1 · Discordo totalmente'], ['2', '2 · Discordo'], ['3', '3 · Neutro'], ['4', '4 · Concordo'], ['5', '5 · Concordo totalmente']]) {
+      const opt = document.createElement('option'); opt.value = val; opt.textContent = label; sel.append(opt);
+    }
+    row.append(lbl, sel);
+    host.append(row);
+  });
+  pilotItemsRendered = true;
+}
+
+async function loadPilotStatus() {
+  if (!user || !$('pilot-eval-details')) return;
+  try {
+    const d = await (await request('/piloto/meu-status')).json();
+    renderSusQuestions(d.sus_itens || []);
+    const st = $('pilot-eval-status'), wBtn = $('pilot-withdraw-btn');
+    if (d.enviado) {
+      if (st) st.textContent = `✓ Obrigado! Sua avaliação anônima (${d.versao_piloto}) foi registrada em ${new Date(d.enviado_em).toLocaleDateString('pt-BR')} · nota SUS: ${d.sus_score} (${d.sus_faixa}).`;
+      wBtn?.classList.remove('hidden');
+    } else {
+      if (st) st.textContent = `Versão de referência em avaliação: ${d.versao_piloto}.`;
+      wBtn?.classList.add('hidden');
+    }
+  } catch (_) {}
+}
+
+$('pilot-eval-details')?.addEventListener('toggle', e => { if (e.target.open) loadPilotStatus(); });
+$('pilot-submit-btn')?.addEventListener('click', async () => {
+  const msg = $('pilot-message'), btn = $('pilot-submit-btn');
+  if (!$('pilot-tcle')?.checked) { msg.textContent = 'Marque o aceite do Termo de Consentimento (TCLE) antes de enviar.'; return; }
+  const sus = [];
+  for (let i = 0; i < 10; i++) {
+    const v = Number($(`pilot-sus-${i}`)?.value || 0);
+    if (v < 1 || v > 5) { msg.textContent = `Responda o item ${i + 1} da escala de facilidade de uso (1 a 5).`; return; }
+    sus.push(v);
+  }
+  btn.disabled = true; msg.textContent = 'Enviando avaliação anônima…';
+  try {
+    const res = await (await request('/piloto/avaliacao', {
+      method: 'POST',
+      body: JSON.stringify({
+        tcle_aceito: true,
+        vinculo: $('pilot-vinculo')?.value || 'mestrado',
+        familiaridade_digital: $('pilot-familiaridade')?.value || 'intermediaria',
+        sus,
+        o_que_ajudou: $('pilot-ajudou')?.value || '',
+        o_que_dificultou: $('pilot-dificultou')?.value || '',
+        percepcao_autoria: $('pilot-autoria')?.value || '',
+        transferencia: {
+          problema: $('pilot-tr-problema')?.value || '',
+          pergunta: $('pilot-tr-pergunta')?.value || '',
+          objetivo_geral: $('pilot-tr-objetivo')?.value || '',
+          como_coletar: $('pilot-tr-coleta')?.value || '',
+        },
+      }),
+    })).json();
+    msg.textContent = `✓ Avaliação registrada (${res.codigo_anonimo}) · SUS: ${res.sus_score} (${res.sus_faixa}). Muito obrigado!`;
+    await loadPilotStatus();
+  } catch (e) { msg.textContent = e.message; }
+  finally { btn.disabled = false; }
+});
+$('pilot-withdraw-btn')?.addEventListener('click', async () => {
+  if (!window.confirm('Deseja retirar seu consentimento e apagar permanentemente sua avaliação do estudo piloto?')) return;
+  try {
+    await request('/piloto/avaliacao', { method: 'DELETE' });
+    $('pilot-message').textContent = 'Consentimento retirado e avaliação apagada com sucesso.';
+    await loadPilotStatus();
+  } catch (e) { $('pilot-message').textContent = e.message; }
+});
+$('admin-pilot-csv')?.addEventListener('click', () => downloadFrom('/admin/piloto/resumo.csv', 'piloto_scriptorium_v1.0-piloto.csv'));
+
 const IS_ADVISOR_SHARE = new URLSearchParams(location.search).has('orientacao');
 if (IS_ADVISOR_SHARE) { loadAdvisorShareView(); }
 
