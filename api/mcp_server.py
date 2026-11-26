@@ -69,6 +69,7 @@ class Store:
                  is_allowed: Callable[[dict], bool]):
         self.db, self.bucket, self.start_job, self.is_allowed = db, bucket, start_job, is_allowed
         self._payloads: dict[str, dict] = {}
+        self._on_revoke: list[Callable[[str], None]] = []
 
     # ---------------------------------------------------------------- tokens
     def token_owner(self, token: str) -> dict | None:
@@ -106,8 +107,11 @@ class Store:
         for snap in self.db.collection("mcp_tokens").where("owner_uid", "==", uid).stream():
             record = snap.to_dict()
             if record.get("id") == token_id and not record.get("revoked"):
-                self.db.collection("mcp_tokens").document(record["hash"]).update(
+                digest = record["hash"]
+                self.db.collection("mcp_tokens").document(digest).update(
                     {"revoked": True, "revoked_at": now()})
+                for cb in self._on_revoke:
+                    cb(digest)
                 return True
         return False
 
@@ -310,7 +314,77 @@ class Store:
                 "sha256": entry.get("sha256")}
         card = search.reading_card(item, self.payload(project, entry))
         card["chave"] = key
+        ref = next((r for r in self.references(project) if r.get("key") == key), None)
+        if ref:
+            fields = ref.get("fields") or {}
+            card["referencia_atual"] = {
+                "tipo": ref.get("type"), "titulo": fields.get("title", ""),
+                "autores": fields.get("author", ""), "ano": fields.get("year", ""),
+                "confianca": flow.ref_level(ref), "origem": ref.get("how", ""),
+            }
         return card
+
+    def _save_library_bib(self, uid: str, source_id: str, entry: dict) -> None:
+        """Item 6: salva ficha confirmada na biblioteca para herança em projetos futuros."""
+        if not source_id:
+            return
+        try:
+            doc_ref = self.db.collection("library_items").document(source_id)
+            snap = doc_ref.get()
+            rec = snap.to_dict() if snap.exists else None
+            if not rec or rec.get("owner_uid") != uid:
+                return
+            fields = dict(entry.get("fields") or {})
+            existing_key = ((rec.get("bib_entry") or {}).get("key") or "").strip()
+            stable_key = (existing_key if existing_key and not existing_key.startswith("fonte_")
+                          else flow.stable_bib_key(fields))
+            doc_ref.update({"bib_entry": {
+                "type": entry.get("type") or "misc",
+                "key": stable_key,
+                "fields": fields,
+                "how": entry.get("how") or "confirmada_pelo_pesquisador",
+                "updated_at": now(),
+            }})
+        except Exception:
+            pass
+
+    def confirm_reference_human(self, uid: str, pid: str, key: str, payload: dict) -> dict:
+        """Itens 6 e 7: pesquisador confirma em 1 clique no site (aceita proposta da IA ou edita)."""
+        project = self.project(uid, pid)
+        if project.get("status") in BUSY:
+            raise Falha("Aguarde o trabalho em andamento terminar para confirmar referências.")
+        refs = self.references(project)
+        entry = next((r for r in refs if r.get("key") == key), None)
+        if not entry:
+            raise Falha(f"Chave '{key}' não está neste projeto.")
+        if payload.get("aceitar_proposta"):
+            prop = entry.get("proposta_pendente")
+            if not isinstance(prop, dict) or not prop.get("fields"):
+                raise Falha("Não há proposta pendente para esta referência.")
+            kind = prop.get("type") or "misc"
+            fields = dict(prop["fields"])
+        else:
+            fields, errors = flow.check_reference_proposal(payload)
+            if errors:
+                raise Falha(" ".join(errors))
+            kind = payload.get("tipo") or "misc"
+        before = dict(entry.get("fields") or {})
+        entry.update(type=kind, fields=fields, how="confirmada_pelo_pesquisador")
+        entry.pop("proposta_pendente", None)
+        prefix = self.prefix(project)
+        self.bucket.blob(prefix + "/references.json").upload_from_string(
+            json.dumps(refs, ensure_ascii=False), content_type="application/json")
+        self.bucket.blob(prefix + "/references.bib").upload_from_string(
+            "".join(flow.render_reference(r) for r in refs), content_type="text/plain; charset=utf-8")
+        self._save_library_bib(uid, entry.get("source_id") or "", entry)
+        history = list(project.get("reference_fixes") or [])[-80:]
+        history.append({"chave": key, "em": now(), "cabeca": "pesquisador", "ia": "confirmacao_humana",
+                        "antes": {k: before.get(k, "") for k in ("author", "title", "year")}})
+        fields_update = {"reference_fixes": history}
+        if project.get("status") in ("concluido", "rascunho"):
+            fields_update.update(status="pronto", error="Referências confirmadas depois do PDF: compile de novo.")
+        self.update_project(project["id"], **fields_update)
+        return {"chave": key, "confirmada": True, "tipo": entry["type"], **fields, "confianca": "confirmada"}
 
     def correct_reference(self, project: dict, key: str, head_id: str, fix: dict) -> dict:
         if project.get("status") in BUSY:
@@ -330,14 +404,27 @@ class Store:
         full = "\n".join(c.get("text", "") for c in chunks)
         fields, errors = flow.check_reference_fix(fix, first, full)
         if errors:
+            # Item 7: se a capa não tiver texto extraível, guarda proposta válida para confirmação em 1 clique.
+            prop_fields, prop_errors = flow.check_reference_proposal(fix)
+            if not prop_errors:
+                entry["proposta_pendente"] = {
+                    "type": fix.get("tipo") or "misc", "fields": prop_fields,
+                    "motivo": errors[:3], "ia": head.get("model") or head.get("client", ""), "em": now(),
+                }
+                self.bucket.blob(self.prefix(project) + "/references.json").upload_from_string(
+                    json.dumps(refs, ensure_ascii=False), content_type="application/json")
+                raise Falha("Correção automática recusada: " + " ".join(errors) +
+                            " A proposta ficou salva no site para o pesquisador confirmar em 1 clique ao lado da capa do PDF.")
             raise Falha("Correção recusada: " + " ".join(errors))
         before = dict(entry.get("fields") or {})
         entry.update(type=fix.get("tipo") or "misc", fields=fields, how="corrigida_pelo_texto")
+        entry.pop("proposta_pendente", None)
         prefix = self.prefix(project)
         self.bucket.blob(prefix + "/references.json").upload_from_string(
             json.dumps(refs, ensure_ascii=False), content_type="application/json")
         self.bucket.blob(prefix + "/references.bib").upload_from_string(
             "".join(flow.render_reference(r) for r in refs), content_type="text/plain; charset=utf-8")
+        self._save_library_bib(project["owner_uid"], entry.get("source_id") or source.get("id") or "", entry)
         history = list(project.get("reference_fixes") or [])[-80:]
         history.append({"chave": key, "em": now(), "cabeca": head.get("id"),
                         "ia": head.get("model") or head.get("client", ""),
@@ -348,7 +435,7 @@ class Store:
             fields_update.update(status="pronto", error="Referências corrigidas depois do PDF: chame compilar de novo.")
         self.update_project(project["id"], **fields_update)
         return {"chave": key, "corrigida": True, "tipo": entry["type"], **fields, "confianca": "confirmada",
-                "aviso": "Chave mantida: o texto já entregue continua válido."}
+                "aviso": "Chave mantida e ficha salva na biblioteca: vale para os próximos projetos."}
 
     def rebuild_references(self, uid: str, pid: str) -> dict:
         """Refaz só a bibliografia (worker, sem IA), mantendo as chaves já citadas no texto."""
@@ -506,12 +593,17 @@ def next_step(store: Store, uid: str, pid: str, head_id: str | None, model: str,
         return {**project_state(store, project), "instrucao": "Todas as etapas foram aceitas. Chame compilar."}
     if stage_def["nova_conversa"]:
         code = store.pass_for(project, stage_def)
+        writer_head = next((((project.get("stages") or {}).get(k) or {}).get("head")
+                            for k in ("reescrita", "redacao", "triagem")
+                            if ((project.get("stages") or {}).get(k) or {}).get("head")), None)
+        suggested_ai = flow.recommend_other_family((writer_head or {}).get("model", ""))
         return {
             "etapa": stage_def["key"], "titulo": stage_def["titulo"], "precisa_de_conversa_nova": True,
-            "passe": code,
+            "passe": code, "ia_recomendada": suggested_ai,
             "instrucao": (
                 "PARE AQUI nesta conversa. Mostre ao pesquisador o passe abaixo e explique: abra uma "
-                "conversa NOVA (de preferência em outra IA conectada ao Scriptorium) e peça: "
+                f"conversa NOVA — de preferência em outra família de IA ({suggested_ai}) conectada ao "
+                "Scriptorium, para evitar autoverificação — e peça: "
                 f"\"Use o Scriptorium: abrir_passe com o código {code}\". Depois que essa etapa for "
                 "aceita, volte a esta conversa e chame proxima_etapa."),
         }
@@ -550,7 +642,7 @@ def open_pass(store: Store, uid: str, code: str, model: str, client: str) -> dic
 
 
 def deliver(store: Store, uid: str, pid: str, stage_key: str, content: str, head_id: str, model: str,
-            client: str) -> dict:
+            client: str, respostas_revisao: str = "") -> dict:
     project = store.project(uid, pid)
     store.ready(project)
     if project.get("status") in ("compilando", "concluido"):
@@ -573,12 +665,27 @@ def deliver(store: Store, uid: str, pid: str, stage_key: str, content: str, head
     if client and not head.get("client"):
         head["client"] = client[:80]
     refs = store.references(project)
+    bib_keys = {r["key"] for r in refs}
     if stage_key in review.BY_KEY:
         ctx = review_context(store, project)
         report = review.validate(stage_key, content or "", ctx, store.chunks_for_key(project))
     else:
-        report = flow.validate(stage_key, content or "", bib_keys={r["key"] for r in refs},
-                               chunks_for_key=store.chunks_for_key(project), template=project.get("template"))
+        review_problems, assigned_claims = None, None
+        if stage_key == "reescrita":
+            rev_state = stages.get("revisao") or {}
+            if rev_state.get("status") == "aceita":
+                rev_text, _ = store.stage_content(project, "revisao", rev_state["version"])
+                review_problems = flow.numbered_review_problems(rev_text)
+        elif stage_key == "verificacao":
+            final_key = "reescrita" if (stages.get("reescrita") or {}).get("status") == "aceita" else "redacao"
+            final_state = stages.get(final_key) or {}
+            if final_state.get("status") == "aceita":
+                final_text, _ = store.stage_content(project, final_key, final_state["version"])
+                assigned_claims = flow.extract_claims_to_verify(final_text, bib_keys)
+        report = flow.validate(stage_key, content or "", bib_keys=bib_keys,
+                               chunks_for_key=store.chunks_for_key(project), template=project.get("template"),
+                               review_problems=review_problems, review_responses=respostas_revisao or None,
+                               assigned_claims=assigned_claims)
     state = dict(stages.get(stage_key) or {})
     version = int(state.get("attempts", 0)) + 1
     store.save_stage(project, stage_key, version, content or "", report)
@@ -684,24 +791,29 @@ def client_name(ctx: Context | None) -> str:
 
 
 class TokenVerifier:
-    """Tokens pessoais do Scriptorium (scr_...), com cache curto em memória."""
+    """Tokens pessoais do Scriptorium (scr_...), com cache por hash SHA-256 e invalidação imediata."""
 
     def __init__(self, store: Store, ttl: float = 60.0):
         self.store, self.ttl, self.cache = store, ttl, {}
+        store._on_revoke.append(self.invalidate)
+
+    def invalidate(self, digest: str) -> None:
+        self.cache.pop(digest, None)
 
     async def verify_token(self, token: str) -> AccessToken | None:
-        hit = self.cache.get(token)
+        digest = flow.token_hash(token)
+        hit = self.cache.get(digest)
         if hit and hit[0] > time.monotonic():
             return hit[1]
         identity = await anyio.to_thread.run_sync(self.store.token_owner, token)
         if not identity:
-            self.cache.pop(token, None)
+            self.cache.pop(digest, None)
             return None
         access = AccessToken(token=token, client_id="scriptorium-token-pessoal", scopes=["scriptorium"],
                              subject=identity["uid"], claims={"email": identity.get("email", "")})
         if len(self.cache) > 500:
             self.cache.clear()
-        self.cache[token] = (time.monotonic() + self.ttl, access)
+        self.cache[digest] = (time.monotonic() + self.ttl, access)
         return access
 
 
@@ -810,12 +922,13 @@ def build_server(store: Store, public_url: str) -> MCPServer:
 
     @server.tool()
     async def entregar_etapa(projeto: str, etapa: str, conteudo: str, cabeca: str, ctx: Context,
-                             modelo_declarado: str = "") -> dict:
+                             modelo_declarado: str = "", respostas_revisao: str = "") -> dict:
         """Entrega o resultado da etapa atual. O Scriptorium confere formato, chaves e citações literais;
-        se recusar, devolve os erros para corrigir e entregar de novo."""
+        na reescrita, aceita respostas_revisao (lista JSON [{id, acao, justificativa}]) ou comentários '% [P1] ...'.
+        Se recusar, devolve os erros para corrigir e entregar de novo."""
         uid = _uid()
         return await run(partial(deliver, store, uid, projeto, etapa, conteudo, cabeca, modelo_declarado,
-                                 client_name(ctx)))
+                                 client_name(ctx), respostas_revisao))
 
     @server.tool()
     async def corrigir_referencia(projeto: str, chave: str, cabeca: str, autores: list[str], titulo: str,

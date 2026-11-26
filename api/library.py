@@ -78,7 +78,7 @@ def validate_signature(data: bytes, suffix: str) -> None:
 def exposed(record: dict) -> dict:
     return {key: record.get(key) for key in (
         "id", "name", "format", "size", "collection", "description", "sha256",
-        "created_at", "archived_at", "status", "origin", "guard",
+        "created_at", "archived_at", "status", "origin", "guard", "bib_entry",
     )}
 
 
@@ -226,6 +226,54 @@ def make_library_router(db, bucket, verify_user: Callable):
                     derived_removed += 1
         collection.document(item_id).delete()
         return {"id": item_id, "deleted": True, "derived_removed": derived_removed}
+
+    @router.get("/items/{item_id}/cover")
+    def render_cover(item_id: str, page: int = Query(default=1, ge=1, le=5), user: dict = dependencies):
+        """Item 7: renderiza a capa (pág. 1..5) do PDF da biblioteca para confirmação em 1 clique."""
+        item = owned(item_id, user)
+        if item.get("status") != "active" or item.get("format") != "pdf":
+            raise HTTPException(404, "Capa disponível apenas para arquivos PDF ativos.")
+        blob = bucket.blob(item["object_path"])
+        if not blob.exists():
+            raise HTTPException(404, "Arquivo indisponível no armazenamento.")
+        from pdf_render import fitz
+        with fitz.open(stream=blob.download_as_bytes(), filetype="pdf") as doc:
+            if doc.page_count == 0:
+                raise HTTPException(404, "PDF sem páginas.")
+            target = min(page, doc.page_count)
+            png = doc[target - 1].get_pixmap(dpi=115, alpha=False).tobytes("png")
+            total = doc.page_count
+        return Response(
+            content=png, media_type="image/png",
+            headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+                     "X-Scriptorium-Page": str(target), "X-Scriptorium-Pages-Total": str(total)},
+        )
+
+    @router.put("/items/{item_id}/reference")
+    async def save_reference(item_id: str, request: Request, user: dict = dependencies):
+        """Item 6: confirma/edita a ficha bibliográfica na biblioteca (vale para todos os projetos)."""
+        import mcp_flow as flow
+        item = owned(item_id, user)
+        if item.get("status") != "active":
+            raise HTTPException(409, "Apenas fontes ativas podem receber ficha bibliográfica.")
+        try:
+            body = await request.json()
+        except ValueError:
+            raise HTTPException(422, "Dados inválidos.") from None
+        fields, errors = flow.check_reference_proposal(body if isinstance(body, dict) else {})
+        if errors:
+            raise HTTPException(422, " ".join(errors))
+        existing_key = ((item.get("bib_entry") or {}).get("key") or "").strip()
+        key = existing_key if existing_key and not existing_key.startswith("fonte_") else flow.stable_bib_key(fields)
+        bib_entry = {
+            "type": (body.get("tipo") or "article"),
+            "key": key,
+            "fields": fields,
+            "how": "confirmada_pelo_pesquisador",
+            "updated_at": utc_now(),
+        }
+        collection.document(item_id).update({"bib_entry": bib_entry})
+        return {"id": item_id, "bib_entry": bib_entry}
 
     @router.post("/items/{item_id}/archive")
     def archive_file(item_id: str, user: dict = dependencies):

@@ -233,6 +233,42 @@ def latex_errors(log: str, limit: int = 5) -> list[str]:
     return out
 
 
+def text_quality_metrics(latex: str, bib_keys: list[str]) -> dict:
+    """Item 15: indicadores objetivos sem IA (proporção de citações diretas, seções curtas, uso das fontes)."""
+    body = re.sub(r"(?m)(?<!\\)%.*$", "", latex or "")
+    plain_text = re.sub(r"\\[A-Za-z]+\*?(?:\[[^\]]*\])?(?:\{[^}]*\})?", " ", body)
+    words = len(re.findall(r"[A-Za-zÀ-ÿ0-9]+", plain_text))
+    quotes = re.findall(r"``(.+?)''|\u201c(.+?)\u201d|(?<![\w\\])\"(.+?)\"", body, flags=re.S)
+    direct = sum(1 for m in quotes if len(re.findall(r"[A-Za-zÀ-ÿ0-9]+", next(g for g in m if g is not None))) >= 4)
+    per_1k = round(direct * 1000 / max(words, 1), 1)
+    sections = re.split(r"\\section\*?\{([^}]*)\}", body)
+    short_sections = []
+    for i in range(1, len(sections), 2):
+        sec_name = sections[i].strip()
+        sec_body = sections[i + 1] if i + 1 < len(sections) else ""
+        paras = [p.strip() for p in re.split(r"\n\s*\n", sec_body)
+                 if p.strip() and not p.strip().startswith(("\\subsection", "\\begin{figure}", "\\end{"))]
+        if len(paras) <= 1:
+            short_sections.append(sec_name)
+    counts = {k: 0 for k in bib_keys}
+    for group in re.findall(r"\\(?:cite|citep|citet|citeonline|citealp|citealt|citeauthor|citeyear|"
+                            r"apud|citeyearpar)\*?(?:\[[^\]]*\]){0,2}\{([^}]*)\}", body):
+        for k in group.split(","):
+            k = k.strip()
+            if k in counts:
+                counts[k] += 1
+    return {
+        "palavras": words,
+        "citacoes_diretas": direct,
+        "citacoes_diretas_por_mil_palavras": per_1k,
+        "excesso_citacao_direta": per_1k > 8.0,
+        "secoes_um_paragrafo": short_sections,
+        "citacoes_por_fonte": counts,
+        "fontes_nao_citadas": sorted(k for k, c in counts.items() if c == 0),
+        "fontes_citadas_uma_vez": sorted(k for k, c in counts.items() if c == 1),
+    }
+
+
 def pending_refs(refs: list[dict]) -> list[dict]:
     return [r for r in refs or [] if bib_integrity.ref_level(r) != "confirmada"]
 
@@ -283,7 +319,52 @@ def _project(db, data: dict, owner_uid: str):
     return ref, project
 
 
-def prepare(data: dict, *, db, bucket, owner_uid: str, cache, get_json, update, derive, metadata) -> dict:
+def _load_library_cards(db, owner_uid: str, sources: list[dict]) -> dict[str, dict]:
+    """Item 6: carrega fichas bibliográficas já confirmadas na biblioteca da conta."""
+    cards = {}
+    for source in sources:
+        sid = source.get("id")
+        if not sid:
+            continue
+        try:
+            snap = db.collection("library_items").document(sid).get()
+            rec = snap.to_dict() if snap.exists else None
+            if rec and rec.get("owner_uid") == owner_uid and isinstance(rec.get("bib_entry"), dict):
+                cards[sid] = rec["bib_entry"]
+        except Exception:
+            continue
+    return cards
+
+
+def _persist_confirmed_cards(db, owner_uid: str, entries: list[dict]) -> None:
+    """Salva fichas confirmadas (ex.: DOI ou 2 fontes concordantes) de volta na biblioteca."""
+    now = datetime.now(timezone.utc).isoformat()
+    for entry in entries:
+        sid = entry.get("source_id")
+        if not sid or bib_integrity.ref_level(entry) != "confirmada":
+            continue
+        if entry.get("how") == "ficha_da_biblioteca":
+            continue
+        try:
+            doc_ref = db.collection("library_items").document(sid)
+            snap = doc_ref.get()
+            rec = snap.to_dict() if snap.exists else None
+            if not rec or rec.get("owner_uid") != owner_uid:
+                continue
+            existing = rec.get("bib_entry") or {}
+            if bib_integrity.ref_level(existing) == "confirmada":
+                continue
+            doc_ref.update({"bib_entry": {
+                "type": entry.get("type", "misc"), "key": entry.get("key", ""),
+                "fields": dict(entry.get("fields") or {}), "how": entry.get("how"),
+                "updated_at": now,
+            }})
+        except Exception:
+            continue
+
+
+def prepare(data: dict, *, db, bucket, owner_uid: str, cache, get_json, update, derive, metadata,
+            crossref_get=None, oasisbr_get=None) -> dict:
     """derive(entry, fetch, cache) -> (payload, status); metadata(entry, fetch, cache) -> dict."""
     from source_materials import derived_key
     ref, project = _project(db, data, owner_uid)
@@ -318,7 +399,11 @@ def prepare(data: dict, *, db, bucket, owner_uid: str, cache, get_json, update, 
             meta[source["id"]] = metadata(source, fetch, cache)
         except Exception:
             meta[source["id"]] = {}
-    entries = bib_integrity.library_entries(ok, get_json, meta, texts)
+    library_cards = _load_library_cards(db, owner_uid, ok)
+    entries = bib_integrity.library_entries(
+        ok, get_json, meta, texts, crossref_get=crossref_get, oasisbr_get=oasisbr_get,
+        library_cards=library_cards)
+    _persist_confirmed_cards(db, owner_uid, entries)
     key_of = {e["source_id"]: e["key"] for e in entries}
     for entry in manifest:
         entry["key"] = key_of.get(entry["id"])
@@ -387,6 +472,8 @@ def compile_project(data: dict, *, db, bucket, owner_uid: str, update, workdir: 
         reasons += problems
     final = bool(pdf) and not reasons
     record = provenance(project, refs, manifest)
+    record["correcoes_de_referencias"] = project.get("reference_fixes") or []
+    record["qualidade_texto"] = text_quality_metrics(body, [r.get("key") for r in refs if r.get("key")])
     record["compilacao"] = {**{k: v for k, v in report.items() if k != "log_final"},
                             "versao": "final" if final else "rascunho", "motivos": reasons}
     files = []
@@ -416,12 +503,13 @@ def compile_project(data: dict, *, db, bucket, owner_uid: str, update, workdir: 
     return record
 
 
-def rebuild_references(data: dict, *, db, bucket, owner_uid: str, cache, get_json, update, metadata) -> dict:
+def rebuild_references(data: dict, *, db, bucket, owner_uid: str, cache, get_json, update, metadata,
+                       crossref_get=None, oasisbr_get=None) -> dict:
     """Refaz só o BibTeX de um projeto existente, sem tocar no texto já aceito.
 
     - A chave de cada fonte continua a mesma (o texto já cita essas chaves).
-    - Referência corrigida com corrigir_referencia (conferida no documento) é mantida.
-    - O resto é refeito com as regras atuais (DOI, OpenAlex com chave, texto da fonte),
+    - Referência corrigida no documento ou confirmada pelo pesquisador é mantida.
+    - O resto é refeito com a cascata atual (biblioteca, DOI, OpenAlex, Crossref, BDTD/Oasisbr),
       mas nunca piora: se a consulta nova falhar, uma referência mais confiável fica.
     """
     ref, project = _project(db, data, owner_uid)
@@ -430,7 +518,6 @@ def rebuild_references(data: dict, *, db, bucket, owner_uid: str, cache, get_jso
     update(status="running", stage="Refazendo as referências", started_at=datetime.now(timezone.utc).isoformat())
     manifest = json.loads(bucket.blob(prefix + "/sources.json").download_as_bytes())
     old = json.loads(bucket.blob(prefix + "/references.json").download_as_bytes())
-    old_by_source = {e.get("source_id"): e for e in old}
     fetch = lambda path: bucket.blob(path).download_as_bytes()  # noqa: E731
     sources, texts, meta = [], {}, {}
     by_id = {s.get("id"): s for s in project.get("sources") or []}
@@ -446,17 +533,23 @@ def rebuild_references(data: dict, *, db, bucket, owner_uid: str, cache, get_jso
         except Exception:  # noqa: BLE001 - metadado do PDF é só uma pista de título
             meta[source["id"]] = {}
         sources.append(source)
-    fresh = {e["source_id"]: e for e in bib_integrity.library_entries(sources, get_json, meta, texts)}
+    library_cards = _load_library_cards(db, owner_uid, sources)
+    fresh = {e["source_id"]: e for e in bib_integrity.library_entries(
+        sources, get_json, meta, texts, crossref_get=crossref_get, oasisbr_get=oasisbr_get,
+        library_cards=library_cards)}
+    _persist_confirmed_cards(db, owner_uid, list(fresh.values()))
     out, changed = [], []
     for previous in old:
         sid = previous.get("source_id")
         new = fresh.get(sid)
         rank = {"confirmada": 2, "sugerida": 1, "a_conferir": 0}
-        if (previous.get("how") == "corrigida_pelo_texto" or not new or
+        if (previous.get("how") in ("corrigida_pelo_texto", "confirmada_pelo_pesquisador") or not new or
                 rank[bib_integrity.ref_level(new)] < rank[bib_integrity.ref_level(previous)]):
             out.append(previous)
             continue
         new = {**new, "key": previous["key"]}  # a chave citada no texto não muda
+        if previous.get("proposta_pendente") and bib_integrity.ref_level(new) != "confirmada":
+            new["proposta_pendente"] = previous["proposta_pendente"]
         if (new.get("fields"), new.get("how")) != (previous.get("fields"), previous.get("how")):
             changed.append(previous["key"])
         out.append(new)

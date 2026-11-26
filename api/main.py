@@ -327,8 +327,9 @@ def revoke_researcher(email: str, user: User):
 
 @app.get("/api/jobs")
 def list_researches(user: User):
-    # Consulta simples, sem índices compostos. Ordenação em memória para acervo pessoal.
-    docs = db.collection("research_jobs").where("owner_uid", "==", user["uid"]).limit(200).stream()
+    # Consulta simples, sem índices compostos. Limite ampliado para não ocultar
+    # pesquisas reais quando há muitos trabalhos auxiliares (SIDE_MODES).
+    docs = db.collection("research_jobs").where("owner_uid", "==", user["uid"]).limit(500).stream()
     items = [serializable(reconcile(s.reference, s.to_dict())) for s in docs
              if (s.to_dict() or {}).get("mode") not in SIDE_MODES]
     items.sort(key=lambda x: x["created_at"], reverse=True)

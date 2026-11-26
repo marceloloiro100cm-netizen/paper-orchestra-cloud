@@ -39,13 +39,20 @@ TITLE_MATCH = 0.86
 VERSION = "bib-integrity-3"
 
 # Mesma tabela de api/mcp_flow.py (tests/test_mcp_jobs.py impede divergência):
-# só DOI registrado ou conferência no documento confirmam uma referência.
+# só DOI registrado, concordância de 2 bases, ficha confirmada ou conferência
+# humana/no documento confirmam uma referência.
 REF_LEVELS = {
     "doi": "confirmada",
     "corrigida_pelo_texto": "confirmada",
+    "confirmada_pelo_pesquisador": "confirmada",
+    "confirmada_duas_fontes": "confirmada",
+    "ficha_da_biblioteca": "confirmada",
     "doi_no_texto": "sugerida",
     "texto_do_pdf": "sugerida",
     "titulo_do_pdf": "sugerida",
+    "crossref": "sugerida",
+    "oasisbr": "sugerida",
+    "proposta_ia": "sugerida",
     "arquivo": "a_conferir",
 }
 
@@ -178,13 +185,168 @@ def entry_from_openalex(work: dict, key: str) -> dict:
     return {"type": kind, "key": key, "fields": {k: v for k, v in fields.items() if v}}
 
 
+KEY_STOPWORDS = {
+    "a", "o", "as", "os", "um", "uma", "uns", "umas", "de", "do", "da", "dos", "das",
+    "em", "no", "na", "nos", "nas", "para", "por", "com", "sem", "sobre", "entre",
+    "que", "como", "mais", "menos", "muito", "eles", "elas", "este", "esta", "esse", "essa",
+    "the", "of", "and", "to", "in", "for", "on", "with", "by", "an", "at", "from", "into",
+    "using", "towards", "toward", "study", "analysis", "review", "estudo", "analise",
+}
+
+
+def _first_title_word(title: str) -> str:
+    words = re.findall(r"[a-z]{3,}", fold(title or ""))
+    for w in words:
+        if w not in KEY_STOPWORDS and len(w) >= 4:
+            return w[:16]
+    for w in words:
+        if w not in KEY_STOPWORDS:
+            return w[:16]
+    return words[0][:16] if words else ""
+
+
 def _key_for(fields: dict, used: set) -> str:
-    base = (surname(fields.get("author", "")) or "fonte") + (fields.get("year") or "")
-    key, n = "fonte_" + base, 2
+    """Chave legível e estável: sobrenome + ano + primeira palavra forte do título (nunca 'fonte')."""
+    who = surname(fields.get("author", ""))
+    year = re.sub(r"[^0-9]", "", str(fields.get("year") or ""))[:4]
+    word = _first_title_word(fields.get("title", ""))
+    if who:
+        base = f"{who}{year}{word}"
+    elif word:
+        base = f"{word}{year}"
+    else:
+        base = f"doc{year or 'ref'}"
+    base = re.sub(r"[^a-z0-9]", "", base) or "docref"
+    if base[0].isdigit():
+        base = "ref" + base
+    key, n = base, 2
     while key in used:
-        key, n = f"fonte_{base}_{n}", n + 1
+        key, n = f"{base}_{n}", n + 1
     used.add(key)
     return key
+
+
+def entry_from_crossref(item: dict, key: str) -> dict:
+    """Converte registro da Crossref REST API (R08) em entrada BibTeX."""
+    authors = []
+    for a in (item.get("author") or [])[:12]:
+        family = (a.get("family") or "").strip()
+        given = (a.get("given") or "").strip()
+        if family and given:
+            authors.append(f"{family}, {given}")
+        elif family:
+            authors.append(family)
+        elif a.get("name"):
+            authors.append(str(a["name"]).strip())
+    title = ((item.get("title") or [""])[0] or "").strip()
+    year = ""
+    for k in ("published-print", "published-online", "issued", "created"):
+        parts = ((item.get(k) or {}).get("date-parts") or [[]])[0]
+        if parts and str(parts[0]).isdigit():
+            year = str(parts[0])
+            break
+    venue = ((item.get("container-title") or [""])[0] or "").strip()
+    raw_type = item.get("type") or ""
+    kind = {"journal-article": "article", "proceedings-article": "inproceedings",
+            "book-chapter": "incollection", "book": "book", "dissertation": "phdthesis",
+            "report": "techreport"}.get(raw_type, "misc")
+    fields = {"author": " and ".join(authors), "title": title, "year": year,
+              "doi": canonical_doi(item.get("DOI") or "")}
+    if kind in ("inproceedings", "incollection") and venue:
+        fields["booktitle"] = venue
+    elif kind == "article" and venue:
+        fields["journal"] = venue
+    elif kind == "book" and item.get("publisher"):
+        fields["publisher"] = str(item["publisher"]).strip()
+    if item.get("volume"):
+        fields["volume"] = str(item["volume"])
+    if item.get("issue"):
+        fields["number"] = str(item["issue"])
+    if item.get("page"):
+        fields["pages"] = str(item["page"]).replace("-", "--")
+    return {"type": kind, "key": key, "fields": {k: v for k, v in fields.items() if v}}
+
+
+def entry_from_oasisbr(record: dict, key: str) -> dict:
+    """Converte registro da BDTD / Oasisbr (IBICT) em entrada BibTeX."""
+    title = str(record.get("title") or "").strip()
+    if isinstance(record.get("title"), list):
+        title = str((record.get("title") or [""])[0]).strip()
+    raw_authors = record.get("authors") or record.get("author") or []
+    authors = []
+    if isinstance(raw_authors, dict):
+        for group in ("primary", "secondary"):
+            if isinstance(raw_authors.get(group), dict):
+                authors.extend(raw_authors[group].keys())
+            elif isinstance(raw_authors.get(group), list):
+                authors.extend(str(a) for a in raw_authors[group])
+    elif isinstance(raw_authors, list):
+        authors = [str(a).strip() for a in raw_authors if str(a).strip()]
+    elif isinstance(raw_authors, str) and raw_authors.strip():
+        authors = [raw_authors.strip()]
+    year = ""
+    for y in (record.get("publicationDates") or [record.get("year") or ""]):
+        m = re.search(r"(1[89]|20)\d{2}", str(y or ""))
+        if m:
+            year = m.group(0)
+            break
+    formats = " ".join(str(f).lower() for f in (record.get("formats") or []))
+    if "master" in formats or "disserta" in formats:
+        kind = "mastersthesis"
+    elif "doctoral" in formats or "tese" in formats or "phd" in formats:
+        kind = "phdthesis"
+    elif "article" in formats or "artigo" in formats:
+        kind = "article"
+    else:
+        kind = "misc"
+    inst = ""
+    publishers = record.get("publishers") or record.get("institution") or []
+    if isinstance(publishers, list) and publishers:
+        inst = str(publishers[0]).strip()
+    elif isinstance(publishers, str):
+        inst = publishers.strip()
+    fields = {"author": " and ".join(authors[:12]), "title": title, "year": year}
+    if inst and kind in ("mastersthesis", "phdthesis"):
+        fields["school"] = inst
+    elif inst and kind == "article":
+        fields["journal"] = inst
+    return {"type": kind, "key": key, "fields": {k: v for k, v in fields.items() if v}}
+
+
+def _entry_confirmed_by_text(entry: dict, text: str) -> bool:
+    fields = entry.get("fields") or {}
+    title = _plain(fields.get("title") or "")
+    author = fields.get("author") or ""
+    if len(title) < 25 or len(title.split()) < 5 or not author:
+        return False
+    surnames = []
+    for part in re.split(r"\s+and\s+", author):
+        if INSTITUTION.search(part):
+            continue
+        sn = surname(part)
+        if len(sn) >= 3:
+            surnames.append(sn)
+    if not surnames:
+        return False
+    plain = " " + _plain(text) + " "
+    if not any(f" {sn} " in plain for sn in surnames):
+        return False
+    if title in plain:
+        return True
+    return any(similarity(line, title) >= TITLE_MATCH for line in (text or "").splitlines()
+               if 12 <= len(line.strip()) <= 300)
+
+
+def sources_agree(a: dict | None, b: dict | None) -> bool:
+    """Item 8: confirmar automaticamente só quando 2 bases independentes concordam em título, sobrenome e ano."""
+    if not a or not b:
+        return False
+    fa, fb = a.get("fields") or {}, b.get("fields") or {}
+    ta, tb = fa.get("title") or "", fb.get("title") or ""
+    sa, sb = surname(fa.get("author", "")), surname(fb.get("author", ""))
+    ya, yb = str(fa.get("year") or "").strip(), str(fb.get("year") or "").strip()
+    return bool(ta and tb and sa and sb and ya and yb and sa == sb and ya == yb
+                and similarity(ta, tb) >= TITLE_MATCH)
 
 
 # Confirmação pelo próprio documento (achado do teste MCP de 25/11/2026): sem
@@ -280,39 +442,79 @@ def first_pages_text(payload: dict, pages: int = 3, limit: int = 12000) -> str:
     return text[:limit]
 
 
-def library_entries(sources: list[dict], get_json, pdf_meta=None, texts=None) -> list[dict]:
-    """BibTeX oficial das fontes anexadas. get_json(url) -> dict (OpenAlex).
+def library_entries(sources: list[dict], get_json, pdf_meta=None, texts=None, *,
+                    crossref_get=None, oasisbr_get=None, library_cards=None) -> list[dict]:
+    """BibTeX oficial das fontes anexadas (cascata P1 itens 6 e 8).
 
-    1. DOI registrado na importação -> metadados do OpenAlex.
-    2. DOI impresso nas primeiras páginas -> OpenAlex, aceito se título e autor
-       aparecem no próprio texto.
-    3. Busca por título (metadado do PDF, nome do arquivo ou linhas do início):
-       com o texto disponível, aceita só o registro confirmado pelo documento;
-       sem texto, aceita título quase idêntico (>= 0,86) e com autoria.
-    4. Sem correspondência segura: entrada mínima com o melhor título disponível
-       e a nota "metadados a conferir" (nunca dados inventados).
-    texts: id da fonte -> texto das primeiras páginas.
+    0. Ficha bibliográfica já confirmada na biblioteca -> herdada sem refazer.
+    1. DOI registrado na importação -> OpenAlex (com fallback Crossref).
+    2. DOI impresso nas primeiras páginas -> OpenAlex / Crossref, confirmado no texto.
+    3. Busca por título: OpenAlex + Crossref + BDTD/Oasisbr (IBICT).
+       Concordância de duas bases independentes (título, sobrenome e ano) confirma
+       automaticamente ('confirmada_duas_fontes'); uma só base fica 'sugerida'.
+    4. Sem correspondência segura: entrada mínima marcada 'metadados a conferir'.
     """
     used, out = set(), []
     for source in sources:
+        sid = source.get("id")
+        # Item 6: ficha já confirmada na biblioteca vale para todos os projetos.
+        card = (library_cards or {}).get(sid) or source.get("bib_entry")
+        if isinstance(card, dict) and ref_level(card) == "confirmada" and (card.get("fields") or {}).get("title"):
+            key = card.get("key") or _key_for(card["fields"], used)
+            if key in used:
+                key = _key_for(card["fields"], used)
+            else:
+                used.add(key)
+            inherited = {
+                "type": card.get("type") or "misc",
+                "key": key,
+                "fields": dict(card["fields"]),
+                "source_id": sid,
+                "how": "ficha_da_biblioteca",
+                "consulta": {"status": "ficha_confirmada", "chamadas": 0, "erros": []},
+            }
+            out.append(inherited)
+            continue
+
         origin = source.get("origin") or {}
-        meta = (pdf_meta or {}).get(source.get("id")) or {}
-        text = (texts or {}).get(source.get("id")) or ""
-        work, how = None, ""
+        meta = (pdf_meta or {}).get(sid) or {}
+        text = (texts or {}).get(sid) or ""
+        entry, how = None, ""
         doi = canonical_doi(origin.get("doi") or "")
         lookup = LookupLog(get_json)
-        get = lookup  # cada consulta é registrada; uma falha não interrompe as seguintes
+        get = lookup
+        cr_lookup = LookupLog(crossref_get) if crossref_get else None
+        oa_entry, cr_entry, ob_entry = None, None, None
         try:
             if doi:
-                work, how = get("https://api.openalex.org/works/doi:" + doi), "doi"
-            if not work and text:
+                work = get("https://api.openalex.org/works/doi:" + doi)
+                if work and work.get("title"):
+                    oa_entry = entry_from_openalex(work, "")
+                    entry, how = oa_entry, "doi"
+                elif cr_lookup:
+                    cr_raw = cr_lookup("https://api.crossref.org/works/" + doi)
+                    cr_msg = (cr_raw or {}).get("message") if isinstance(cr_raw, dict) else None
+                    if cr_msg and (cr_msg.get("title") or [""])[0]:
+                        cr_entry = entry_from_crossref(cr_msg, "")
+                        entry, how = cr_entry, "doi"
+            if not entry and text:
                 for found in dois_in_text(text):
                     candidate = get("https://api.openalex.org/works/doi:" + found)
                     if candidate and confirmed_by_text(candidate, text):
-                        work, how = candidate, "doi_no_texto"
+                        oa_entry = entry_from_openalex(candidate, "")
+                        entry, how = oa_entry, "doi_no_texto"
+                        if cr_lookup:
+                            cr_raw = cr_lookup("https://api.crossref.org/works/" + found)
+                            cr_msg = (cr_raw or {}).get("message") if isinstance(cr_raw, dict) else None
+                            if cr_msg and (cr_msg.get("title") or [""])[0]:
+                                cand_cr = entry_from_crossref(cr_msg, "")
+                                if sources_agree(oa_entry, cand_cr):
+                                    how = "confirmada_duas_fontes"
                         break
-            if not work:
-                for query in title_candidates(source, meta, text):
+            if not entry:
+                queries = title_candidates(source, meta, text)
+                # 3a. OpenAlex
+                for query in queries:
                     found = get("https://api.openalex.org/works?per-page=5&search="
                                 + re.sub(r"\s+", "+", clean_title(query)))
                     results = (found or {}).get("results", [])
@@ -324,25 +526,70 @@ def library_entries(sources: list[dict], get_json, pdf_meta=None, texts=None) ->
                     if ok:
                         ok.sort(key=lambda c: (-similarity(c.get("title") or "", query),
                                                c.get("publication_year") or 9999))
-                        work, how = ok[0], ("texto_do_pdf" if text else "titulo_do_pdf")
+                        oa_entry = entry_from_openalex(ok[0], "")
                         break
+                # 3b. Crossref (segunda opinião para confirmar ou fallback se OpenAlex falhar)
+                if cr_lookup and queries:
+                    for query in queries[:2]:
+                        cr_raw = cr_lookup("https://api.crossref.org/works?rows=5&query.bibliographic="
+                                           + re.sub(r"\s+", "+", clean_title(query)))
+                        items = ((cr_raw or {}).get("message") or {}).get("items", []) if isinstance(cr_raw, dict) else []
+                        cands = [entry_from_crossref(it, "") for it in items]
+                        if text:
+                            ok_cr = [c for c in cands if _entry_confirmed_by_text(c, text)]
+                        else:
+                            ok_cr = [c for c in cands if c["fields"].get("author")
+                                     and similarity(c["fields"].get("title", ""), query) >= TITLE_MATCH]
+                        if ok_cr:
+                            ok_cr.sort(key=lambda c: -similarity(c["fields"].get("title", ""), query))
+                            cr_entry = ok_cr[0]
+                            break
+                # 3c. BDTD / Oasisbr (IBICT) — teses e dissertações brasileiras
+                if oasisbr_get and queries and not (oa_entry and cr_entry and sources_agree(oa_entry, cr_entry)):
+                    for query in queries[:2]:
+                        try:
+                            ob_raw = oasisbr_get(
+                                "https://oasisbr.ibict.br/vufind/api/v1/search?type=Title&limit=5&lookfor="
+                                + re.sub(r"\s+", "+", clean_title(query)))
+                        except Exception:
+                            ob_raw = None
+                        records = (ob_raw or {}).get("records", []) if isinstance(ob_raw, dict) else []
+                        cands = [entry_from_oasisbr(rec, "") for rec in records]
+                        if text:
+                            ok_ob = [c for c in cands if _entry_confirmed_by_text(c, text)]
+                        else:
+                            ok_ob = [c for c in cands if c["fields"].get("author")
+                                     and similarity(c["fields"].get("title", ""), query) >= TITLE_MATCH]
+                        if ok_ob:
+                            ok_ob.sort(key=lambda c: -similarity(c["fields"].get("title", ""), query))
+                            ob_entry = ok_ob[0]
+                            break
+                # Decisão da cascata (Item 8): 2 fontes concordantes => confirmada_duas_fontes
+                if oa_entry and cr_entry and sources_agree(oa_entry, cr_entry):
+                    entry, how = oa_entry, "confirmada_duas_fontes"
+                elif oa_entry and ob_entry and sources_agree(oa_entry, ob_entry):
+                    entry, how = oa_entry, "confirmada_duas_fontes"
+                elif cr_entry and ob_entry and sources_agree(cr_entry, ob_entry):
+                    entry, how = cr_entry, "confirmada_duas_fontes"
+                elif oa_entry:
+                    entry, how = oa_entry, ("texto_do_pdf" if text else "titulo_do_pdf")
+                elif cr_entry:
+                    entry, how = cr_entry, "crossref"
+                elif ob_entry:
+                    entry, how = ob_entry, "oasisbr"
         except Exception:
-            work = None
-        if work and work.get("title"):
-            entry = entry_from_openalex(work, "")
-            entry["key"] = _key_for(entry["fields"], used)
+            entry = None
+        if entry and (entry.get("fields") or {}).get("title"):
+            entry = {"type": entry["type"], "key": _key_for(entry["fields"], used), "fields": dict(entry["fields"])}
         else:
             stem = re.sub(r"\.(pdf|docx|txt)$", "", source.get("name") or "", flags=re.I)
-            # Sem correspondência: só o título do metadado ou o nome do arquivo. Linhas do
-            # texto e o autor do metadado do PDF erravam (nome de pessoa como título,
-            # autor do arquivo no lugar do autor da obra) e ficam para corrigir_referencia.
             title = meta.get("pdf_title") if len(meta.get("pdf_title") or "") > 15 else stem
             why = ("o OpenAlex recusou a consulta" if lookup.status(False) == "api_recusou"
-                   else "sem correspondência segura no OpenAlex")
+                   else "sem correspondência segura nas bases")
             fields = {"title": title, "note": f"metadados a conferir: {why}"}
             entry = {"type": "misc", "key": _key_for(fields, used), "fields": fields}
             how = "arquivo"
-        entry["source_id"], entry["how"] = source.get("id"), how
+        entry["source_id"], entry["how"] = sid, how
         entry["consulta"] = {"status": lookup.status(how != "arquivo"), "chamadas": lookup.calls,
                              "erros": lookup.errors[:3]}
         out.append(entry)

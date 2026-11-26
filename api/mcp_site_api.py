@@ -4,15 +4,19 @@ O token é mostrado uma única vez, na criação; o Firestore guarda só o hash.
 """
 from __future__ import annotations
 
+import io
+import json
 import re
+import zipfile
 from typing import Callable
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
+import mcp_flow as flow
 import mcp_review as review
 import mcp_student as student
-from mcp_server import MCP_PATH, Falha, Store, mode, project_state, review_context
+from mcp_server import MCP_PATH, Falha, Store, compile_project, mode, project_state, review_context
 
 FILES = {"scriptorium.pdf": "application/pdf", "scriptorium.tex": "text/x-tex",
          "references.bib": "text/x-bibtex", "proveniencia.json": "application/json"}
@@ -25,6 +29,20 @@ class FinalSynthesis(BaseModel):
 
 class NewToken(BaseModel):
     label: str = Field(default="Minha IA", min_length=1, max_length=60)
+
+
+class ConfirmReference(BaseModel):
+    aceitar_proposta: bool = False
+    autores: list[str] | str = Field(default_factory=list)
+    titulo: str = ""
+    ano: str = ""
+    tipo: str = "article"
+    veiculo: str = ""
+    doi: str = ""
+
+
+class CompileRequest(BaseModel):
+    rascunho: bool = False
 
 
 def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
@@ -85,6 +103,91 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
             return store.rebuild_references(user["uid"], project_id)
         except Falha as exc:
             raise HTTPException(409, str(exc)) from None
+
+    @router.get("/projetos/{project_id}/referencias/{key}/capa")
+    def reference_cover(project_id: str, key: str, page: int = Query(default=1, ge=1, le=5),
+                        user: dict = dependency):
+        """Item 7: renderiza a capa (pág. 1..5) do PDF da fonte para confirmação em 1 clique."""
+        project = owned(project_id, user)
+        refs = store.references(project)
+        entry = next((r for r in refs if r.get("key") == key), None)
+        sid = (entry or {}).get("source_id")
+        source = next((s for s in (project.get("sources") or []) if s.get("id") == sid), None)
+        if not source or source.get("format") != "pdf":
+            raise HTTPException(404, "Capa disponível apenas para fontes em PDF.")
+        path = str(source.get("object_path", ""))
+        if not path.startswith(f"library/{user['uid']}/{source['id']}/"):
+            raise HTTPException(404, "Fonte indisponível.")
+        blob = store.bucket.blob(path)
+        if not blob.exists():
+            raise HTTPException(404, "Arquivo original não encontrado.")
+        from pdf_render import fitz
+        with fitz.open(stream=blob.download_as_bytes(), filetype="pdf") as doc:
+            if doc.page_count == 0:
+                raise HTTPException(404, "PDF sem páginas.")
+            target = min(page, doc.page_count)
+            png = doc[target - 1].get_pixmap(dpi=115, alpha=False).tobytes("png")
+            total = doc.page_count
+        return Response(content=png, media_type="image/png", headers={
+            "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+            "X-Scriptorium-Page": str(target), "X-Scriptorium-Pages-Total": str(total),
+        })
+
+    @router.post("/projetos/{project_id}/referencias/{key}/confirmar")
+    def confirm_reference(project_id: str, key: str, payload: ConfirmReference, user: dict = dependency):
+        """Itens 6 e 7: confirmação humana em 1 clique ao lado da capa (salva também na biblioteca)."""
+        owned(project_id, user)
+        try:
+            return store.confirm_reference_human(user["uid"], project_id, key, payload.model_dump())
+        except Falha as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @router.post("/projetos/{project_id}/compilar", status_code=202)
+    def trigger_compile(project_id: str, payload: CompileRequest, user: dict = dependency):
+        """Permite gerar PDF final ou rascunho direto pelo botão no site."""
+        owned(project_id, user)
+        try:
+            return compile_project(store, user["uid"], project_id, draft=payload.rascunho)
+        except Falha as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @router.get("/projetos/{project_id}/pacote-orientacao.zip")
+    def advisor_package(project_id: str, user: dict = dependency):
+        """Pacote para orientação (pág. 10): PDF, BibTeX, proveniência e resumo legível em um só ZIP."""
+        project = owned(project_id, user)
+        prefix = f"{Store.prefix(project)}/final/"
+        refs = store.references(project)
+        view = student.view(project, mode(project), refs, project.get("concordancia"))
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for name in ("scriptorium.pdf", "references.bib", "proveniencia.json"):
+                blob = store.bucket.blob(prefix + name)
+                if blob.exists():
+                    zf.writestr(name, blob.download_as_bytes())
+            lines = [
+                f"# Pacote para orientação — {project.get('title') or project['id']}",
+                "",
+                f"- **Situação:** {'PDF final (todas as travas aprovadas)' if view['pdf_final'] else 'Rascunho / com pendências'}",
+                f"- **Tipo:** {mode(project)}",
+                "",
+                "## O que o Scriptorium conferiu",
+            ]
+            for p in view.get("provas") or ["Nenhuma etapa concluída ainda."]:
+                lines.append(f"- {p}")
+            pending = view.get("referencias_a_conferir") or []
+            lines += ["", "## Pendências antes da versão final"]
+            if pending:
+                for r in pending:
+                    lines.append(f"- `{r['chave']}` ({r['nivel_texto']}): {r.get('titulo') or 'sem título'}")
+            else:
+                lines.append("- Nenhuma referência pendente.")
+            err = str(project.get("error") or "").strip()
+            if err:
+                lines += ["", "## Avisos da última compilação", err]
+            zf.writestr("resumo_para_orientacao.md", "\n".join(lines).encode("utf-8"))
+        return Response(content=buf.getvalue(), media_type="application/zip",
+                        headers={"Content-Disposition": 'attachment; filename="pacote_orientacao.zip"',
+                                 "Cache-Control": "no-store"})
 
     @router.get("/projetos/{project_id}/detalhe")
     def detail(project_id: str, user: dict = dependency):

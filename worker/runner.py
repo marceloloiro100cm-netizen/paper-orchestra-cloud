@@ -241,12 +241,13 @@ def run_mcp(data: dict) -> None:
         from source_materials import derive_source
         mcp_jobs.prepare(data, db=client, bucket=bucket, owner_uid=OWNER_UID, cache=DerivedCache(),
                          get_json=openalex_json, update=update, derive=derive_source,
-                         metadata=source_metadata)
+                         metadata=source_metadata, crossref_get=crossref_json, oasisbr_get=oasisbr_json)
         return
     if data["mode"] == "mcp_refs":
         from coverage_facets import source_metadata
         mcp_jobs.rebuild_references(data, db=client, bucket=bucket, owner_uid=OWNER_UID, cache=DerivedCache(),
-                                    get_json=openalex_json, update=update, metadata=source_metadata)
+                                    get_json=openalex_json, update=update, metadata=source_metadata,
+                                    crossref_get=crossref_json, oasisbr_get=oasisbr_json)
         return
     with tempfile.TemporaryDirectory(prefix="mcp_tex_") as tmp:
         mcp_jobs.compile_project(data, db=client, bucket=bucket, owner_uid=OWNER_UID, update=update,
@@ -324,6 +325,24 @@ def openalex_json(url: str) -> dict:
     from reference_verification import USER_AGENT
     params = {"api_key": OPENALEX_KEY} if OPENALEX_KEY else None
     response = requests.get(url, params=params, timeout=20, headers={"User-Agent": USER_AGENT})
+    response.raise_for_status()
+    return response.json()
+
+
+def crossref_json(url: str) -> dict:
+    """GET na Crossref REST API (R08, pool polite) como segunda opinião de metadados."""
+    import requests
+    from reference_verification import USER_AGENT
+    response = requests.get(url, timeout=15, headers={"User-Agent": USER_AGENT})
+    response.raise_for_status()
+    return response.json()
+
+
+def oasisbr_json(url: str) -> dict:
+    """GET na BDTD / Oasisbr (IBICT) para teses e dissertações brasileiras sem DOI."""
+    import requests
+    from reference_verification import USER_AGENT
+    response = requests.get(url, timeout=15, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
     response.raise_for_status()
     return response.json()
 

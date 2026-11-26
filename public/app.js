@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
+import { initializeAuth, getAuth, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, browserPopupRedirectResolver, setPersistence, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 
 const $ = (id) => document.getElementById(id);
 // Modo com API Gemini (geração pelo servidor, chave pessoal, fichamento e testes com IA).
@@ -15,8 +15,59 @@ if (!config || !config.apiKey || config.apiKey === 'SUBSTITUIR') {
   $('login').disabled = true;
   throw new Error('Firebase Web App não configurado');
 }
-const auth = getAuth(initializeApp(config));
+const firebaseApp = initializeApp(config);
+// Persistência explícita: localStorage primeiro (rápido e resistente a limpeza de IndexedDB),
+// com IndexedDB e sessão como reserva. Evita pedir login toda vez que o site abre.
+let auth;
+try {
+  auth = initializeAuth(firebaseApp, {
+    persistence: [browserLocalPersistence, indexedDBLocalPersistence, browserSessionPersistence],
+    popupRedirectResolver: browserPopupRedirectResolver,
+  });
+} catch (_) {
+  auth = getAuth(firebaseApp);
+}
 const provider = new GoogleAuthProvider();
+const SESSION_CACHE_KEY = 'scriptorium_session_cache_v1';
+const uiCacheKey = (uid) => 'scriptorium_ui_cache_' + uid;
+function readSessionCache() {
+  try {
+    const data = JSON.parse(localStorage.getItem(SESSION_CACHE_KEY) || 'null');
+    if (data && data.uid && data.email && (Date.now() - (data.savedAt || 0)) < 30 * 86400 * 1000) return data;
+  } catch (_) {}
+  return null;
+}
+function writeSessionCache(u, access) {
+  if (!u || !$('keep-signed-in')?.checked) return;
+  try {
+    localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify({
+      uid: u.uid, email: u.email || '', access: access || null, savedAt: Date.now()
+    }));
+  } catch (_) {}
+}
+function clearSessionCache(uid) {
+  try {
+    localStorage.removeItem(SESSION_CACHE_KEY);
+    if (uid) localStorage.removeItem(uiCacheKey(uid));
+  } catch (_) {}
+}
+function readUiCache(uid) {
+  try { return JSON.parse(localStorage.getItem(uiCacheKey(uid)) || 'null'); } catch (_) { return null; }
+}
+function writeUiCache(uid, patch) {
+  if (!uid) return;
+  try {
+    const prev = readUiCache(uid) || {};
+    localStorage.setItem(uiCacheKey(uid), JSON.stringify({ ...prev, ...patch, savedAt: Date.now() }));
+  } catch (_) {}
+}
+// Ponte para o Guia de escrita mostrar o estado do artigo ativo sem chamadas extras.
+window.ScriptoriumProjetos = window.ScriptoriumProjetos || {
+  _lista: [], _cbs: [],
+  listar() { return this._lista; },
+  aoMudar(cb) { this._cbs.push(cb); },
+  definir(lista) { this._lista = Array.isArray(lista) ? lista : []; this._cbs.forEach(cb => { try { cb(this._lista); } catch (_) {} }); }
+};
 let user = null;
 let refreshInterval = null;
 let libraryItems = [];
@@ -41,7 +92,11 @@ async function request(path, options = {}) {
 }
 
 $('login').addEventListener('click', async () => {
-  $('auth-status').textContent = 'Autenticando…';
+  $('auth-status').textContent = 'Abrindo login do Google…';
+  const keep = $('keep-signed-in') ? $('keep-signed-in').checked : true;
+  try {
+    await setPersistence(auth, keep ? browserLocalPersistence : browserSessionPersistence);
+  } catch (_) { /* segue com a persistência padrão */ }
   try { await signInWithPopup(auth, provider); }
   catch (err) {
     if (['auth/popup-blocked','auth/cancelled-popup-request'].includes(err.code)) {
@@ -50,7 +105,10 @@ $('login').addEventListener('click', async () => {
   }
 });
 getRedirectResult(auth).catch(e => { $('auth-status').textContent = e.message; });
-$('logout').addEventListener('click', () => signOut(auth));
+$('logout').addEventListener('click', () => {
+  clearSessionCache(user?.uid);
+  signOut(auth);
+});
 
 
 function libraryMessage(text) { $('library-message').textContent = text; }
@@ -100,16 +158,25 @@ function displayLibrary() {
       libraryMessage('');updateSelectedCount();
     });
     const name = document.createElement('span'); name.textContent = item.name;
-    label.append(check, name);body.append(label);
+    const bibOk = item.bib_entry && ['doi', 'corrigida_pelo_texto', 'confirmada_pelo_pesquisador', 'confirmada_duas_fontes', 'ficha_da_biblioteca'].includes(item.bib_entry.how);
+    const refPill = el('span', bibOk ? '✓ Referência confirmada' : 'Referência pendente', 'lib-ref-pill' + (bibOk ? '' : ' pending'));
+    label.append(check, name);
+    const titleLine = document.createElement('div');
+    titleLine.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:6px';
+    titleLine.append(label, refPill);
+    body.append(titleLine);
     const meta = document.createElement('div');meta.className='library-meta';
+    const bibHint = bibOk && item.bib_entry?.fields?.author ? ` · ${item.bib_entry.fields.author.split(' and ')[0]} (${item.bib_entry.fields.year || '?'})` : '';
     meta.textContent = (item.collection||'Geral') + ' · ' + String(item.format||'').toUpperCase() +
-      ' · ' + (item.size / 1024).toFixed(0) + ' KB';
+      ' · ' + (item.size / 1024).toFixed(0) + ' KB' + bibHint;
     body.append(meta);
     if (item.description) {
       const desc = document.createElement('p');desc.className='library-note';
       desc.textContent=item.description;body.append(desc);
     }
     const actions = document.createElement('div');actions.className='library-actions';
+    const refBtn = document.createElement('button');refBtn.type='button';refBtn.textContent = bibOk ? 'Editar referência' : 'Conferir referência';
+    refBtn.addEventListener('click', () => toggleLibraryRefEditor(item, body));
     const down = document.createElement('button');down.type='button';down.textContent='Baixar original';
     down.addEventListener('click', async()=>{
       try{
@@ -131,7 +198,7 @@ function displayLibrary() {
     const remove = document.createElement('button');remove.type='button';remove.textContent='Apagar';
     remove.className='library-delete btn-danger-text';
     remove.addEventListener('click',()=>deleteLibraryItem(item));
-    actions.append(down,archive,remove);body.append(actions);line.append(body);target.append(line);
+    actions.append(refBtn,down,archive,remove);body.append(actions);line.append(body);target.append(line);
   }
 }
 
@@ -141,6 +208,7 @@ async function loadLibrary() {
     const r=await request('/library/items');
     const data=await r.json();
     libraryItems=data.items||[];
+    writeUiCache(user.uid, { libraryItems });
     // M13: arquivos retidos na verificação de segurança (não podem ser usados).
     const held=data.quarantined||[];const q=$('quarantine-list');
     if(q){q.replaceChildren();q.classList.toggle('hidden',!held.length);
@@ -1233,6 +1301,148 @@ function askBox(text) {
   box.append(code, copy); return box;
 }
 
+const REF_TYPE_OPTIONS = [
+  ['article', 'Artigo de revista'],
+  ['inproceedings', 'Artigo em evento / anais'],
+  ['mastersthesis', 'Dissertação de mestrado'],
+  ['phdthesis', 'Tese de doutorado'],
+  ['book', 'Livro'],
+  ['incollection', 'Capítulo de livro'],
+  ['techreport', 'Relatório técnico / guia'],
+  ['misc', 'Outro documento'],
+];
+
+async function renderCoverPreview(coverBox, coverPath, page = 1) {
+  coverBox.replaceChildren(el('p', 'Carregando imagem da capa…', 'subtle'));
+  try {
+    const r = await request(`${coverPath}?page=${page}`);
+    const total = Number(r.headers.get('X-Scriptorium-Pages-Total') || page);
+    const shown = Number(r.headers.get('X-Scriptorium-Page') || page);
+    const url = URL.createObjectURL(await r.blob());
+    coverBox.replaceChildren();
+    const nav = document.createElement('div');
+    nav.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap';
+    const prev = el('button', '← Anterior', 'btn alt'); prev.type = 'button'; prev.style.padding = '4px 9px'; prev.disabled = shown <= 1;
+    const lbl = el('small', `Página ${shown} de ${total}`);
+    const next = el('button', 'Próxima →', 'btn alt'); next.type = 'button'; next.style.padding = '4px 9px'; next.disabled = shown >= Math.min(total, 5);
+    prev.addEventListener('click', () => renderCoverPreview(coverBox, coverPath, shown - 1));
+    next.addEventListener('click', () => renderCoverPreview(coverBox, coverPath, shown + 1));
+    nav.append(prev, lbl, next);
+    const img = document.createElement('img');
+    img.src = url; img.alt = `Página ${shown} do PDF`;
+    img.addEventListener('load', () => setTimeout(() => URL.revokeObjectURL(url), 2000));
+    coverBox.append(nav, img);
+  } catch (e) {
+    coverBox.replaceChildren(el('p', 'Não foi possível mostrar a capa: ' + e.message, 'subtle'));
+  }
+}
+
+function buildReferenceCard({ titleLabel, badgeText, initial, proposal, coverPath, onConfirm }) {
+  const card = document.createElement('div'); card.className = 'ref-check-card';
+  const head = document.createElement('div'); head.className = 'ref-check-head';
+  head.append(el('strong', titleLabel), el('span', badgeText, 'pill'));
+  card.append(head);
+
+  const src = (proposal && proposal.fields) ? { ...proposal.fields, tipo: proposal.type } : initial;
+  const venueVal = src.veiculo || src.journal || src.booktitle || src.school || src.publisher || src.institution || src.howpublished || '';
+
+  if (proposal && proposal.fields) {
+    const banner = document.createElement('div'); banner.className = 'ref-proposal-banner';
+    banner.textContent = '✨ A sua IA já preencheu uma sugestão abaixo. Confira olhando a capa do PDF ao lado e clique em "Confirmar referência".';
+    card.append(banner);
+  }
+
+  const grid = document.createElement('div'); grid.className = 'ref-check-grid';
+  const form = document.createElement('div'); form.className = 'ref-check-form';
+  const mkField = (labelText, value, placeholder, full = false) => {
+    const wrap = document.createElement('div'); if (full) wrap.className = 'full';
+    const lbl = el('label', labelText);
+    const inp = document.createElement('input'); inp.type = 'text'; inp.value = value || ''; inp.placeholder = placeholder || '';
+    wrap.append(lbl, inp); form.append(wrap);
+    return inp;
+  };
+  const inpTitle = mkField('Título completo da obra', src.title || src.titulo || '', 'Ex.: Diretrizes para revisões sistemáticas', true);
+  const inpAuthors = mkField('Autores (Sobrenome, Nome — separe vários com ";")',
+    String(src.author || src.autor || '').replace(/\s+and\s+/g, '; '), 'Ex.: Kitchenham, Barbara; Charters, Stuart', true);
+  const inpYear = mkField('Ano', src.year || src.ano || '', 'Ex.: 2024', false);
+
+  const typeWrap = document.createElement('div');
+  typeWrap.append(el('label', 'Tipo de publicação'));
+  const selType = document.createElement('select');
+  for (const [val, label] of REF_TYPE_OPTIONS) selType.append(new Option(label, val));
+  selType.value = src.tipo || initial.tipo || 'article';
+  typeWrap.append(selType); form.append(typeWrap);
+
+  const inpVenue = mkField('Revista, evento ou instituição (opcional)', venueVal, 'Ex.: RENOTE ou IFRS', true);
+  const inpDoi = mkField('DOI (opcional)', src.doi || '', 'Ex.: 10.1234/exemplo', true);
+
+  const coverBox = document.createElement('div'); coverBox.className = 'ref-cover-box';
+  if (coverPath) {
+    const showCover = el('button', '👁 Ver capa do PDF', 'btn alt'); showCover.type = 'button';
+    showCover.addEventListener('click', () => renderCoverPreview(coverBox, coverPath, 1));
+    coverBox.append(el('small', 'Confira título, autor e ano direto na capa original:', 'subtle'), document.createElement('br'), showCover);
+  } else {
+    coverBox.append(el('small', 'Prévia de capa disponível apenas para arquivos PDF.', 'subtle'));
+  }
+
+  grid.append(form, coverBox);
+  card.append(grid);
+
+  const foot = document.createElement('div'); foot.className = 'actions'; foot.style.marginTop = '12px';
+  const status = el('span', '', 'subtle');
+  const saveBtn = el('button', '✓ Confirmar referência', 'btn'); saveBtn.type = 'button';
+  saveBtn.addEventListener('click', async () => {
+    const authors = inpAuthors.value.split(/\s*;\s*|\s+and\s+/).map(s => s.trim()).filter(Boolean);
+    saveBtn.disabled = true; status.textContent = 'Salvando…';
+    try {
+      await onConfirm({
+        aceitar_proposta: false,
+        titulo: inpTitle.value.trim(),
+        autores: authors,
+        ano: inpYear.value.trim(),
+        tipo: selType.value,
+        veiculo: inpVenue.value.trim(),
+        doi: inpDoi.value.trim(),
+      });
+      status.textContent = '✓ Confirmada e salva na sua biblioteca para futuros artigos!';
+    } catch (e) {
+      status.textContent = e.message; saveBtn.disabled = false;
+    }
+  });
+  foot.append(saveBtn);
+  if (proposal && proposal.fields) {
+    const quick = el('button', '✓ Aceitar sugestão da IA (1 clique)', 'btn alt'); quick.type = 'button';
+    quick.addEventListener('click', async () => {
+      quick.disabled = saveBtn.disabled = true; status.textContent = 'Confirmando…';
+      try { await onConfirm({ aceitar_proposta: true }); status.textContent = '✓ Confirmada!'; }
+      catch (e) { status.textContent = e.message; quick.disabled = saveBtn.disabled = false; }
+    });
+    foot.append(quick);
+  }
+  foot.append(status);
+  card.append(foot);
+  return card;
+}
+
+function toggleLibraryRefEditor(item, holder) {
+  const existing = holder.querySelector('.lib-ref-editor');
+  if (existing) { existing.remove(); return; }
+  const wrap = document.createElement('div'); wrap.className = 'lib-ref-editor'; wrap.style.marginTop = '10px';
+  const bib = item.bib_entry || {};
+  const card = buildReferenceCard({
+    titleLabel: 'Ficha bibliográfica permanente (vale para todos os artigos)',
+    badgeText: bib.how ? 'Confirmada' : 'Ainda não confirmada',
+    initial: { ...(bib.fields || {}), tipo: bib.type || 'article', titulo: (bib.fields || {}).title || item.name.replace(/\.\w+$/, '') },
+    proposal: null,
+    coverPath: item.format === 'pdf' ? `/library/items/${item.id}/cover` : null,
+    onConfirm: async (payload) => {
+      await request(`/library/items/${item.id}/reference`, { method: 'PUT', body: JSON.stringify(payload) });
+      await loadLibrary();
+    },
+  });
+  wrap.append(card); holder.append(wrap);
+}
+
 function articleCard(p) {
   const card = document.createElement('article'); card.className = 'art-card';
   const head = document.createElement('div'); head.className = 'mcp-row-head';
@@ -1248,9 +1458,31 @@ function articleCard(p) {
   bar.append(fill); info.append(bar);
   const actions = document.createElement('div'); actions.className = 'actions'; actions.style.margin = '0';
   if ((p.arquivos || []).includes('scriptorium.pdf')) {
-    const pdf = el('button', p.pdf_final ? 'Baixar PDF' : 'Baixar PDF (rascunho)', 'btn'); pdf.type = 'button';
+    const pdf = el('button', p.pdf_final ? 'Baixar PDF final' : 'Baixar PDF (rascunho)', 'btn'); pdf.type = 'button';
     pdf.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/arquivos/scriptorium.pdf`, 'scriptorium.pdf'));
     actions.append(pdf);
+    const pkg = el('button', 'Pacote para orientação (.zip)', 'btn alt'); pkg.type = 'button';
+    pkg.title = 'Baixa PDF, BibTeX, proveniência e resumo legível para enviar à orientação.';
+    pkg.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/pacote-orientacao.zip`, 'pacote_orientacao.zip'));
+    actions.append(pkg);
+  }
+  const refs = p.referencias_a_conferir || [];
+  const busy = ['preparando', 'compilando', 'refazendo_referencias'].includes(p.status);
+  if (p.pode_compilar && !busy) {
+    const wantDraft = refs.length > 0;
+    const compBtn = el('button', wantDraft ? 'Gerar rascunho agora' : 'Gerar PDF final', wantDraft ? 'btn alt' : 'btn');
+    compBtn.type = 'button';
+    compBtn.addEventListener('click', async () => {
+      compBtn.disabled = true; compBtn.textContent = 'Iniciando…';
+      try {
+        await request(`/mcp-conta/projetos/${p.projeto}/compilar`, { method: 'POST', body: JSON.stringify({ rascunho: wantDraft }) });
+        await loadMcpProjects();
+      } catch (e) {
+        compBtn.disabled = false; compBtn.textContent = wantDraft ? 'Gerar rascunho agora' : 'Gerar PDF final';
+        card.append(el('p', e.message, 'warning'));
+      }
+    });
+    actions.append(compBtn);
   }
   const open = el('button', 'Ver etapas', 'btn alt'); open.type = 'button'; open.setAttribute('aria-expanded', 'false');
   const detail = document.createElement('div'); detail.className = 'mcp-detail'; detail.hidden = true;
@@ -1264,30 +1496,45 @@ function articleCard(p) {
     if (step.detalhe) next.append(el('p', step.detalhe, 'subtle'));
     if (step.pedido) next.append(askBox(step.pedido));
     if (step.pedido_rascunho) {
-      next.append(el('p', 'Para ler o texto antes, peça um rascunho (sai marcado como RASCUNHO):', 'subtle'));
+      next.append(el('p', 'Para ler o texto antes, você pode clicar em "Gerar rascunho agora" acima ou pedir à sua IA:', 'subtle'));
       next.append(askBox(step.pedido_rascunho));
     }
     card.append(next);
   }
-  const refs = p.referencias_a_conferir || [];
-  const busy = ['preparando', 'compilando', 'refazendo_referencias'].includes(p.status);
   if (refs.length && !p.pdf_final) {
     const box = document.createElement('details'); box.className = 'art-refs';
-    box.append(el('summary', `${refs.length} referência(s) para confirmar antes do PDF final`));
-    box.append(el('p', '"Sugerida": achada por busca de título, pode ser de outra obra. "A conferir": os dados vieram só do arquivo. Peça à sua IA para confirmar ou corrigir cada uma pela capa do documento:', 'subtle'));
-    box.append(askBox(p.pedido_referencias));
-    const ul = document.createElement('ul');
-    for (const r of refs) ul.append(el('li', `${r.titulo || r.chave}${r.autor ? ` (${r.autor})` : ''}: ${r.nivel_texto || 'a conferir'}`));
-    box.append(ul);
+    if (refs.some(r => r.proposta_pendente)) box.open = true;
+    box.append(el('summary', `${refs.length} referência(s) para confirmar antes do PDF final (clique para conferir ao lado da capa)`));
+    box.append(el('p', 'Confira cada obra olhando a capa do PDF e clique em "Confirmar referência". Quando você confirma uma vez, ela fica salva na sua biblioteca para todos os próximos artigos.', 'subtle'));
+    const listWrap = document.createElement('div'); listWrap.className = 'ref-check-list';
+    for (const r of refs) {
+      listWrap.append(buildReferenceCard({
+        titleLabel: `${r.titulo || r.chave} (${r.chave})`,
+        badgeText: r.proposta_pendente ? 'Proposta pronta da IA' : (r.nivel_texto || 'A conferir'),
+        initial: r,
+        proposal: r.proposta_pendente || null,
+        coverPath: r.tem_capa ? `/mcp-conta/projetos/${p.projeto}/referencias/${encodeURIComponent(r.chave)}/capa` : null,
+        onConfirm: async (payload) => {
+          await request(`/mcp-conta/projetos/${p.projeto}/referencias/${encodeURIComponent(r.chave)}/confirmar`,
+            { method: 'POST', body: JSON.stringify(payload) });
+          await loadMcpProjects();
+        },
+      }));
+    }
+    box.append(listWrap);
+    const helpDetails = document.createElement('details'); helpDetails.className = 'mini-details';
+    helpDetails.append(el('summary', 'Preferir pedir para a sua IA conferir automaticamente?'));
+    helpDetails.append(askBox(p.pedido_referencias));
+    box.append(helpDetails);
     if (!busy) {
-      const again = el('button', 'Refazer referências', 'btn alt'); again.type = 'button';
-      again.title = 'Monta de novo a bibliografia com as regras atuais, mantendo as chaves e as correções já feitas.';
+      const again = el('button', 'Refazer busca automática das referências', 'btn alt'); again.type = 'button';
+      again.title = 'Consulta de novo as bases acadêmicas mantendo as chaves e as confirmações já feitas.';
       again.addEventListener('click', async () => {
         again.disabled = true;
         try { await request(`/mcp-conta/projetos/${p.projeto}/referencias/refazer`, {method: 'POST'}); await loadMcpProjects(); }
         catch (e) { again.disabled = false; box.append(el('p', e.message, 'warning')); }
       });
-      const actions = document.createElement('div'); actions.className = 'actions'; actions.append(again); box.append(actions);
+      const act = document.createElement('div'); act.className = 'actions'; act.append(again); box.append(act);
     }
     card.append(box);
   }
@@ -1300,12 +1547,10 @@ function articleCard(p) {
   return card;
 }
 
-async function loadMcpProjects() {
+function renderMcpProjectsList(projects) {
   const box = $('mcp-projects'); if (!box) return;
-  let projects = [];
-  try { projects = (await (await request('/mcp-conta/projetos')).json()).projetos || []; }
-  catch (e) { box.replaceChildren(el('p', e.message, 'subtle')); return; }
   box.replaceChildren();
+  window.ScriptoriumProjetos?.definir(projects);
   updateStart('artigo', projects.length > 0);
   if (!projects.length) {
     const empty = document.createElement('div'); empty.className = 'art-empty';
@@ -1320,6 +1565,15 @@ async function loadMcpProjects() {
     box.append(empty); return;
   }
   for (const p of projects) box.append(articleCard(p));
+}
+
+async function loadMcpProjects() {
+  const box = $('mcp-projects'); if (!box) return;
+  let projects = [];
+  try { projects = (await (await request('/mcp-conta/projetos')).json()).projetos || []; }
+  catch (e) { if (!box.children.length) box.replaceChildren(el('p', e.message, 'subtle')); return; }
+  if (user) writeUiCache(user.uid, { mcpProjects: projects });
+  renderMcpProjectsList(projects);
 }
 $('mcp-projects-refresh')?.addEventListener('click', () => loadMcpProjects());
 if (API_MODE && $('step-sub-3')) $('step-sub-3').textContent = 'Histórico, agentes e pareceres';
@@ -1649,60 +1903,90 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && $('account-panel').classList.contains('open')) { setAccountPanelOpen(false); $('account-button').focus(); }
 });
 
-async function loadAccountAccess() {
+function applyAccountAccessUi(access) {
+  accountAccess = access;
+  $('workspace').classList.remove('access-pending', 'access-setup');
+  const noCredit = accountAccess.model_access?.billing_alert?.state === 'prepay_depleted';
+  const keyState = accountAccess.model_access?.status === 'admin_vertex' ? 'IA pelo projeto (exceção)' :
+    noCredit ? 'Chave sem saldo pré-pago' :
+    (accountAccess.byok_ready ?
+      (accountAccess.model_access?.status === 'verified' ? 'Chave Gemini verificada' : 'Verifique sua chave') :
+      'Conecte sua chave Gemini');
+  $('account-state').textContent = (accountAccess.admin ? 'Administrador · ' : '') + (API_MODE ? keyState : 'Acesso liberado');
+  $('admin-invitations').classList.toggle('hidden', !accountAccess.admin);
+  $('guest-credential').classList.toggle('hidden', accountAccess.model_access?.status === 'admin_vertex');
+  const guestReady = !!accountAccess.byok_ready;
+  const guestVerified = guestReady && accountAccess.model_access?.status === 'verified';
+  const hasModels = !!accountAccess.research_generation_enabled;
+  $('workspace').classList.toggle('access-setup', API_MODE && !hasModels);
+  $('gemini-setup-details').open = !guestVerified;
+  $('gemini-setup-title').textContent = guestReady
+    ? 'Gerenciar ou trocar minha chave Gemini'
+    : 'Conectar minha chave Gemini — primeiro acesso';
+  $('gemini-key-ready').classList.toggle('hidden', !guestVerified);
+  $('remove-personal-key').classList.toggle('hidden', !guestReady);
+  $('submit').disabled = !hasModels;
+  $('account-message').textContent = accountAccess.model_access?.status === 'admin_vertex' ? '' :
+    noCredit ? 'O Google recusou a última execução por falta de saldo pré-pago na sua chave (erro 402). Adicione créditos no Google AI Studio, em Faturamento; o aviso some na próxima execução que funcionar ou se você cadastrar a chave de novo.' :
+    (guestVerified ? '' : (guestReady
+      ? 'Sua chave foi cadastrada, mas ainda não há um modelo confirmado. Confira a chave abaixo.'
+      : 'Para começar, conecte sua chave Gemini seguindo as instruções.'));
+  if (!API_MODE) $('account-message').textContent = '';
+  applyModelAccess();
+}
+
+async function fetchAccountAccessWithRetry() {
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 18000);
+    try {
+      const response = await request('/account/access', { signal: controller.signal });
+      clearTimeout(timeout);
+      return await response.json();
+    } catch (error) {
+      clearTimeout(timeout);
+      lastError = error;
+      if (error?.status === 401 || error?.status === 403 || error?.status === 404) throw error;
+    }
+  }
+  throw lastError;
+}
+
+async function loadAccountAccess(cachedAccess = null) {
   $('account-panel').classList.remove('hidden');
-  $('workspace').classList.remove('access-setup');
-  $('workspace').classList.add('access-pending');
   $('access-pending').classList.add('hidden');
-  $('guest-credential').classList.add('hidden');
-  $('admin-invitations').classList.add('hidden');
   $('legacy-api-notice').classList.add('hidden');
-  $('submit').disabled = true;
-  $('account-state').textContent = 'Verificando...';
   $('pending-email').textContent = user?.email || '';
   $('pending-help').textContent = '';
-  // Uma API demorada nunca deve bloquear a tela indefinidamente.
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
+  if (cachedAccess) {
+    // Sessão em cache: libera a tela de imediato e revalida em segundo plano.
+    applyAccountAccessUi(cachedAccess);
+    updateAccountMode();
+  } else {
+    $('workspace').classList.remove('access-setup');
+    $('workspace').classList.add('access-pending');
+    $('guest-credential').classList.add('hidden');
+    $('admin-invitations').classList.add('hidden');
+    $('submit').disabled = true;
+    $('account-state').textContent = 'Verificando...';
+  }
   try {
-    const response = await request('/account/access', { signal: controller.signal });
-    accountAccess = await response.json();
-    $('workspace').classList.remove('access-pending', 'access-setup');
-    const noCredit = accountAccess.model_access?.billing_alert?.state === 'prepay_depleted';
-    const keyState = accountAccess.model_access?.status === 'admin_vertex' ? 'IA pelo projeto (exceção)' :
-      noCredit ? 'Chave sem saldo pré-pago' :
-      (accountAccess.byok_ready ?
-        (accountAccess.model_access?.status === 'verified' ? 'Chave Gemini verificada' : 'Verifique sua chave') :
-        'Conecte sua chave Gemini');
-    $('account-state').textContent = (accountAccess.admin ? 'Administrador · ' : '') + (API_MODE ? keyState : 'Acesso liberado');
-    $('admin-invitations').classList.toggle('hidden', !accountAccess.admin);
-    // Todos conectam a própria chave: os tokens de geração são de quem pesquisa.
-    $('guest-credential').classList.toggle('hidden', accountAccess.model_access?.status === 'admin_vertex');
-    const guestReady = !!accountAccess.byok_ready;
-    const guestVerified = guestReady && accountAccess.model_access?.status === 'verified';
-    const hasModels = !!accountAccess.research_generation_enabled;
-    $('workspace').classList.toggle('access-setup', API_MODE && !hasModels);
-    $('gemini-setup-details').open = !guestVerified;
-    $('gemini-setup-title').textContent = guestReady
-      ? 'Gerenciar ou trocar minha chave Gemini'
-      : 'Conectar minha chave Gemini — primeiro acesso';
-    $('gemini-key-ready').classList.toggle('hidden', !guestVerified);
-    $('remove-personal-key').classList.toggle('hidden', !guestReady);
-    $('submit').disabled = !hasModels;
-    $('account-message').textContent = accountAccess.model_access?.status === 'admin_vertex' ? '' :
-      noCredit ? 'O Google recusou a última execução por falta de saldo pré-pago na sua chave (erro 402). Adicione créditos no Google AI Studio, em Faturamento; o aviso some na próxima execução que funcionar ou se você cadastrar a chave de novo.' :
-      (guestVerified ? '' : (guestReady
-        ? 'Sua chave foi cadastrada, mas ainda não há um modelo confirmado. Confira a chave abaixo.'
-        : 'Para começar, conecte sua chave Gemini seguindo as instruções.'));
-    if (!API_MODE) $('account-message').textContent = '';
-    applyModelAccess();
+    const fresh = await fetchAccountAccessWithRetry();
+    applyAccountAccessUi(fresh);
+    writeSessionCache(user, fresh);
     if (accountAccess.admin) { loadAccessRequests(); if (API_MODE) loadRetrievalEval(); }
   } catch (error) {
+    // Se já havia acesso em cache e houve apenas lentidão/falha de rede, mantém a tela usable.
+    if (cachedAccess && error?.status !== 403 && error?.status !== 401) {
+      $('account-message').textContent = 'Conexão lenta com o servidor; mostrando os dados salvos neste aparelho.';
+      updateAccountMode();
+      return;
+    }
     accountAccess = null;
-    // Compatibilidade exclusiva da conta administradora já autorizada na API antiga.
     if (error?.status === 404) {
       try {
-        await request('/capabilities', { signal: controller.signal });
+        await request('/capabilities');
         accountAccess = {
           admin: true, byok_ready: false, multiuser_enabled: false,
           research_generation_enabled: true, legacy_backend: true,
@@ -1722,19 +2006,20 @@ async function loadAccountAccess() {
     }
     const timedOut = error?.name === 'AbortError' || error?.name === 'TimeoutError';
     const awaitingAuthorization = error?.status === 403;
+    if (awaitingAuthorization) clearSessionCache(user?.uid);
     $('account-state').textContent = timedOut ? 'Conexão indisponível' :
       (awaitingAuthorization ? 'Aguardando autorização' : 'Verificação falhou');
     $('account-message').textContent = awaitingAuthorization
       ? 'A conta Google está conectada, mas o Scriptorium ainda não liberou seu acesso.'
       : (timedOut
-        ? 'A API não respondeu em 12 segundos. Tente verificar novamente.'
+        ? 'O servidor demorou para responder. Toque em "Já fui autorizado" para tentar novamente.'
         : 'Não foi possível confirmar sua conta: ' + (error?.message || 'erro inesperado'));
+    $('workspace').classList.add('access-pending');
     $('access-pending').classList.remove('hidden');
     $('workspace').classList.remove('access-setup');
     $('submit').disabled = true;
     accountAccess = null;
   } finally {
-    clearTimeout(timeout);
     updateAccountMode();
   }
 }
@@ -1866,8 +2151,24 @@ $('retry-api-version').addEventListener('click', async () => {
   }
 });
 
+let authInitialized = false;
+if (typeof auth.authStateReady === 'function') {
+  auth.authStateReady().then(() => {
+    authInitialized = true;
+    $('session-restoring')?.classList.add('hidden');
+    if (!auth.currentUser) {
+      clearSessionCache();
+      $('login-panel').classList.remove('hidden');
+    }
+  }).catch(() => {
+    authInitialized = true;
+    $('session-restoring')?.classList.add('hidden');
+  });
+}
+
 onAuthStateChanged(auth, async (current) => {
-  user=current;
+  user = current;
+  $('session-restoring')?.classList.add('hidden');
   // Guia de escrita: mesma conta do site; com login, a aba do guia substitui o botão do cabeçalho.
   window.ScriptoriumConta?.definir(current);
   document.body.classList.toggle('guest', !current);
@@ -1875,21 +2176,36 @@ onAuthStateChanged(auth, async (current) => {
   window.dispatchEvent(new CustomEvent('scriptorium:library-user-changed', {
     detail: { uid: current?.uid || null }
   }));
-  if (user) $('workspace').classList.add('access-pending');
+  const cachedSession = current ? readSessionCache() : null;
+  const cachedAccess = (cachedSession && cachedSession.uid === current?.uid) ? cachedSession.access : null;
+  if (user && !cachedAccess) $('workspace').classList.add('access-pending');
   $('login-panel').classList.toggle('hidden', !!user);
   $('workspace').classList.toggle('hidden', !user);
   $('logout').classList.toggle('hidden', !user);
   $('account-button').classList.toggle('hidden', !user);
-  $('identity').textContent=user?.email || '';
+  $('identity').textContent = user?.email || '';
   if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
   if (user) {
-    await loadAccountAccess();
+    // Pinta biblioteca e artigos salvos em cache imediatamente (sem esperar cold start).
+    const cachedUi = readUiCache(user.uid);
+    if (cachedUi) {
+      if (Array.isArray(cachedUi.libraryItems) && cachedUi.libraryItems.length) {
+        libraryItems = cachedUi.libraryItems;
+        updateSelectedCount(); displayLibrary();
+      }
+      if (Array.isArray(cachedUi.mcpProjects) && cachedUi.mcpProjects.length) {
+        renderMcpProjectsList(cachedUi.mcpProjects);
+      }
+    }
+    await loadAccountAccess(cachedAccess);
     if (canWork()) {
-      await Promise.all([loadJobs(),loadLibrary(),loadCapabilities(),loadAdvisor(),loadMcp()]);
+      await Promise.all([loadJobs(), loadLibrary(), loadCapabilities(), loadAdvisor(), loadMcp()]);
       refreshInterval = setInterval(loadJobs, 12000);
     }
   } else {
+    if (authInitialized) clearSessionCache();
     accountAccess = null;
+    window.ScriptoriumProjetos?.definir([]);
     $('workspace').classList.remove('access-pending', 'access-setup');
     $('account-panel').classList.add('hidden');
     setAccountPanelOpen(false);

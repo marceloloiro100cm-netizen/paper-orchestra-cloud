@@ -1,8 +1,668 @@
-// Guia de escrita do Scriptorium, montado dentro do site (aba Guia de escrita).
-// Gerado a partir do guia avulso (Pesquisa Guiada v2); CSS isolado em Shadow DOM.
+// Guia de escrita do Scriptorium MPIE: redesenhado no padrão visual do site
+// com UX calmo e acessível para a comunidade acadêmica não nativa digital.
 (function(){
-const CSS=":host{display:block;zoom:var(--font,1);\n--bg:transparent;--surface:var(--bg-surface,#fff);--soft:var(--bg-subtle,#EFF4FA);--ink:var(--text-primary,#0F1C2E);\n--muted:var(--text-secondary,#3B4F68);--border:var(--border-main,#D8E3F0);--blue:#0E4F92;--blue2:#1466B8;\n--gold:var(--mpie-gold-text,#8A5A00);--link:var(--mpie-blue-text,#105396);--success:var(--mpie-blue,#1466B8);\n--danger:var(--danger-strong,#A85400);--warn:var(--warn-text,#7A4F00);--shadow:var(--shadow-sm,0 2px 10px rgba(15,28,46,.04))}\n:host([data-theme=\"dark\"]){--blue:#173A69;--blue2:#2A5A9C}\n\n\n\n*{box-sizing:border-box}.guia-body{color:var(--ink);font-family:var(--font-sans,Inter,system-ui,sans-serif);line-height:1.5;font-size:1rem}button,input,textarea,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}a{color:var(--link)}:focus-visible{outline:3px solid var(--gold)!important;outline-offset:3px}h1,h2,h3,h4,p{margin-top:0}h1,h2{font-family:var(--font-serif,Georgia,serif);letter-spacing:-.025em}h1{font-size:1.8rem;line-height:1.18;margin-bottom:.35rem}h2{font-size:1.4rem;margin-bottom:.5rem}h3{font-size:1.04rem;margin-bottom:.5rem}.muted{color:var(--muted)}.small{font-size:.88rem}.tiny{font-size:.77rem}.eyebrow{font-size:.72rem;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:var(--gold)}.bold{font-weight:700}.serif{font-family:var(--font-serif,Georgia,serif)}.wrap{max-width:1260px;margin:0 auto;padding:0 22px}.flex{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.spread{justify-content:space-between}.row-top{align-items:flex-start}.grow{flex:1}.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--ink);font-weight:650;padding:.6rem .88rem;text-decoration:none;transition:background .14s, transform .14s;min-height:39px}.btn:hover:not(:disabled){background:var(--soft)}.btn:active:not(:disabled){transform:scale(.985)}.btn.blue{background:var(--blue2);color:white;border-color:transparent}.btn.blue:hover{background:var(--blue)}.btn.gold{background:var(--gold);color:#161a20;border-color:transparent}.btn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 25%,var(--border))}.btn.tinybtn{font-size:.8rem;padding:.38rem .62rem;min-height:31px}.btn.ghost{border:none;background:transparent}.pill{border:1px solid var(--border);border-radius:100px;padding:.16rem .55rem;font-size:.72rem;color:var(--muted);white-space:nowrap}.pill.gold{color:var(--gold);border-color:var(--gold)}.pill.good{color:var(--success);border-color:var(--success)}.pill.warn{color:var(--warn);border-color:var(--warn)}\n.site-header{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;box-shadow:0 3px 18px rgba(0,0,0,.03)}.site-header .wrap{display:flex;gap:18px;justify-content:space-between;align-items:center;padding-top:14px;padding-bottom:14px}.brand{display:flex;gap:13px;align-items:center;min-width:270px}.brand-icon{background:var(--blue);color:#fff;border-radius:13px;width:42px;height:42px;display:grid;place-items:center;border:1px solid var(--gold);font-size:24px}.brand-name{font-family:Georgia,serif;font-size:1.4rem;font-weight:800;letter-spacing:-.04em}.head-actions{display:flex;flex-wrap:wrap;gap:7px;justify-content:flex-end}.ribbon{background:var(--blue);color:#eaf2ff;padding:9px 0}.ribbon .wrap{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}.ribbon small{font-size:.78rem}.ribbon .status{color:#ffe1a1}.ribbon .status.alert{color:#FFD9A8}.layout{padding-top:22px;padding-bottom:50px}.panel{background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)}.chain-panel{padding:17px 22px;background:var(--blue);color:#fff;border-color:var(--gold)}.chain-links{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px}.chain-link{font-size:.77rem;border:1px solid rgba(255,255,255,.35);color:#eaf2ff;border-radius:24px;padding:.33rem .55rem;background:rgba(255,255,255,.08)}.chain-link.filled{background:rgba(244,185,59,.22);border-color:#F4B93B}.chain-arrow{opacity:.65}.stations{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;margin:18px 0}.station{padding:12px 9px;border:1px solid var(--border);border-radius:15px;background:var(--surface);color:var(--ink);text-align:left;min-height:93px;display:flex;flex-direction:column;justify-content:space-between;gap:4px}.station.selected{background:var(--blue2);color:white;border-color:var(--gold)}.station .num{border-radius:50%;width:26px;height:26px;display:grid;place-items:center;background:var(--soft);color:var(--ink);font-size:.78rem;font-weight:800}.station.selected .num{background:var(--gold);color:#171c21}.station small{font-size:.68rem;opacity:.75}.station b{font-size:.76rem;line-height:1.16}.sheet{overflow:hidden}.sheet-head{padding:23px 26px;border-bottom:1px solid var(--border);background:var(--soft);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:15px}.tabbar{display:flex;border:1px solid var(--border);background:var(--surface);padding:4px;border-radius:12px;gap:4px;flex-wrap:wrap}.tabbar button{border:none;border-radius:9px;background:transparent;padding:.56rem .75rem;color:var(--muted);font-size:.85rem;font-weight:750}.tabbar button[aria-selected=\"true\"]{background:var(--blue2);color:white}.sheet-body{padding:23px 26px}.section-max{max-width:920px}.card{background:var(--soft);border:1px solid var(--border);border-radius:14px;padding:16px 18px}.card.white{background:var(--surface)}.card.warning{background:color-mix(in srgb,var(--gold) 10%,var(--surface));border-color:color-mix(in srgb,var(--gold) 40%,var(--border))}.card.danger{border-color:var(--danger)}.section-gap>*+*{margin-top:18px}.two-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field{padding:15px 18px;border:1px solid var(--border);border-radius:14px;background:var(--soft)}.field-label{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}.field label{font-weight:740;display:block;font-size:.93rem}.field .hint{font-size:.8rem;color:var(--muted);margin:0 0 8px}.field input,.field textarea,.field select,.form-control{width:100%;padding:10px 12px;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;color:var(--ink);min-height:43px}.field textarea{min-height:94px;resize:vertical;line-height:1.5}.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--blue2);outline:2px solid transparent;box-shadow:0 0 0 3px rgba(68,123,189,.15)}.fieldgroup{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.full{grid-column:1/-1}.record{border:1px solid var(--border);border-radius:14px;padding:13px;margin-top:11px;background:var(--surface)}.record>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:760}.record>summary::-webkit-details-marker{display:none}.record[open]>summary{margin-bottom:13px}.record-title{flex:1}.record-index{background:var(--soft);border:1px solid var(--border);font-size:.7rem;border-radius:50%;width:24px;height:24px;display:inline-grid;place-items:center}.record-controls{display:flex;justify-content:flex-end;margin-top:10px}.repeat-block{padding:18px;border-radius:16px;border:1px solid var(--border);margin:18px 0;background:var(--soft)}.repeat-intro{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.lead{font-size:1rem;line-height:1.65}.notice{padding:11px 14px;border-left:3px solid var(--gold);background:color-mix(in srgb,var(--gold) 10%,var(--surface));border-radius:6px;font-size:.85rem}.callouts{display:grid;grid-template-columns:1fr 1fr;gap:12px}.check-card{display:grid;grid-template-columns:24px 1fr;gap:11px;border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--soft);margin:9px 0}.check-card input[type=checkbox]{accent-color:var(--success);width:18px;height:18px;margin-top:3px}.check-card label{cursor:pointer;font-weight:650}.check-note{width:100%;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--ink);margin-top:8px}.action-footer{margin-top:22px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.status-steps{display:flex;gap:9px;flex-wrap:wrap}.status-step{font-size:.76rem;border:1px solid var(--border);border-radius:50px;padding:.24rem .6rem;color:var(--muted)}.status-step.on{border-color:var(--success);color:var(--success);font-weight:750}.audit-list{padding:0;list-style:none}.audit-list li{border:1px solid var(--border);border-radius:10px;margin:9px 0;padding:11px 13px;background:var(--soft);font-size:.84rem}.audit-list li strong{display:block;margin-bottom:2px}.audit-list li.warn{border-left:4px solid var(--warn)}.audit-list li.info{border-left:4px solid var(--link)}.audit-list li.good{border-left:4px solid var(--success)}.audit-list li.high{border-left:4px solid var(--danger)}.timeline-wrap{overflow-x:auto}.table{border-collapse:collapse;width:100%;font-size:.88rem}.table th,.table td{border-bottom:1px solid var(--border);padding:10px;text-align:left;vertical-align:top}.table th{color:var(--muted);font-weight:750;background:var(--soft)}.table td{overflow-wrap:anywhere}.empty{color:var(--muted);font-style:italic}.modal-wrap{position:fixed;inset:0;z-index:50;background:rgba(6,15,30,.70);display:flex;align-items:center;justify-content:center;padding:16px}.modal{background:var(--surface);color:var(--ink);border-radius:18px;padding:23px;max-width:760px;width:100%;max-height:90vh;overflow:auto;border:1px solid var(--border);box-shadow:0 20px 65px rgba(0,0,0,.20)}.modal-header{display:flex;align-items:start;justify-content:space-between;gap:16px;border-bottom:1px solid var(--border);margin-bottom:15px;padding-bottom:13px}.modal-title{font-family:Georgia,serif;font-size:1.34rem;font-weight:740}.modal-content{white-space:normal}.modal-footer{border-top:1px solid var(--border);margin-top:15px;padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}.modal-scroll{max-height:53vh;overflow:auto}.mono{font-family:ui-monospace,Consolas,monospace}.example-text{white-space:pre-wrap;line-height:1.55;background:var(--soft);border:1px solid var(--border);padding:15px;border-radius:12px}.grid-small{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.tag{font-size:.74rem;border-radius:7px;padding:3px 7px;background:var(--soft);color:var(--muted)}#toast{position:fixed;bottom:18px;right:18px;z-index:80;max-width:min(420px,90vw);background:var(--ink);color:var(--surface);padding:12px 16px;border-radius:11px;box-shadow:var(--shadow);display:none}#printArea{display:none}.footer{padding:12px 0 36px;text-align:center;color:var(--muted);font-size:.78rem}.export-preview{background:var(--soft);border:1px solid var(--border);padding:16px;border-radius:10px;max-height:330px;overflow:auto;font-size:.86rem}.export-preview pre{white-space:pre-wrap}.helper-list{margin:0;padding-left:20px;line-height:1.75}.footer-links{font-size:.73rem} .group-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 0 10px}.group-title h3{margin:0}.field-skip{color:var(--muted);font-size:.76rem}.test-note{font-size:.76rem;color:var(--muted);margin-top:5px}\n@media(max-width:1024px){.stations{grid-template-columns:repeat(4,minmax(0,1fr))}.site-header .wrap{flex-wrap:wrap}.head-actions{justify-content:flex-start}.brand{min-width:auto}}\n@media(max-width:640px){.wrap{padding-left:12px;padding-right:12px}.site-header .wrap{padding-top:10px;padding-bottom:10px}.brand-name{font-size:1.18rem}.head-actions .btn{font-size:.73rem;padding:.46rem .55rem}.stations{grid-template-columns:repeat(2,minmax(0,1fr))}.station{min-height:74px}.sheet-head,.sheet-body{padding:17px 14px}.two-cols,.callouts,.fieldgroup,.grid-small{grid-template-columns:1fr}h1{font-size:1.47rem}.tabbar{width:100%}.tabbar button{flex:1;padding:.51rem .23rem;font-size:.76rem}.ribbon .wrap{display:block}.ribbon .status{display:block;margin-bottom:4px}.modal{padding:15px}.field{padding:13px}}\n@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}\n@page{size:A4;margin:17mm 14mm}\n@media print{.guia-body{background:#fff!important;color:#111!important;font-size:10pt!important}.site-header,.ribbon,.layout,.footer,.modal-wrap,#toast{display:none!important}#printArea{display:block!important;position:static;background:white;color:#111}#printArea h1{font-size:21pt;margin-bottom:5mm}#printArea h2{font-size:15pt;margin:7mm 0 3mm}#printArea h3{font-size:11pt;margin:5mm 0 1mm}#printArea .print-p{white-space:pre-wrap;line-height:1.45;margin:1mm 0 4mm}#printArea section{break-inside:avoid-page}#printArea .small{font-size:9pt;color:#555}#printArea table{font-size:9pt}#printArea th,#printArea td{border:1px solid #bbb;padding:3mm}#printArea .page-break{break-before:page}#printArea .print-box{border:1px solid #aaa;padding:4mm;margin:3mm 0;break-inside:avoid-page}}\n[hidden]{display:none!important}\n.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}\n\n/* Integrado ao site: sem cabeçalho próprio, largura do site, barra de ferramentas comum. */\n.site-header{position:static;background:transparent;border:0;box-shadow:none;padding:0 0 12px}\n.site-header .brand,.footer,[data-action=\"toggle-theme\"]{display:none!important}\n.site-header .wrap{justify-content:flex-end}\n.wrap{max-width:none;padding:0}\n.ribbon{border-radius:14px;margin-bottom:14px}\n.station.selected .num{background:var(--mpie-gold,#F4B93B);color:#0F1C2E}\n";
-const MARKUP="<header class=\"site-header\"><div class=\"wrap\"><div class=\"brand\"><div class=\"brand-icon\" aria-hidden=\"true\">✒</div><div><div class=\"flex\"><span class=\"brand-name\">Scriptorium MPIE</span><span class=\"pill gold\">Guia de escrita</span></div><div class=\"small muted\">Guia de escrita · 8 etapas · <a href=\"/\">voltar ao Scriptorium</a></div></div></div><div class=\"head-actions\"><label class=\"sr-only\" for=\"tipoTrabalho\">Tipo de trabalho</label><select id=\"tipoTrabalho\" class=\"btn tinybtn\" title=\"Tipo de trabalho\"><option value=\"artigo\">Artigo científico</option><option value=\"projeto\">Projeto de pesquisa (M1 a M12)</option></select><button class=\"btn tinybtn\" data-action=\"glossary\">Dicionário</button><button class=\"btn tinybtn\" data-action=\"versions\">Versões</button><button class=\"btn tinybtn\" data-action=\"examples\">Exemplos</button><button class=\"btn tinybtn blue\" data-action=\"export\">Exportar</button><button class=\"btn tinybtn\" data-action=\"backup\">Backup</button><button class=\"btn tinybtn\" data-action=\"settings\" aria-label=\"Configurações de aparência\">Aa</button></div></div></header>\n<div class=\"ribbon\"><div class=\"wrap\"><span id=\"saveStatus\" class=\"status\" role=\"status\" aria-live=\"polite\">Carregando…</span><div class=\"flex\"><small id=\"projectInfo\">Carregando…</small><button class=\"btn tinybtn\" data-action=\"help\" style=\"background:transparent;color:#fff;border-color:#8799b9\">Como usar?</button></div></div></div>\n<main class=\"wrap layout\"><section class=\"panel chain-panel\"><div class=\"flex spread\"><div><div class=\"eyebrow\" style=\"color:#f9d28d\">Cadeia de coerência</div><div class=\"small\">Indicadores de preenchimento; as relações científicas exigem análise e orientação humana.</div></div><button class=\"btn tinybtn\" data-action=\"audit\">Conferir relações</button></div><nav id=\"chain\" class=\"chain-links\" aria-label=\"Cadeia de coerência\"></nav></section><nav id=\"stations\" class=\"stations\" aria-label=\"Navegação pelas oito etapas\"></nav><section class=\"panel sheet\"><div id=\"stageHeader\" class=\"sheet-head\"></div><div id=\"stageBody\" class=\"sheet-body\"></div></section></main>\n<footer class=\"footer wrap\">Com login, o guia fica salvo na sua conta do Scriptorium; sem login, só neste navegador. Nenhuma aprovação acadêmica é automática.</footer>\n<div id=\"modalMount\"></div><div id=\"toast\" role=\"status\" aria-live=\"polite\"></div><div id=\"printArea\"></div><input type=\"file\" id=\"importJSON\" accept=\".json,application/json\" hidden aria-label=\"Importar arquivo de backup JSON\">";
+const CSS=`
+:host {
+  display: block;
+  zoom: var(--font, 1);
+  color: var(--text-primary, #0F1C2E);
+  font-family: var(--font-sans, 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif);
+}
+* { box-sizing: border-box; }
+.guia-body {
+  color: var(--text-primary, #0F1C2E);
+  font-family: var(--font-sans, 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif);
+  line-height: 1.6;
+  font-size: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+a { color: var(--mpie-blue-text, #105396); text-decoration: underline; text-underline-offset: 2px; }
+:focus-visible { outline: 3px solid var(--mpie-blue, #1466B8); outline-offset: 3px; }
+h2, h3, h4, p { margin-top: 0; }
+h2, h3 { font-family: var(--font-serif, 'Newsreader', Georgia, serif); letter-spacing: -0.01em; color: var(--text-primary, #0F1C2E); }
+h2 { font-size: clamp(1.35rem, 2.4vw, 1.7rem); font-weight: 600; line-height: 1.2; margin-bottom: 6px; }
+h3 { font-size: 1.12rem; font-weight: 600; line-height: 1.28; margin-bottom: 8px; }
+h4 { font-size: 0.96rem; font-weight: 700; margin-bottom: 6px; color: var(--text-primary, #0F1C2E); }
+
+.muted { color: var(--text-secondary, #3B4F68); }
+.subtle { color: var(--text-muted, #5F748E); }
+.small { font-size: 0.9rem; line-height: 1.55; }
+.tiny { font-size: 0.78rem; }
+.eyebrow {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mpie-gold-text, #8A5A00);
+}
+.bold { font-weight: 700; }
+.flex { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.spread { justify-content: space-between; }
+
+/* Painéis no padrão exato do Scriptorium */
+.panel {
+  background: var(--bg-surface, #FFFFFF);
+  border: 1px solid var(--border-main, #D8E3F0);
+  border-radius: 18px;
+  padding: 24px 26px;
+  box-shadow: var(--shadow-sm, 0 2px 10px rgba(15, 28, 46, 0.04));
+}
+
+/* Botões no padrão exato do Scriptorium (alvos grandes >= 42px) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 9px 16px;
+  border-radius: 11px;
+  border: 1px solid var(--border-main, #D8E3F0);
+  background: var(--bg-subtle, #EFF4FA);
+  color: var(--text-primary, #0F1C2E);
+  font-weight: 600;
+  font-size: 0.88rem;
+  text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.btn:hover:not(:disabled) { border-color: var(--mpie-blue, #1466B8); }
+.btn.primary {
+  background: var(--mpie-blue, #1466B8);
+  border-color: var(--mpie-blue, #1466B8);
+  color: #FFFFFF;
+}
+:host([data-theme="dark"]) .btn.primary { color: #070A0F; }
+.btn.primary:hover:not(:disabled) {
+  background: var(--mpie-blue-hover, #0E4F92);
+  border-color: var(--mpie-blue-hover, #0E4F92);
+}
+.btn.danger {
+  color: var(--danger-text, #8F4A00);
+  border-color: var(--danger-border, #F0B867);
+  background: var(--danger-soft, #FFF3E0);
+}
+.btn.sm { min-height: 36px; padding: 6px 12px; font-size: 0.82rem; }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--mpie-blue-text, #105396); padding: 6px 10px; }
+.btn.ghost:hover:not(:disabled) { background: var(--mpie-blue-soft, #E8F2FC); }
+
+/* Pílulas e seletor segmentado (iguais aos do Scriptorium) */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: var(--bg-subtle, #EFF4FA);
+  color: var(--text-secondary, #3B4F68);
+  border: 1px solid var(--border-main, #D8E3F0);
+  white-space: nowrap;
+}
+.pill.gold { background: var(--mpie-gold-soft, #FEF7E4); color: var(--mpie-gold-text, #8A5A00); border-color: var(--warn-border, #F4D88A); }
+.pill.good { background: var(--ok-bg, #E8F2FC); color: var(--ok-text, #105396); border-color: var(--ok-border, #B9D4F0); }
+.pill.warn { background: var(--warn-bg, #FFFBEB); color: var(--warn-text, #7A4F00); border-color: var(--warn-border, #F4D88A); }
+
+.segmented {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--bg-subtle, #EFF4FA);
+  border: 1px solid var(--border-main, #D8E3F0);
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.seg-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #3B4F68);
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-size: 0.86rem;
+  font-weight: 650;
+  min-height: 38px;
+}
+.seg-btn.active { background: var(--mpie-blue, #1466B8); color: #FFFFFF; }
+:host([data-theme="dark"]) .seg-btn.active { color: #070A0F; }
+
+/* Cabeçalho calmo do Guia */
+.guide-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-soft, #E8EFF7);
+}
+.guide-top-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+.status-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 11px;
+  background: var(--ok-bg, #E8F2FC);
+  border: 1px solid var(--ok-border, #B9D4F0);
+  color: var(--ok-text, #105396);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.status-bar.alert {
+  background: var(--danger-soft, #FFF3E0);
+  border-color: var(--danger-border, #F0B867);
+  color: var(--danger-text, #8F4A00);
+}
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #3B4F68);
+  font-weight: 600;
+}
+.progress-track {
+  width: 130px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border-soft, #E8EFF7);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--mpie-blue, #1466B8);
+  transition: width 200ms ease;
+}
+
+/* Menu retrátil "Mais ferramentas": mantém o topo limpo para não assustar iniciantes */
+.tools-menu { margin-top: 12px; }
+.tools-menu > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.86rem;
+  font-weight: 650;
+  color: var(--mpie-blue-text, #105396);
+  padding: 6px 10px;
+  border-radius: 9px;
+  background: var(--bg-subtle, #EFF4FA);
+  border: 1px solid var(--border-main, #D8E3F0);
+}
+.tools-menu > summary::-webkit-details-marker { display: none; }
+.tools-menu-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg-subtle, #EFF4FA);
+  border: 1px solid var(--border-main, #D8E3F0);
+}
+
+/* Ponte gentil com artigo ativo em Seus artigos */
+.project-bridge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: var(--mpie-blue-soft, #E8F2FC);
+  border: 1px solid var(--ok-border, #B9D4F0);
+  font-size: 0.86rem;
+  color: var(--text-primary, #0F1C2E);
+}
+
+/* Fio condutor (substitui o bloco azul escuro antigo por faixa editorial calma) */
+.chain-card {
+  background: var(--bg-subtle, #EFF4FA);
+  border: 1px solid var(--border-main, #D8E3F0);
+  border-left: 4px solid var(--mpie-gold, #F4B93B);
+  border-radius: 14px;
+  padding: 14px 18px;
+}
+.chain-links { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
+.chain-link {
+  border: 1px solid var(--border-main, #D8E3F0);
+  background: var(--bg-surface, #FFFFFF);
+  color: var(--text-secondary, #3B4F68);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.chain-link:hover { border-color: var(--mpie-blue, #1466B8); color: var(--mpie-blue-text, #105396); }
+.chain-link.filled {
+  background: var(--ok-bg, #E8F2FC);
+  border-color: var(--ok-border, #B9D4F0);
+  color: var(--ok-text, #105396);
+}
+.chain-arrow { color: var(--text-muted, #5F748E); font-size: 0.82rem; }
+
+/* Grade das 8 etapas no estilo .step-btn do Scriptorium */
+.stations {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.station {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  text-align: left;
+  padding: 13px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border-main, #D8E3F0);
+  background: var(--bg-surface, #FFFFFF);
+  color: var(--text-primary, #0F1C2E);
+  min-height: 76px;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+.station:hover { border-color: var(--mpie-blue, #1466B8); }
+.station.selected {
+  background: var(--mpie-blue-soft, #E8F2FC);
+  border-color: var(--mpie-blue, #1466B8);
+  box-shadow: inset 0 0 0 1px var(--mpie-blue, #1466B8);
+}
+.station .num {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: var(--mpie-gold-soft, #FEF7E4);
+  color: var(--mpie-gold-text, #8A5A00);
+}
+.station.done .num { background: var(--ok-bg, #E8F2FC); color: var(--ok-text, #105396); }
+.station.selected .num { background: var(--mpie-blue, #1466B8); color: #FFFFFF; }
+:host([data-theme="dark"]) .station.selected .num { color: #070A0F; }
+.station-info { min-width: 0; flex: 1; }
+.station b { display: block; font-size: 0.88rem; line-height: 1.25; }
+.station small { display: block; font-size: 0.76rem; color: var(--text-muted, #5F748E); margin-top: 3px; }
+.station.selected small { color: var(--mpie-blue-text, #105396); font-weight: 600; }
+
+/* Cartão da etapa atual */
+.sheet { scroll-margin-top: 88px; }
+.sheet-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-soft, #E8EFF7);
+}
+.tabbar {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--bg-subtle, #EFF4FA);
+  border: 1px solid var(--border-main, #D8E3F0);
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tabbar button {
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  padding: 9px 14px;
+  min-height: 40px;
+  color: var(--text-secondary, #3B4F68);
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+.tabbar button[aria-selected="true"] {
+  background: var(--mpie-blue, #1466B8);
+  color: #FFFFFF;
+}
+:host([data-theme="dark"]) .tabbar button[aria-selected="true"] { color: #070A0F; }
+
+.section-max { max-width: 820px; }
+.section-gap > * + * { margin-top: 18px; }
+
+.card {
+  background: var(--bg-subtle, #EFF4FA);
+  border: 1px solid var(--border-main, #D8E3F0);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+.card.white { background: var(--bg-surface, #FFFFFF); }
+.card.warning { background: var(--warn-bg, #FFFBEB); border-color: var(--warn-border, #F4D88A); }
+.lead { font-size: 1.03rem; line-height: 1.65; color: var(--text-primary, #0F1C2E); }
+.callouts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.notice {
+  padding: 13px 16px;
+  border-radius: 12px;
+  border-left: 3px solid var(--mpie-gold, #F4B93B);
+  background: var(--bg-subtle, #EFF4FA);
+  font-size: 0.88rem;
+  color: var(--text-secondary, #3B4F68);
+  line-height: 1.55;
+}
+.notice strong { color: var(--text-primary, #0F1C2E); }
+
+/* Campos de escrita confortáveis em 1 coluna (fácil de ler e preencher sem se perder) */
+.fieldgroup { display: flex; flex-direction: column; gap: 14px; }
+.field {
+  padding: 16px 18px;
+  border: 1px solid var(--border-main, #D8E3F0);
+  border-radius: 14px;
+  background: var(--bg-subtle, #EFF4FA);
+}
+.field-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.field label { font-weight: 700; font-size: 0.96rem; color: var(--text-primary, #0F1C2E); display: block; }
+.field .hint { font-size: 0.86rem; color: var(--text-secondary, #3B4F68); margin: 0 0 10px; line-height: 1.48; }
+.field input, .field textarea, .field select, .form-control {
+  width: 100%;
+  padding: 11px 13px;
+  background: var(--bg-input, #F8FAFD);
+  border: 1.5px solid var(--border-main, #D8E3F0);
+  border-radius: 11px;
+  color: var(--text-primary, #0F1C2E);
+  font-size: 0.96rem;
+  min-height: 44px;
+  line-height: 1.5;
+}
+.field textarea { min-height: 108px; resize: vertical; }
+.field input:focus, .field textarea:focus, .field select:focus, .form-control:focus {
+  outline: none;
+  border-color: var(--mpie-blue, #1466B8);
+  box-shadow: 0 0 0 3px var(--mpie-blue-soft, #E8F2FC);
+}
+
+/* Blocos repetíveis */
+.repeat-block {
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--border-main, #D8E3F0);
+  background: var(--bg-subtle, #EFF4FA);
+}
+.repeat-intro { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.record {
+  border: 1px solid var(--border-main, #D8E3F0);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-top: 12px;
+  background: var(--bg-surface, #FFFFFF);
+}
+.record > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 0.94rem;
+}
+.record > summary::-webkit-details-marker { display: none; }
+.record[open] > summary { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-soft, #E8EFF7); }
+.record-title { flex: 1; }
+.record-index {
+  background: var(--mpie-blue-soft, #E8F2FC);
+  color: var(--mpie-blue-text, #105396);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.74rem;
+  font-weight: 700;
+  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+}
+.record-controls { display: flex; justify-content: flex-end; margin-top: 12px; }
+
+/* Checklist na aba Conferir */
+.check-card {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 12px;
+  border: 1px solid var(--border-main, #D8E3F0);
+  border-radius: 14px;
+  padding: 15px 16px;
+  background: var(--bg-subtle, #EFF4FA);
+  margin: 10px 0;
+}
+.check-card input[type=checkbox] { accent-color: var(--mpie-blue, #1466B8); width: 20px; height: 20px; margin-top: 2px; cursor: pointer; }
+.check-card label { cursor: pointer; font-weight: 650; font-size: 0.94rem; color: var(--text-primary, #0F1C2E); }
+.check-note {
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--border-main, #D8E3F0);
+  background: var(--bg-input, #F8FAFD);
+  color: var(--text-primary, #0F1C2E);
+  margin-top: 8px;
+  font-size: 0.88rem;
+}
+.action-footer {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft, #E8EFF7);
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.status-steps { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.status-step { font-size: 0.78rem; border: 1px solid var(--border-main, #D8E3F0); border-radius: 999px; padding: 4px 10px; color: var(--text-muted, #5F748E); background: var(--bg-surface, #FFFFFF); }
+.status-step.on { border-color: var(--mpie-blue, #1466B8); background: var(--ok-bg, #E8F2FC); color: var(--ok-text, #105396); font-weight: 700; }
+
+.audit-list { padding: 0; list-style: none; margin: 12px 0 0; }
+.audit-list li { border: 1px solid var(--border-main, #D8E3F0); border-radius: 12px; margin: 9px 0; padding: 12px 14px; background: var(--bg-subtle, #EFF4FA); font-size: 0.88rem; }
+.audit-list li strong { display: block; margin-bottom: 4px; }
+.audit-list li.warn { border-left: 4px solid var(--mpie-gold, #F4B93B); }
+.audit-list li.info { border-left: 4px solid var(--mpie-blue, #1466B8); }
+.audit-list li.good { border-left: 4px solid var(--mpie-blue, #1466B8); }
+.audit-list li.high { border-left: 4px solid var(--danger-strong, #A85400); }
+
+.timeline-wrap { overflow-x: auto; }
+.table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+.table th, .table td { border-bottom: 1px solid var(--border-main, #D8E3F0); padding: 10px 12px; text-align: left; vertical-align: top; }
+.table th { color: var(--text-secondary, #3B4F68); font-weight: 700; background: var(--bg-subtle, #EFF4FA); }
+.table td { overflow-wrap: anywhere; }
+.empty { color: var(--text-muted, #5F748E); font-style: italic; }
+.helper-list { margin: 0; padding-left: 22px; line-height: 1.75; }
+.helper-list li { margin-bottom: 6px; }
+.group-title { margin: 18px 0 10px; }
+.test-note { font-size: 0.8rem; color: var(--text-muted, #5F748E); margin-top: 6px; }
+.tag { font-size: 0.76rem; font-weight: 600; border-radius: 8px; padding: 3px 8px; background: var(--bg-surface, #FFFFFF); border: 1px solid var(--border-main, #D8E3F0); color: var(--text-secondary, #3B4F68); }
+.example-text { white-space: pre-wrap; line-height: 1.6; background: var(--bg-subtle, #EFF4FA); border: 1px solid var(--border-main, #D8E3F0); padding: 14px 16px; border-radius: 12px; font-size: 0.92rem; }
+
+/* Modais no padrão exato de #config-modal do Scriptorium */
+.modal-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(7, 10, 15, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal {
+  background: var(--bg-surface, #FFFFFF);
+  color: var(--text-primary, #0F1C2E);
+  border-radius: 18px;
+  padding: 22px 24px;
+  max-width: 740px;
+  width: 100%;
+  max-height: 88vh;
+  overflow: auto;
+  border: 1px solid var(--border-main, #D8E3F0);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.35);
+}
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid var(--border-soft, #E8EFF7);
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+}
+.modal-title { font-family: var(--font-serif, Georgia, serif); font-size: 1.32rem; font-weight: 600; }
+.modal-footer {
+  border-top: 1px solid var(--border-soft, #E8EFF7);
+  margin-top: 18px;
+  padding-top: 14px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.modal-scroll { max-height: 54vh; overflow: auto; padding-right: 4px; }
+
+#toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 90;
+  max-width: min(420px, 90vw);
+  background: var(--mpie-blue, #1466B8);
+  color: #FFFFFF;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+  display: none;
+}
+:host([data-theme="dark"]) #toast { color: #070A0F; }
+#printArea { display: none; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+@media (max-width: 980px) {
+  .stations { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .panel { padding: 16px; border-radius: 14px; }
+  .callouts { grid-template-columns: 1fr; }
+  .tabbar { width: 100%; }
+  .tabbar button { flex: 1; padding: 8px 6px; font-size: 0.82rem; }
+  .action-footer { flex-direction: column; }
+  .action-footer .btn { width: 100%; }
+  .modal { padding: 16px; }
+}
+@media (max-width: 440px) {
+  .stations { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}
+@page { size: A4; margin: 17mm 14mm; }
+@media print {
+  .guia-body { background: #fff !important; color: #111 !important; font-size: 10pt !important; }
+  .guia-screen, .modal-wrap, #toast { display: none !important; }
+  #printArea { display: block !important; position: static; background: white; color: #111; }
+  #printArea h1 { font-size: 20pt; margin-bottom: 5mm; }
+  #printArea h2 { font-size: 14pt; margin: 7mm 0 3mm; }
+  #printArea h3 { font-size: 11pt; margin: 5mm 0 1mm; }
+  #printArea .print-p { white-space: pre-wrap; line-height: 1.45; margin: 1mm 0 4mm; }
+  #printArea section { break-inside: avoid-page; }
+  #printArea .small { font-size: 9pt; color: #555; }
+  #printArea table { font-size: 9pt; border-collapse: collapse; width: 100%; }
+  #printArea th, #printArea td { border: 1px solid #bbb; padding: 3mm; }
+  #printArea .print-box { border: 1px solid #aaa; padding: 4mm; margin: 3mm 0; break-inside: avoid-page; }
+}
+`;
+
+const MARKUP=`
+<div class="guia-screen">
+  <section class="panel" aria-labelledby="guia-heading">
+    <div class="guide-top">
+      <div>
+        <h2 id="guia-heading">Guia de escrita passo a passo</h2>
+        <p class="small muted" style="margin:0">Construa seu texto em 8 etapas calmas. Tudo o que você escreve fica salvo automaticamente.</p>
+      </div>
+      <div class="flex">
+        <div class="segmented" role="radiogroup" aria-label="Tipo de trabalho">
+          <button type="button" class="seg-btn" id="modeArtigo" role="radio" aria-checked="true" data-action="set-tipo" data-tipo="artigo">Artigo científico</button>
+          <button type="button" class="seg-btn" id="modeProjeto" role="radio" aria-checked="false" data-action="set-tipo" data-tipo="projeto">Projeto de pesquisa</button>
+        </div>
+        <button type="button" class="btn primary" data-action="export">Baixar ou imprimir</button>
+        <button type="button" class="btn" data-action="help">Como usar</button>
+      </div>
+    </div>
+
+    <div class="guide-top-meta">
+      <span id="saveStatus" class="status-bar" role="status" aria-live="polite">Carregando…</span>
+      <div class="progress-wrap">
+        <span id="projectInfo">0/8 etapas preenchidas</span>
+        <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div id="projectBridge" class="project-bridge" hidden></div>
+
+    <details class="tools-menu">
+      <summary>Mais ferramentas (dicionário, exemplos, versões e tamanho da letra) ▾</summary>
+      <div class="tools-menu-grid">
+        <button type="button" class="btn sm" data-action="audit">Conferir coerência</button>
+        <button type="button" class="btn sm" data-action="examples">Ver exemplos prontos</button>
+        <button type="button" class="btn sm" data-action="glossary">Dicionário de termos</button>
+        <button type="button" class="btn sm" data-action="versions">Versões salvas</button>
+        <button type="button" class="btn sm" data-action="backup">Cópia de segurança</button>
+        <button type="button" class="btn sm" data-action="settings">Tamanho da letra (Aa)</button>
+      </div>
+    </details>
+  </section>
+
+  <section class="chain-card" aria-label="Fio condutor do trabalho">
+    <div class="flex spread">
+      <div>
+        <div class="eyebrow">Fio condutor do seu texto</div>
+        <div class="small muted">Clique em qualquer ponto para ir direto à etapa correspondente.</div>
+      </div>
+      <button type="button" class="btn sm" data-action="audit">Conferir coerência</button>
+    </div>
+    <nav id="chain" class="chain-links" aria-label="Etapas do fio condutor"></nav>
+  </section>
+
+  <nav id="stations" class="stations" aria-label="Escolha uma das oito etapas"></nav>
+
+  <section class="panel sheet" id="stageSheet">
+    <div id="stageHeader" class="sheet-head"></div>
+    <div id="stageBody"></div>
+  </section>
+</div>
+<div id="modalMount"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="printArea"></div>
+<input type="file" id="importJSON" accept=".json,application/json" hidden aria-label="Restaurar cópia de segurança JSON">
+`;
 function montar(host){
 if(host.shadowRoot)return;
 const HOST=host;
@@ -343,7 +1003,12 @@ function applyMode(){
   STAGES.splice(0,STAGES.length,...next);
   Object.assign(STAGE_LABELS,PROJECT_LABELS,isArticle()?ARTICLE_LABELS:{});
   REPEAT.timeline.title=isArticle()?'Cronograma até a submissão':'Cronograma por entregável';
-  const sel=R.getElementById('tipoTrabalho');if(sel)sel.value=isArticle()?'artigo':'projeto';
+  const bA=R.getElementById('modeArtigo'), bP=R.getElementById('modeProjeto');
+  if(bA&&bP){
+    const art=isArticle();
+    bA.classList.toggle('active',art); bA.setAttribute('aria-checked',String(art));
+    bP.classList.toggle('active',!art); bP.setAttribute('aria-checked',String(!art));
+  }
 }
 const STORAGE_KEY='scriptorium_pesquisa_guiada_v2_independente';
 const TRASH_KEY='scriptorium_pesquisa_guiada_v2_lixeira';
@@ -365,7 +1030,20 @@ function snapshot(label='Cópia manual',stage=state.active,note=''){state.versio
 function persist(){try{const stored=localStorage.getItem(STORAGE_KEY);if(stored){const x=JSON.parse(stored);if(x.changedAt>lastKnownWrite){writeConflict=true;savingError=true;updateStatus();return false;}}if(writeConflict){savingError=true;updateStatus();return false;}state.changedAt=Date.now();localStorage.setItem(STORAGE_KEY,JSON.stringify(state));lastKnownWrite=state.changedAt;savingError=false;if(NUVEM)NUVEM.agendar();updateStatus();return true;}catch(e){savingError=true;updateStatus();return false;}}
 function scheduleSave(){const s=R.getElementById('saveStatus');if(s)s.textContent='● Alterações locais ainda não gravadas…';clearTimeout(saveTimer);saveTimer=setTimeout(persist,320);}
 function flush(){clearTimeout(saveTimer);return persist();}
-function updateStatus(){const n=R.getElementById('saveStatus');if(!n)return;n.className='status'+(savingError?' alert':'');n.textContent=writeConflict?'⚠ Alterações simultâneas em outra aba. Faça backup JSON antes de recarregar.':savingError?'⚠ Falha ao salvar neste navegador. Exporte um backup JSON agora.':(NUVEM&&NUVEM.texto()||'✓ Salvo neste navegador às '+new Date().toLocaleTimeString('pt-BR')+' · Entre no Scriptorium para salvar na sua conta');R.getElementById('projectInfo').textContent=(isArticle()?'Artigo':'Projeto')+' · '+stageProgressLabel();}
+function updateStatus(){
+  const n=R.getElementById('saveStatus');if(!n)return;
+  n.className='status-bar'+(savingError?' alert':'');
+  n.textContent=writeConflict
+    ?'⚠ Alterações em outra aba. Salve uma cópia de segurança antes de recarregar.'
+    :savingError?'⚠ Não foi possível salvar aqui. Baixe uma cópia de segurança agora.'
+    :(NUVEM&&NUVEM.texto()||'✓ Salvo neste aparelho às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · Entre com Google para salvar na sua conta');
+  const filled=STAGES.filter(s=>info(s.id).complete).length;
+  const worked=STAGES.filter(s=>info(s.id).code!=='empty').length;
+  const infoEl=R.getElementById('projectInfo');
+  if(infoEl)infoEl.textContent=`${worked} de 8 iniciadas · ${filled} de 8 prontas`;
+  const fillEl=R.getElementById('progressFill');
+  if(fillEl)fillEl.style.width=`${Math.round((filled/8)*100)}%`;
+}
 function notify(message){const node=R.getElementById('toast');node.textContent=message;node.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>node.style.display='none',3500);}
 function recs(k){return Array.isArray(state.records[k])?state.records[k]:[];}
 function info(stage){const id=Number(stage);const f=byStage(id).fields;const present=f.filter(x=>isFilled(x.key)).length;let specialTotal=0,specialDone=0;const requireCount=(ok,total=1)=>{specialTotal+=total;specialDone+=ok?total:0;};
@@ -390,38 +1068,112 @@ function badge(label,type=''){return `<span class="pill ${type}">${esc(label)}</
 function htmlLines(s){return esc(s||'').replace(/\n/g,'<br>');}
 function safeDate(s){return plain(s)||'(vazio)';}
 
-function renderHeader(){const s=byStage(state.active),p=info(s.id);R.getElementById('stageHeader').innerHTML=`<div><div class="flex" style="margin-bottom:7px"><span class="eyebrow">Etapa ${s.id} de 8</span>${badge(s.models,'gold')}${badge(p.label,p.code==='self'||p.code==='review'?'good':'')}</div><h1>${esc(s.title)}</h1><div class="small muted">${esc(s.objective)}</div></div><div class="tabbar" role="tablist" aria-label="Três momentos da etapa">${[['entender','1 · Entender'],['preencher','2 · Preencher'],['conferir','3 · Conferir']].map(([k,label])=>`<button role="tab" data-action="tab" data-tab="${k}" aria-selected="${state.tab===k}">${label}</button>`).join('')}</div>`;}
-function renderChain(){const arr=[['Problema',2,'problema'],['Pergunta',2,'pergunta'],['Revisão',3,'m5_lacuna'],['Objetivo',4,'objetivoGeral'],['Método',5,'estrategia'],['Dados e análise',5,'analiseDados'],isArticle()?['Resultados',6,'resultadosPorObjetivo']:['Produto',6,'tipoProduto']];R.getElementById('chain').innerHTML=arr.map(([label,step,key],i)=>`<button class="chain-link ${isFilled(key)?'filled':''}" data-action="jump" data-stage="${step}">${isFilled(key)?'✓':'○'} ${esc(label)}</button>${i<arr.length-1?'<span class="chain-arrow" aria-hidden="true">→</span>':''}`).join('');}
-function renderStations(){R.getElementById('stations').innerHTML=STAGES.map(s=>{const p=info(s.id);return `<button class="station ${s.id===state.active?'selected':''}" data-action="jump" data-stage="${s.id}" aria-current="${s.id===state.active?'step':'false'}"><div class="flex spread"><span class="num">${s.id}</span><small>${p.code==='self'||p.code==='review'?'✓':`${p.count}/${p.max}`}</small></div><b>${esc(STAGE_LABELS[s.id])}</b><small>${esc(p.label)}</small></button>`}).join('');}
-function renderEntender(s){const related=Object.values(REPEAT).filter(r=>r.stage===s.id).map(x=>x.model);const suffix=related.length?` Atividades detalhadas: ${related.join(', ')}.`:'';return `<div class="section-max section-gap"><div class="card"><span class="eyebrow">Orientação pedagógica</span><p class="lead" style="margin:9px 0 0">${esc(s.plainExplain)}${esc(suffix)}</p></div><div class="callouts"><div class="card white"><span class="eyebrow">Entregável</span><p>${esc(s.deliverable)}</p></div><div class="card white"><span class="eyebrow">Papel possível da IA</span><p>${esc(s.aiRole)}</p><p class="test-note">O guia não executa IA: as conferências são regras simples e limitadas.</p></div></div><div class="card white"><h3>Perguntas para refletir</h3><ul class="helper-list">${s.guidingQuestions.map(q=>`<li>${esc(q)}</li>`).join('')}</ul></div><div class="notice"><strong>O que conta para avançar?</strong> ${s.criteria.length} critérios de autoverificação. O percurso pode ser revisitado; não há aprovação automática ou bloqueio definitivo.</div><div class="action-footer"><button class="btn" data-action="speak">◖ Ouvir explicação</button><button class="btn blue" data-action="tab" data-tab="preencher">Ir para preencher →</button></div></div>`;}
-function renderInputControl(field,v,context={}){const key=field.key,typ=field.type||'textarea';const att=context.rec?`data-rec="${esc(context.rec)}" data-item="${esc(context.item)}" data-key="${esc(key)}"`:`data-field="${esc(key)}"`;const id=`ctrl-${context.rec||'simple'}-${context.item||'s'}-${key}`.replace(/[^a-zA-Z0-9_-]/g,'-');const hintId=`hint-${id}`;const hint=context.rec?'':field.plainHint;
-  let input='';if(typ==='select'){input=`<select id="${id}" ${att} aria-describedby="${hintId}"><option value="">Selecione…</option>${(field.options||[]).map(o=>`<option value="${esc(o)}" ${v===o?'selected':''}>${esc(o)}</option>`).join('')}</select>`;}
-  else if(typ==='textarea'){input=`<textarea id="${id}" ${att} rows="${context.rec?2:4}" aria-describedby="${hintId}" placeholder="${esc(field.placeholder||'Registre sua resposta aqui…')}">${esc(v)}</textarea>`;}
+function renderHeader(){
+  const s=byStage(state.active),p=info(s.id);
+  R.getElementById('stageHeader').innerHTML=`
+    <div>
+      <div class="flex" style="margin-bottom:8px">
+        <span class="eyebrow">Etapa ${s.id} de 8</span>
+        ${badge(p.label,p.code==='self'||p.code==='review'||p.code==='filled'?'good':'gold')}
+      </div>
+      <h2>${esc(s.title)}</h2>
+      <div class="small muted">${esc(s.objective)}</div>
+    </div>
+    <div class="tabbar" role="tablist" aria-label="Três passos desta etapa">
+      ${[['entender','1 · Entender'],['preencher','2 · Escrever'],['conferir','3 · Conferir']].map(([k,label])=>`<button type="button" role="tab" data-action="tab" data-tab="${k}" aria-selected="${state.tab===k}">${label}</button>`).join('')}
+    </div>`;
+}
+function renderChain(){
+  const arr=[['Problema',2,'problema'],['Pergunta',2,'pergunta'],['Revisão',3,'m5_lacuna'],['Objetivo',4,'objetivoGeral'],['Método',5,'estrategia'],['Análise',5,'analiseDados'],isArticle()?['Resultados',6,'resultadosPorObjetivo']:['Produto',6,'tipoProduto']];
+  R.getElementById('chain').innerHTML=arr.map(([label,step,key],i)=>`<button type="button" class="chain-link ${isFilled(key)?'filled':''}" data-action="jump" data-stage="${step}">${isFilled(key)?'✓':'○'} ${esc(label)}</button>${i<arr.length-1?'<span class="chain-arrow" aria-hidden="true">→</span>':''}`).join('');
+}
+function renderStations(){
+  const friendly={empty:'Começar',draft:'Em andamento',filled:'Preenchida ✓',self:'Conferida ✓',review:'Revisada ✓'};
+  R.getElementById('stations').innerHTML=STAGES.map(s=>{
+    const p=info(s.id);
+    const done=p.code==='filled'||p.code==='self'||p.code==='review';
+    return `<button type="button" class="station ${s.id===state.active?'selected':''} ${done?'done':''}" data-action="jump" data-stage="${s.id}" aria-current="${s.id===state.active?'step':'false'}">
+      <span class="num">${String(s.id).padStart(2,'0')}</span>
+      <span class="station-info">
+        <b>${esc(STAGE_LABELS[s.id])}</b>
+        <small>${esc(friendly[p.code]||p.label)}${done?'':` · ${p.count}/${p.max}`}</small>
+      </span>
+    </button>`;
+  }).join('');
+}
+function renderEntender(s){
+  return `<div class="section-max section-gap">
+    <div class="card">
+      <span class="eyebrow">Explicação simples</span>
+      <p class="lead" style="margin:8px 0 0">${esc(s.plainExplain)}</p>
+    </div>
+    <div class="callouts">
+      <div class="card white"><span class="eyebrow">O que você vai produzir aqui</span><p class="small" style="margin:6px 0 0">${esc(s.deliverable)}</p></div>
+      <div class="card white"><span class="eyebrow">Como a IA pode ajudar</span><p class="small" style="margin:6px 0 0">${esc(s.aiRole)}</p><p class="test-note">Este guia não usa IA: você escreve com suas palavras e no seu ritmo.</p></div>
+    </div>
+    <div class="card white">
+      <h3>Perguntas para ajudar a pensar</h3>
+      <ul class="helper-list">${s.guidingQuestions.map(q=>`<li>${esc(q)}</li>`).join('')}</ul>
+    </div>
+    <div class="action-footer">
+      <button type="button" class="btn" data-action="speak">🔊 Ouvir explicação</button>
+      <button type="button" class="btn primary" data-action="tab" data-tab="preencher">Começar a escrever esta etapa →</button>
+    </div>
+  </div>`;
+}
+function renderInputControl(field,v,context={}){
+  const key=field.key,typ=field.type||'textarea';
+  const att=context.rec?`data-rec="${esc(context.rec)}" data-item="${esc(context.item)}" data-key="${esc(key)}"`:`data-field="${esc(key)}"`;
+  const id=`ctrl-${context.rec||'simple'}-${context.item||'s'}-${key}`.replace(/[^a-zA-Z0-9_-]/g,'-');
+  const hintId=`hint-${id}`;const hint=context.rec?'':field.plainHint;
+  let input='';
+  if(typ==='select'){input=`<select id="${id}" ${att} aria-describedby="${hintId}"><option value="">Escolha uma opção…</option>${(field.options||[]).map(o=>`<option value="${esc(o)}" ${v===o?'selected':''}>${esc(o)}</option>`).join('')}</select>`;}
+  else if(typ==='textarea'){input=`<textarea id="${id}" ${att} rows="${context.rec?3:4}" aria-describedby="${hintId}" placeholder="${esc(field.placeholder||'Escreva aqui com suas palavras…')}">${esc(v)}</textarea>`;}
   else{input=`<input id="${id}" ${att} type="${['date','month','number','text'].includes(typ)?typ:'text'}" value="${esc(v)}" aria-describedby="${hintId}" placeholder="${esc(field.placeholder||'')}">`;}
-  return `<div class="field"><div class="field-label"><label for="${id}">${esc(field.label)}</label>${!context.rec&&field.example?`<button class="btn tinybtn" data-action="field-example" data-field="${esc(key)}" type="button">Ver exemplo</button>`:''}</div><p id="${hintId}" class="hint">${esc(hint||'Escreva com suas palavras e confira os dados nas fontes.')}</p>${input}</div>`;}
+  return `<div class="field"><div class="field-label"><label for="${id}">${esc(field.label)}</label>${!context.rec&&field.example?`<button class="btn sm" data-action="field-example" data-field="${esc(key)}" type="button">Ver exemplo</button>`:''}</div><p id="${hintId}" class="hint">${esc(hint||'Escreva com suas palavras, sem pressa: você pode editar depois.')}</p>${input}</div>`;
+}
 function renderStandard(s,onlyKeys=null){let fields=s.fields;if(onlyKeys)fields=fields.filter(f=>onlyKeys.includes(f.key));const body=fields.map(f=>renderInputControl(f,state.values[f.key]||'')).join('');return `<div class="fieldgroup">${body}</div>`;}
-function renderRepeat(name){const cfg=REPEAT[name],arr=recs(name);const rowControls=(r)=>cfg.fields.map(([key,label,typ,opts])=>renderInputControl({key,label,type:typ,options:opts,placeholder:'Preencha com as informações verificadas…'},r[key]||'',{rec:name,item:r.id})).join('');return `<section class="repeat-block" id="repeat-${name}"><div class="repeat-intro"><div><div class="eyebrow">${esc(cfg.model)}</div><h3>${esc(cfg.title)} <span class="tag">${arr.length} registro(s)</span></h3><p class="small muted" style="max-width:730px;margin:0">${esc(cfg.help)}</p></div><button class="btn tinybtn blue" data-action="add-rec" data-rec="${name}">+ Adicionar</button></div>${arr.length?arr.map((r,i)=>`<details class="record" ${i===arr.length-1?'open':''}><summary><span class="record-index">${i+1}</span><span class="record-title">${esc(plain(r[cfg.fields[0][0]])||plain(r.referencia)||'Registro em elaboração')}</span><span class="tiny muted">Editar ▾</span></summary><div class="fieldgroup">${rowControls(r)}</div><div class="record-controls"><button class="btn tinybtn danger" data-action="remove-rec" data-rec="${name}" data-item="${esc(r.id)}">Remover este registro</button></div></details>`).join(''):`<p class="empty" style="margin-top:14px">Nenhum registro. Clique em “+ Adicionar” para começar.</p>`}</section>`;}
+function renderRepeat(name){
+  const cfg=REPEAT[name],arr=recs(name);
+  const rowControls=(r)=>cfg.fields.map(([key,label,typ,opts])=>renderInputControl({key,label,type:typ,options:opts,placeholder:'Preencha com as informações verificadas…'},r[key]||'',{rec:name,item:r.id})).join('');
+  return `<section class="repeat-block" id="repeat-${name}">
+    <div class="repeat-intro">
+      <div><div class="eyebrow">${esc(cfg.model)}</div><h3>${esc(cfg.title)} <span class="tag">${arr.length} registro(s)</span></h3><p class="small muted" style="max-width:680px;margin:0">${esc(cfg.help)}</p></div>
+      <button type="button" class="btn sm primary" data-action="add-rec" data-rec="${name}">+ Adicionar</button>
+    </div>
+    ${arr.length?arr.map((r,i)=>`<details class="record" ${i===arr.length-1?'open':''}><summary><span class="record-index">${i+1}</span><span class="record-title">${esc(plain(r[cfg.fields[0][0]])||plain(r.referencia)||'Novo registro')}</span><span class="tiny muted">Abrir / editar ▾</span></summary><div class="fieldgroup">${rowControls(r)}</div><div class="record-controls"><button type="button" class="btn sm danger" data-action="remove-rec" data-rec="${name}" data-item="${esc(r.id)}">Remover este registro</button></div></details>`).join(''):`<p class="empty" style="margin:12px 0 0">Nenhum item adicionado ainda. Clique em "+ Adicionar" acima.</p>`}
+  </section>`;
+}
 function renderMatrix(){const obs=recs('objectives');const objMap=(state.records.methodLinks||{});return `<section class="repeat-block"><div class="eyebrow">M8 · Matriz de coerência</div><h3>Correspondência entre objetivos, dados e análise</h3><p class="small muted">Cada linha é vinculada a um objetivo específico da Etapa 4. Se alterar os objetivos, revise as linhas. Nenhuma matriz é apagada automaticamente.</p>${obs.length?obs.map((o,i)=>{const v=objMap[o.id]||{};const fields=[['dados','Dados necessários'],['origem','Participantes ou documentos que produzem os dados'],['instrumento','Instrumento de produção de dados'],['momento','Momento de produção de dados'],['analise','Técnica de análise'],['ética','Questões éticas / autorizações']];return `<details class="record" open><summary><span class="record-index">${i+1}</span><span class="record-title">${esc(plain(o.texto)||'Objetivo ainda vazio')}</span></summary><div class="fieldgroup">${fields.map(([key,label])=>renderMatrixControl(o.id,key,label,v[key]||'')).join('')}</div></details>`;}).join(''):'<div class="notice">Para construir a matriz M8, registre primeiro os objetivos específicos na Etapa 4.</div>'}</section>`;}
 function renderMatrixControl(id,key,label,value){const fld=`mx-${id}-${key}`;return `<div class="field"><label for="${esc(fld)}">${esc(label)}</label><textarea rows="2" id="${esc(fld)}" data-matrix="${esc(id)}" data-matrix-key="${esc(key)}">${esc(value)}</textarea></div>`;}
 function renderM9(){const fields=[['Tema','tema'],['Situação problemática','problema'],['Questão de pesquisa','pergunta'],['Objetivo geral','objetivoGeral'],['Objetivos específicos','~objectives'],['Contexto e participantes','participantes'],['Método e estratégia','estrategia'],['Abordagem','abordagem'],['Material empírico','materialEmpirico'],['Análise','analiseDados'],['Impacto social','impactoSocial'],isArticle()?['Resultados','resultadosPorObjetivo']:['Produto','tipoProduto']];const vfield=(k)=>k==='~objectives'?recs('objectives').map((r,i)=>`${i+1}. ${plain(r.texto)}`).join('\n'):val(k);
   return `<div class="card white"><div class="eyebrow">M9 · Quadro 2 · Síntese automática do projeto</div><p class="small muted">A estrutura abaixo foi adaptada: o modelo M9 integral não estava incluído no guia enviado. Confira sua correspondência com o formulário da disciplina antes de usar academicamente.</p><div class="timeline-wrap"><table class="table"><tbody>${fields.map(([name,key])=>`<tr><th scope="row" style="width:30%">${esc(name)}</th><td>${htmlLines(vfield(key)||'(vazio)')}</td></tr>`).join('')}</tbody></table></div></div>`;}
 function presentation(){const parts=[['1 min','Contexto',val('ambienteOrigem')||val('inquietacaoLivre')],['1,5 min','Quadro 1 · Referencial (M6)',recs('theories').map(r=>`${plain(r.conceito)}: ${plain(r.autor)}`).filter(Boolean).join('; ')],['3 min','Quadro 2 · Projeto (M9)',`Questão: ${val('pergunta')}\nObjetivo: ${val('objetivoGeral')}`],isArticle()?['2 min','Resultados e discussão',`${val('resultadosPorObjetivo')}\n${val('limitacoes')}`]:['2 min','Quadro 3 · PTT (M10)',`${val('tipoProduto')}\n${val('pttAvaliacao')}`],['0,5 min','Dúvida para a orientação',val('duvidaOrientacao')]];return `<section class="card white"><h3>Roteiro de apresentação: 8 minutos</h3><div class="fieldgroup">${parts.map(([tm,title,text])=>`<div class="card"><span class="tag">${esc(tm)}</span><h4>${esc(title)}</h4><p class="small">${htmlLines(text||'Campo ainda pendente')}</p></div>`).join('')}</div></section>`;}
 function renderLegacy(s){const keys={3:['descritores','basesProtocolo','sinteseRevisao','autoresConceitos'],4:['objetivosEspecificos'],5:['instrumentos','analiseEtica'],6:['publicoAplicabilidade','inovacaoImpacto','avaliacaoDeposito'],7:['introducao5Mov','cronogramaM11']}[s.id]||[];const matches=keys.filter(k=>val(k));if(!matches.length)return '';return `<div class="card warning"><h3>Conteúdo preservado da versão anterior</h3><p class="small">Estes campos resumidos foram encontrados em uma versão antiga. Não foram apagados, mas precisam ser distribuídos nos novos modelos estruturados. Copie e revise antes de eliminar qualquer dado.</p>${matches.map(k=>`<details><summary>${esc(k)}</summary><div class="example-text">${htmlLines(val(k))}</div></details>`).join('')}</div>`;}
-function renderPreencher(s){let body='';if(s.id===3){body=renderRepeat('searchBlocks')+renderRepeat('searchRuns')+renderRepeat('readings')+'<div class="group-title"><h3>M5 · Síntese crítica da revisão</h3></div>'+renderStandard(s)+renderRepeat('theories');}
+function renderPreencher(s){let body='';if(s.id===3){body=renderRepeat('searchBlocks')+renderRepeat('searchRuns')+renderRepeat('readings')+'<div class="group-title"><h3>Síntese crítica da revisão</h3></div>'+renderStandard(s)+renderRepeat('theories');}
   else if(s.id===4)body=renderStandard(s)+renderRepeat('objectives');
   else if(s.id===5)body=renderStandard(s)+renderMatrix();
   else if(s.id===7)body=renderStandard(s)+renderRepeat('timeline');
   else if(s.id===8)body=renderM9()+renderStandard(s)+renderRepeat('aiUse')+presentation();
   else body=renderStandard(s);
-  return `<div class="section-max section-gap"><div class="notice"><strong>Modo de elaboração:</strong> preencha com suas palavras. Com login, o guia fica salvo na sua conta; sem login, só neste navegador. O Backup gera uma cópia JSON. ${s.id===3?'Não confunda um resumo com um protocolo de revisão reproduzível.':''}</div>${renderLegacy(s)}${body}<div class="action-footer"><button class="btn" data-action="examples">Consultar exemplos</button><button class="btn blue" data-action="tab" data-tab="conferir">Conferir os critérios →</button></div></div>`;}
-function renderConferir(s){const p=info(s.id);const items=s.criteria.map((c,i)=>{const k=`${s.id}:${i}`;return `<div class="check-card"><input type="checkbox" id="check-${s.id}-${i}" data-check="${esc(k)}" ${state.criteria[k]?'checked':''}><div><label for="check-${s.id}-${i}">${esc(c)}</label><textarea class="check-note" rows="2" data-evidence="${esc(k)}" aria-label="Evidência ou justificativa para o critério ${i+1}" placeholder="Onde está a evidência? O que ainda precisa revisar?">${esc(state.evidence[k]||'')}</textarea></div></div>`;}).join('');
-const rev=state.reviews[s.id];return `<div class="section-max section-gap"><div class="card warning"><span class="eyebrow">Conferência formativa, não aprovação</span><p class="small">Assinale apenas quando conseguir localizar ou justificar a evidência. Campos e critérios preenchidos não garantem validade científica. Você pode avançar livremente e retornar depois.</p><div class="status-steps">${['Em elaboração','Preenchido','Autoverificado','Revisão externa registrada'].map((q,i)=>`<span class="status-step ${(i===0&&p.count>0)||(i===1&&p.complete)||(i===2&&p.complete&&p.allChecked)||(i===3&&rev&&rev.result==='revisado')?'on':''}">${q}</span>`).join('')}</div></div><h3>Checklist da etapa</h3><div class="small muted">Campos/modelos: ${p.count} de ${p.max} grupos preenchidos · Autoavaliação: ${s.criteria.filter((_,i)=>state.criteria[`${s.id}:${i}`]).length}/${s.criteria.length} critérios declarados.</div>${items}<div class="card"><h3>Revisão humana</h3>${rev?.stale?'<div class="notice">O conteúdo mudou desde o parecer registrado; a revisão precisa ser refeita.</div>':''}<p class="small">${rev?'Último registro: '+esc(rev.reviewer)+' · '+esc(rev.date)+': '+esc(rev.comment):'Nenhuma revisão externa registrada.'}</p><button class="btn tinybtn" data-action="review">Registrar parecer recebido</button><p class="test-note">O registro é informado pelo usuário e não comprova aprovação oficial da orientação ou banca.</p></div><div class="action-footer"><button class="btn" data-action="snapshot">Salvar uma versão recuperável</button><div class="flex"><button class="btn" data-action="jump" data-stage="${Math.max(1,s.id-1)}" ${s.id===1?'disabled':''}>← Etapa anterior</button><button class="btn blue" data-action="jump" data-stage="${Math.min(8,s.id+1)}">${s.id===8?'Revisar etapa final':'Próxima etapa →'}</button></div></div></div>`;}
-function markChanged(stageId){const deps=stageId===2?[2,4,5,6,7,8]:stageId===3?[3,4,5,6,7,8]:stageId===4?[4,5,6,7,8]:stageId===5?[5,6,7,8]:stageId===6?[6,7,8]:stageId===7?[7,8]:[stageId];let invalidated=false;for(const id of deps){for(let i=0;i<byStage(id).criteria.length;i++){const k=`${id}:${i}`;if(state.criteria[k]){state.criteria[k]=false;invalidated=true;}}if(state.reviews[id]&&!state.reviews[id].stale){state.reviews[id].stale=true;invalidated=true;}}if(invalidated)notify('Como houve alterações, os critérios ou pareceres relacionados precisam ser revistos.');}
-function render(){HOST.dataset.theme=temaDoSite();HOST.style.setProperty('--font',state.font);renderHeader();renderChain();renderStations();R.getElementById('stageBody').innerHTML=state.tab==='entender'?renderEntender(byStage(state.active)):state.tab==='preencher'?renderPreencher(byStage(state.active)):renderConferir(byStage(state.active));updateStatus();}
+  return `<div class="section-max section-gap"><div class="notice"><strong>Escreva no seu tempo:</strong> tudo o que você digita fica salvo automaticamente. Você pode sair e voltar depois sem perder nada.</div>${renderLegacy(s)}${body}<div class="action-footer"><button type="button" class="btn" data-action="examples">Ver exemplos prontos</button><button type="button" class="btn primary" data-action="tab" data-tab="conferir">Revisar e avançar →</button></div></div>`;}
+function renderConferir(s){const p=info(s.id);const items=s.criteria.map((c,i)=>{const k=`${s.id}:${i}`;return `<div class="check-card"><input type="checkbox" id="check-${s.id}-${i}" data-check="${esc(k)}" ${state.criteria[k]?'checked':''}><div><label for="check-${s.id}-${i}">${esc(c)}</label><textarea class="check-note" rows="2" data-evidence="${esc(k)}" aria-label="Anotação para o critério ${i+1}" placeholder="Anotação opcional (o que já está pronto ou o que falta revisar)…">${esc(state.evidence[k]||'')}</textarea></div></div>`;}).join('');
+const rev=state.reviews[s.id];return `<div class="section-max section-gap"><div class="card warning"><span class="eyebrow">Revisão pessoal desta etapa</span><p class="small" style="margin:6px 0">Marque cada item abaixo quando sentir que ele está bem resolvido no seu texto. Você pode avançar e voltar quando quiser.</p><div class="status-steps">${['Em andamento','Preenchida','Conferida','Revisão da orientação'].map((q,i)=>`<span class="status-step ${(i===0&&p.count>0)||(i===1&&p.complete)||(i===2&&p.complete&&p.allChecked)||(i===3&&rev&&rev.result==='revisado')?'on':''}">${q}</span>`).join('')}</div></div><h3>Lista de conferência</h3><div class="small muted">Preenchido: ${p.count} de ${p.max} blocos · Marcados: ${s.criteria.filter((_,i)=>state.criteria[`${s.id}:${i}`]).length} de ${s.criteria.length}</div>${items}<div class="card white"><h3>Comentário da orientação (opcional)</h3>${rev?.stale?'<div class="notice" style="margin-bottom:10px">Você editou esta etapa depois do último parecer registrado.</div>':''}<p class="small">${rev?'Último registro: '+esc(rev.reviewer)+' · '+esc(rev.date)+': '+esc(rev.comment):'Nenhum comentário registrado ainda.'}</p><button type="button" class="btn sm" data-action="review">Registrar comentário recebido</button></div><div class="action-footer"><button type="button" class="btn" data-action="snapshot">Guardar uma versão</button><div class="flex"><button type="button" class="btn" data-action="jump" data-stage="${Math.max(1,s.id-1)}" ${s.id===1?'disabled':''}>← Etapa anterior</button><button type="button" class="btn primary" data-action="jump" data-stage="${Math.min(8,s.id+1)}">${s.id===8?'Concluir revisão':'Ir para a Etapa '+Math.min(8,s.id+1)+' →'}</button></div></div></div>`;}
+function renderProjectBridge(){
+  const box=R.getElementById('projectBridge');if(!box)return;
+  const list=window.ScriptoriumProjetos?.listar()||[];
+  if(!list.length){box.hidden=true;return;}
+  const active=list[0];
+  const step=active.proximo_passo||{};
+  box.hidden=false;
+  box.innerHTML=`<div><strong>Seu artigo em andamento:</strong> ${esc(active.titulo||'Sem título')} · <span class="muted">${esc(step.titulo||'Em elaboração')}</span></div><button type="button" class="btn sm" data-action="open-articles">Abrir em Seus artigos →</button>`;
+}
+function markChanged(stageId){const deps=stageId===2?[2,4,5,6,7,8]:stageId===3?[3,4,5,6,7,8]:stageId===4?[4,5,6,7,8]:stageId===5?[5,6,7,8]:stageId===6?[6,7,8]:stageId===7?[7,8]:[stageId];let invalidated=false;for(const id of deps){for(let i=0;i<byStage(id).criteria.length;i++){const k=`${id}:${i}`;if(state.criteria[k]){state.criteria[k]=false;invalidated=true;}}if(state.reviews[id]&&!state.reviews[id].stale){state.reviews[id].stale=true;invalidated=true;}}if(invalidated)notify('Como houve alterações, revise os critérios relacionados quando puder.');}
+function render(){HOST.dataset.theme=temaDoSite();HOST.style.setProperty('--font',state.font);renderHeader();renderChain();renderStations();renderProjectBridge();R.getElementById('stageBody').innerHTML=state.tab==='entender'?renderEntender(byStage(state.active)):state.tab==='preencher'?renderPreencher(byStage(state.active)):renderConferir(byStage(state.active));updateStatus();}
 
-function modal(title,content,buttons=''){lastModalFocus=R.activeElement;R.getElementById('modalMount').innerHTML=`<div class="modal-wrap" id="modalBackdrop"><div class="modal" id="activeModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1"><div class="modal-header"><div id="modalTitle" class="modal-title">${esc(title)}</div><button class="btn tinybtn" data-action="close-modal" aria-label="Fechar janela">✕</button></div><div class="modal-content">${content}</div>${buttons?`<div class="modal-footer">${buttons}</div>`:''}</div></div>`;R.getElementById('activeModal').focus();}
+function modal(title,content,buttons=''){lastModalFocus=R.activeElement;R.getElementById('modalMount').innerHTML=`<div class="modal-wrap" id="modalBackdrop"><div class="modal" id="activeModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1"><div class="modal-header"><div id="modalTitle" class="modal-title">${esc(title)}</div><button type="button" class="btn sm" data-action="close-modal" aria-label="Fechar janela">✕</button></div><div class="modal-content">${content}</div>${buttons?`<div class="modal-footer">${buttons}</div>`:''}</div></div>`;R.getElementById('activeModal').focus();}
 function closeModal(){R.getElementById('modalMount').innerHTML='';if(lastModalFocus&&lastModalFocus.focus)lastModalFocus.focus();}
-function askConfirm(title,question,confirmText,onConfirm,danger=false){pendingConfirm=onConfirm;modal(title,`<p>${question}</p><p class="small muted">Os dados alterados podem ser recuperados pelas versões ou por backup, quando disponíveis.</p>`,`<button class="btn" data-action="close-modal">Cancelar</button><button class="btn ${danger?'danger':'blue'}" data-action="do-confirm">${esc(confirmText)}</button>`);}
+function askConfirm(title,question,confirmText,onConfirm,danger=false){pendingConfirm=onConfirm;modal(title,`<p>${esc(question)}</p><p class="small muted">Seus dados anteriores podem ser recuperados em "Versões salvas" ou por cópia de segurança.</p>`,`<button type="button" class="btn" data-action="close-modal">Cancelar</button><button type="button" class="btn ${danger?'danger':'primary'}" data-action="do-confirm">${esc(confirmText)}</button>`);}
 let pendingConfirm=null;
 function audit(){const arr=[];const put=(lvl,title,text,step)=>arr.push({lvl,title,text,step});const q=val('pergunta');const og=val('objetivoGeral');const tema=val('tema');
   if(!val('problema'))put('high','Problema sem descrição','Descreva sujeitos, contexto e evidências iniciais.',2);
@@ -453,16 +1205,16 @@ function audit(){const arr=[];const put=(lvl,title,text,step)=>arr.push({lvl,tit
   for(const s of STAGES)if(info(s.id).code==='empty')put('info',`Etapa ${s.id} não iniciada`,'É possível avançar livremente, mas ela precisa ser revisada antes da conclusão.',s.id);
   if(arr.length===0)put('good','Nenhuma pendência estrutural detectada','Isso não constitui validação científica. Confira a relevância, veracidade e coerência com a orientação.',8);
   return arr;}
-function auditHTML(){const list=audit();const high=list.filter(x=>x.lvl==='high').length;return `<div class="card warning"><strong>${high} pendência(s) estruturais de maior prioridade</strong><p class="small muted">Estas verificações analisam presença e padrões simples de texto. Não são uma avaliação semântica da pesquisa e não utilizam IA neste arquivo.</p></div><ul class="audit-list">${list.map(a=>`<li class="${a.lvl}"><strong>${esc(a.title)} ${badge('Etapa '+a.step)}</strong>${esc(a.text)} <button class="btn tinybtn ghost" data-action="jump" data-stage="${a.step}">Ir para etapa</button></li>`).join('')}</ul>`;}
-function openAudit(){modal('Conferência de coerência: indicadores locais',`<div class="modal-scroll">${auditHTML()}</div>`,`<button class="btn" data-action="close-modal">Fechar</button>`);}
-function glossaryModal(){const entries=[...EXTRA_GLOSSARY];modal('Dicionário de pesquisa',`<p class="small muted">Definições resumidas para orientar a leitura; consulte a literatura especializada para fundamentação.</p><div class="modal-scroll">${entries.map(([term,def])=>`<div class="card white" style="margin:8px 0"><strong>${esc(term)}</strong><p class="small" style="margin:6px 0 0">${esc(def)}</p></div>`).join('')}</div>`);}
-function helpModal(){modal('Como usar o guia',`<div class="section-gap"><p>O guia organiza a construção de um artigo (ou de um projeto de pesquisa) em oito etapas, sempre com <strong>Entender → Preencher → Conferir</strong>.</p><ol class="helper-list"><li>Comece pela preparação (Etapa 1) e avance até a validação final (Etapa 8).</li><li>Volte a qualquer etapa quando uma nova leitura alterar suas decisões.</li><li>Preencha modelos M1–M12; na Etapa 3, cada busca e cada trabalho têm um registro próprio.</li><li>Use “Conferir relações” para localizar possíveis omissões estruturais, sem presumir aprovação científica.</li><li>Escolha no topo se está construindo um artigo ou um projeto de pesquisa: as etapas 6 a 8 mudam conforme o tipo.</li><li>Use “Versões” para criar cópias recuperáveis; mantenha também backups JSON em lugar seguro.</li><li>Na exportação, gere síntese, projeto ou memorial; use o navegador para imprimir/salvar em PDF.</li></ol><div class="notice"><strong>Limites:</strong> o guia não usa IA; com login no Scriptorium, fica salvo na sua conta; sem login, só neste navegador. As regras da disciplina de origem (PPIE) devem ser adaptadas às exigências do programa do estudante, como o ProfEPT. M9 e M12 foram estruturados como adaptações porque os modelos integrais não constavam do material anexado.</div><p class="small muted">Dados locais podem ser perdidos ao limpar o armazenamento, mudar de dispositivo ou usar navegação privativa. A interface nunca substitui orientação, CEP ou banca.</p></div>`);}
-function examplesModal(){modal('Exemplos: visualização sem sobrescrever',`<p>Os exemplos originais da disciplina permanecem disponíveis como referência. Você pode consultar cada campo, sem inseri-los no projeto.</p><p class="small">Para testar uma demonstração, o botão abaixo preenche <strong>somente campos vazios</strong> com os exemplos existentes, preserva tudo o que você já escreveu e cria uma versão recuperável. Não há preenchimento automático de critérios de qualidade.</p><div class="card warning"><strong>Aviso:</strong> exemplos ilustrativos não devem ser utilizados como evidências científicas ou dados reais.</div>`,`<button class="btn" data-action="close-modal">Fechar</button><button class="btn blue" data-action="fill-examples">Inserir exemplos apenas nos campos vazios</button>`);}
-function fieldExampleModal(key){const f=STAGES.flatMap(s=>s.fields).find(x=>x.key===key);if(!f)return;modal('Exemplo · '+f.label,`<p class="small muted">Apenas um exemplo ilustrativo da atividade, não uma resposta científica validada.</p><div class="example-text">${esc(f.example||'Não há exemplo preparado para este campo. Use a orientação do próprio campo.')}</div>`,`<button class="btn" data-action="close-modal">Fechar</button>${f.example?`<button class="btn blue" data-action="insert-example" data-field="${esc(key)}">Inserir neste campo</button>`:''}`);}
-function versionModal(){const items=state.versions.slice().reverse();modal('Versões completas e recuperáveis',`<p class="small muted">Cada versão salva uma fotografia de campos, modelos, checklist e revisões. Isso é diferente do salvamento contínuo do rascunho. Limite local: ${MAX_VERSIONS} versões.</p><div class="card"><label for="versionNote" class="bold">Motivo da nova versão</label><input class="form-control" id="versionNote" placeholder="Ex.: pergunta revisada após leitura da literatura"><div style="margin-top:9px"><button class="btn blue tinybtn" data-action="save-version">Salvar versão agora</button></div></div><div class="modal-scroll" style="margin-top:13px">${items.length?items.map(x=>`<div class="card white" style="margin-bottom:10px"><div class="flex spread"><div><strong>${esc(x.label)}</strong> <span class="tag">${esc(x.date)}</span></div><button class="btn tinybtn" data-action="restore-version" data-version="${esc(x.id)}">Restaurar cópia</button></div><p class="small muted" style="margin-bottom:0">${esc(x.note||'Sem observações')} · ${x.stage?'Etapa '+x.stage:'Geral'}</p></div>`).join(''):'<p class="empty">Ainda não existem versões manuais.</p>'}</div>`,`<button class="btn" data-action="close-modal">Fechar</button>`);}
-function reviewModal(){const prev=state.reviews[state.active]||{};modal('Registrar parecer recebido',`<p class="small muted">Este registro é preenchido manualmente pelo estudante e não autentica uma aprovação acadêmica.</p><div class="fieldgroup"><div class="field"><label for="reviewer">Quem realizou a revisão?</label><input id="reviewer" class="form-control" value="${esc(prev.reviewer||'')}" placeholder="Docente, colega ou orientador(a)"></div><div class="field"><label for="reviewResult">Situação informada</label><select id="reviewResult" class="form-control"><option value="pendente">Há ajustes pendentes</option><option value="revisado" ${prev.result==='revisado'?'selected':''}>Revisão registrada</option></select></div><div class="field full"><label for="reviewComment">Comentários recebidos e providências</label><textarea id="reviewComment" rows="4">${esc(prev.comment||'')}</textarea></div></div>`,`<button class="btn" data-action="close-modal">Cancelar</button><button class="btn blue" data-action="save-review">Registrar parecer</button>`);}
-function backupModal(){let trash=null;try{trash=JSON.parse(localStorage.getItem(TRASH_KEY)||'null')}catch(e){}modal('Preservação e recuperação de dados',`<div class="section-gap"><div class="card warning"><strong>Onde seus dados ficam.</strong><p class="small">Com login no Scriptorium, o guia é salvo na sua conta e aparece em qualquer dispositivo. Sem login, fica só neste navegador e pode se perder ao limpar o navegador. O backup JSON vale nos dois casos.</p></div><div class="flex"><button class="btn blue" data-action="download-json">Baixar backup JSON completo</button><button class="btn" data-action="import-json">Restaurar de arquivo JSON</button></div><div class="card"><h3>Cópia local antes de limpar</h3><p class="small muted">${trash?'Última cópia temporária: '+esc(trash.date):'Nenhuma cópia na lixeira local.'}</p><div class="flex">${trash?'<button class="btn" data-action="restore-trash">Recuperar projeto anterior</button>':''}<button class="btn danger" data-action="reset-project">Limpar projeto…</button></div></div></div>`,`<button class="btn" data-action="close-modal">Fechar</button>`);}
-function settingsModal(){modal('Aparência e informações',`<p>Personalize a leitura. As preferências são locais.</p><div class="flex"><button class="btn" data-action="toggle-theme">Alternar tema claro/escuro</button><button class="btn" data-action="font-down">A−</button><button class="btn" data-action="font-reset">A</button><button class="btn" data-action="font-up">A+</button></div><div class="notice" style="margin-top:16px">O guia não usa IA: as conferências são regras simples e a decisão é sempre sua e da orientação.</div>`);}
+function auditHTML(){const list=audit();const high=list.filter(x=>x.lvl==='high').length;return `<div class="card warning"><strong>${high} pendência(s) estruturais de maior prioridade</strong><p class="small muted">Estas verificações analisam presença e padrões simples de texto. Não são uma avaliação semântica da pesquisa e não utilizam IA neste arquivo.</p></div><ul class="audit-list">${list.map(a=>`<li class="${a.lvl}"><strong>${esc(a.title)} ${badge('Etapa '+a.step)}</strong>${esc(a.text)} <button type="button" class="btn sm" data-action="jump" data-stage="${a.step}">Ir para etapa</button></li>`).join('')}</ul>`;}
+function openAudit(){modal('Conferência de coerência: indicadores locais',`<div class="modal-scroll">${auditHTML()}</div>`,`<button type="button" class="btn" data-action="close-modal">Fechar</button>`);}
+function glossaryModal(){const entries=[...EXTRA_GLOSSARY];modal('Dicionário de pesquisa',`<p class="small muted">Definições resumidas para orientar a leitura; consulte a literatura especializada para fundamentação.</p><div class="modal-scroll">${entries.map(([term,def])=>`<div class="card white" style="margin:8px 0"><strong>${esc(term)}</strong><p class="small" style="margin:6px 0 0">${esc(def)}</p></div>`).join('')}</div>`,`<button type="button" class="btn" data-action="close-modal">Fechar</button>`);}
+function helpModal(){modal('Como usar o guia',`<div class="section-gap"><p>O guia organiza a construção de um artigo (ou de um projeto de pesquisa) em oito etapas, sempre com <strong>Entender → Escrever → Conferir</strong>.</p><ol class="helper-list"><li>Comece pela preparação (Etapa 1) e avance até a validação final (Etapa 8).</li><li>Volte a qualquer etapa quando uma nova leitura alterar suas decisões.</li><li>Preencha modelos M1–M12; na Etapa 3, cada busca e cada trabalho têm um registro próprio.</li><li>Use “Conferir relações” para localizar possíveis omissões estruturais, sem presumir aprovação científica.</li><li>Escolha no topo se está construindo um artigo ou um projeto de pesquisa: as etapas 6 a 8 mudam conforme o tipo.</li><li>Use “Versões salvas” para criar cópias recuperáveis; mantenha também backups JSON em lugar seguro.</li><li>Na exportação, gere síntese, projeto ou memorial; use o navegador para imprimir/salvar em PDF.</li></ol><div class="notice"><strong>Limites:</strong> o guia não usa IA; com login no Scriptorium, fica salvo na sua conta; sem login, só neste navegador. As regras da disciplina de origem (PPIE) devem ser adaptadas às exigências do programa do estudante, como o ProfEPT. M9 e M12 foram estruturados como adaptações porque os modelos integrais não constavam do material anexado.</div><p class="small muted">Dados locais podem ser perdidos ao limpar o armazenamento, mudar de dispositivo ou usar navegação privativa. A interface nunca substitui orientação, CEP ou banca.</p></div>`,`<button type="button" class="btn primary" data-action="close-modal">Entendi</button>`);}
+function examplesModal(){modal('Exemplos prontos (sem apagar o que você escreveu)',`<p>Os exemplos originais da disciplina servem apenas como referência. Você pode consultar cada campo sem inseri-los no seu texto.</p><p class="small">Se quiser testar uma demonstração, o botão abaixo preenche <strong>somente campos vazios</strong>, preserva tudo o que você já escreveu e cria uma versão recuperável.</p><div class="card warning"><strong>Aviso:</strong> exemplos ilustrativos não devem ser usados como evidências científicas ou dados reais.</div>`,`<button type="button" class="btn" data-action="close-modal">Fechar</button><button type="button" class="btn primary" data-action="fill-examples">Inserir apenas nos campos vazios</button>`);}
+function fieldExampleModal(key){const f=STAGES.flatMap(s=>s.fields).find(x=>x.key===key);if(!f)return;modal('Exemplo · '+f.label,`<p class="small muted">Apenas um exemplo ilustrativo da atividade, não uma resposta científica validada.</p><div class="example-text">${esc(f.example||'Não há exemplo preparado para este campo. Use a orientação do próprio campo.')}</div>`,`<button type="button" class="btn" data-action="close-modal">Fechar</button>${f.example?`<button type="button" class="btn primary" data-action="insert-example" data-field="${esc(key)}">Inserir neste campo</button>`:''}`);}
+function versionModal(){const items=state.versions.slice().reverse();modal('Versões completas e recuperáveis',`<p class="small muted">Cada versão salva uma fotografia de campos, modelos, checklist e revisões. Limite local: ${MAX_VERSIONS} versões.</p><div class="card"><label for="versionNote" class="bold">Motivo da nova versão</label><input class="form-control" id="versionNote" placeholder="Ex.: pergunta revisada após leitura da literatura"><div style="margin-top:10px"><button type="button" class="btn sm primary" data-action="save-version">Salvar versão agora</button></div></div><div class="modal-scroll" style="margin-top:14px">${items.length?items.map(x=>`<div class="card white" style="margin-bottom:10px"><div class="flex spread"><div><strong>${esc(x.label)}</strong> <span class="tag">${esc(x.date)}</span></div><button type="button" class="btn sm" data-action="restore-version" data-version="${esc(x.id)}">Restaurar cópia</button></div><p class="small muted" style="margin-bottom:0">${esc(x.note||'Sem observações')} · ${x.stage?'Etapa '+x.stage:'Geral'}</p></div>`).join(''):'<p class="empty">Ainda não existem versões manuais.</p>'}</div>`,`<button type="button" class="btn" data-action="close-modal">Fechar</button>`);}
+function reviewModal(){const prev=state.reviews[state.active]||{};modal('Registrar parecer recebido',`<p class="small muted">Este registro é preenchido manualmente por você e serve como histórico da orientação.</p><div class="fieldgroup"><div class="field"><label for="reviewer">Quem realizou a revisão?</label><input id="reviewer" class="form-control" value="${esc(prev.reviewer||'')}" placeholder="Docente, colega ou orientador(a)"></div><div class="field"><label for="reviewResult">Situação informada</label><select id="reviewResult" class="form-control"><option value="pendente">Há ajustes pendentes</option><option value="revisado" ${prev.result==='revisado'?'selected':''}>Revisão registrada</option></select></div><div class="field full"><label for="reviewComment">Comentários recebidos e providências</label><textarea id="reviewComment" rows="4">${esc(prev.comment||'')}</textarea></div></div>`,`<button type="button" class="btn" data-action="close-modal">Cancelar</button><button type="button" class="btn primary" data-action="save-review">Registrar parecer</button>`);}
+function backupModal(){let trash=null;try{trash=JSON.parse(localStorage.getItem(TRASH_KEY)||'null')}catch(e){}modal('Cópia de segurança e recuperação',`<div class="section-gap"><div class="card warning"><strong>Onde seus dados ficam.</strong><p class="small" style="margin:6px 0 0">Com login no Scriptorium, o guia é salvo na sua conta e aparece em qualquer dispositivo. Sem login, fica só neste navegador e pode se perder ao limpar o histórico. O backup JSON funciona nos dois casos.</p></div><div class="flex"><button type="button" class="btn primary" data-action="download-json">Baixar cópia JSON</button><button type="button" class="btn" data-action="import-json">Restaurar de arquivo JSON</button></div><div class="card"><h3>Cópia local antes de limpar</h3><p class="small muted">${trash?'Última cópia temporária: '+esc(trash.date):'Nenhuma cópia na lixeira local.'}</p><div class="flex">${trash?'<button type="button" class="btn" data-action="restore-trash">Recuperar projeto anterior</button>':''}<button type="button" class="btn danger" data-action="reset-project">Limpar projeto…</button></div></div></div>`,`<button type="button" class="btn" data-action="close-modal">Fechar</button>`);}
+function settingsModal(){modal('Tamanho da letra e leitura',`<p class="small muted">Ajuste o tamanho da letra do guia para ficar mais confortável para ler. O tema claro/escuro é controlado pelo botão no topo do Scriptorium.</p><div class="flex"><button type="button" class="btn" data-action="font-down">Diminuir letra (A−)</button><button type="button" class="btn" data-action="font-reset">Tamanho normal</button><button type="button" class="btn primary" data-action="font-up">Aumentar letra (A+)</button></div><div class="notice" style="margin-top:16px">Este guia não usa IA: as conferências são regras simples de apoio e a decisão é sempre sua e da orientação.</div>`,`<button type="button" class="btn" data-action="close-modal">Fechar</button>`);}
 function readableField(f){const v=val(f.key);return `<section><h3>${esc(f.label)}</h3><div class="print-p">${htmlLines(v||'[Não preenchido]')}</div></section>`;}
 function recordPrint(name){const c=REPEAT[name];return `<section><h2>${esc(c.model)} · ${esc(c.title)}</h2>${recs(name).length?recs(name).map((r,i)=>`<div class="print-box"><h3>Registro ${i+1}</h3>${c.fields.map(([key,label])=>`<p class="print-p"><strong>${esc(label)}:</strong> ${htmlLines(r[key]||'(vazio)')}</p>`).join('')}</div>`).join(''):'<p class="empty">Nenhum registro preenchido.</p>'}</section>`;}
 function m9HTML(){return renderM9().replace(/class="card white"/g,'class="print-box"');}
@@ -472,30 +1224,33 @@ function exportContent(kind){let result=`<div class="small">Scriptorium MPIE · 
   if(kind==='projeto'){result+=`<h2>Identificação</h2>`+byStage(1).fields.map(readableField).join('');const sections=[['Título','tituloFinal'],['Introdução','sec_introducao'],['Revisão de literatura','sec_revisao'],['Justificativa','sec_justificativa'],['Objetivos','sec_objetivos'],['Referencial teórico','sec_referencial'],['Metodologia','sec_metodologia'],['Produto técnico-tecnológico','sec_produto'],['Referências','sec_referencias']];result+=sections.map(([name,key])=>`<section><h2>${esc(name)}</h2><div class="print-p">${htmlLines(val(key)||'[Não preenchido]')}</div></section>`).join('')+recordPrint('timeline');return result;}
   for(const s of STAGES){result+=`<section><h2>Etapa ${s.id}: ${esc(s.title)}</h2><p class="small">Estado: ${esc(info(s.id).label)}. Modelos: ${esc(s.models)}.</p>`+s.fields.map(readableField).join('');for(const [key,c] of Object.entries(REPEAT))if(c.stage===s.id)result+=recordPrint(key);if(s.id===5){const obs=recs('objectives');result+='<h2>M8 · Matriz metodológica</h2>'+obs.map(o=>`<div class="print-box"><h3>${esc(o.texto)}</h3>${Object.entries((state.records.methodLinks||{})[o.id]||{}).map(([key,v])=>`<p><strong>${esc(key)}:</strong> ${htmlLines(v)}</p>`).join('')}</div>`).join('');}if(s.id===8)result+=m9HTML();}
   result+='<h2>Campos herdados da versão anterior</h2>'+Object.entries(state.values).filter(([k,v])=>['descritores','basesProtocolo','sinteseRevisao','autoresConceitos','objetivosEspecificos','instrumentos','analiseEtica','publicoAplicabilidade','inovacaoImpacto','avaliacaoDeposito','introducao5Mov','cronogramaM11'].includes(k)&&plain(v)).map(([k,v])=>`<p><strong>${esc(k)}:</strong> ${htmlLines(v)}</p>`).join('')+'<h2>Versões registradas</h2>'+state.versions.map(x=>`<p>${esc(x.date)} · ${esc(x.label)} · ${esc(x.note||'')}</p>`).join('');result+='<h2>Alertas estruturais</h2>'+audit().map(x=>`<p>[${esc(x.lvl)}] Etapa ${x.step}: ${esc(x.title)}: ${esc(x.text)}</p>`).join('');return result;}
-function exportModal(){modal('Exportar os resultados',`<p>Escolha o documento. A opção “Imprimir / PDF” utiliza o comando de impressão do navegador. Selecione <strong>Salvar como PDF</strong> nas opções de destino.</p><div class="field"><label for="exportKind">Formato do documento</label><select id="exportKind" class="form-control"><option value="resumo">${isArticle()?'Resumo para a orientação: referencial, síntese, resultados e apresentação':'Resumo acadêmico: M6, M9, M10 e apresentação'}</option><option value="projeto">${isArticle()?'Artigo: seções na ordem da revista':'Projeto acadêmico: seções e cronograma'}</option><option value="memorial">Memorial completo: modelos, decisões e lacunas</option></select></div><div class="notice" style="margin-top:12px">A exportação organiza o conteúdo registrado pelo estudante. Não cria seções nem inventa fontes, dados ou conclusões.</div>`,`<button class="btn" data-action="download-text">Baixar texto</button><button class="btn" data-action="download-html">Baixar documento HTML</button><button class="btn blue" data-action="print-document">Imprimir / PDF</button>`);}
+function exportModal(){modal('Exportar ou imprimir',`<p>Escolha o formato abaixo. Na opção “Imprimir / PDF”, selecione <strong>Salvar como PDF</strong> na janela de impressão do navegador.</p><div class="field"><label for="exportKind">Formato do documento</label><select id="exportKind" class="form-control"><option value="resumo">${isArticle()?'Resumo para a orientação: referencial, síntese, resultados e apresentação':'Resumo acadêmico: M6, M9, M10 e apresentação'}</option><option value="projeto">${isArticle()?'Artigo: seções na ordem da revista':'Projeto acadêmico: seções e cronograma'}</option><option value="memorial">Memorial completo: modelos, decisões e lacunas</option></select></div><div class="notice" style="margin-top:12px">A exportação organiza apenas o conteúdo que você registrou. Não cria seções nem inventa fontes, dados ou conclusões.</div>`,`<button type="button" class="btn" data-action="download-text">Baixar texto (.txt)</button><button type="button" class="btn" data-action="download-html">Baixar página (.html)</button><button type="button" class="btn primary" data-action="print-document">Imprimir / PDF</button>`);}
 function download(filename,text,mime){const blob=new Blob([text],{type:mime});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(u)},500);}
 function exportKind(){return R.getElementById('exportKind')?.value||'resumo';}
 function textExport(kind){const div=document.createElement('div');div.innerHTML=exportContent(kind);function walk(node){if(node.nodeType===3)return node.nodeValue||'';if(node.nodeType!==1)return '';const tag=node.tagName.toLowerCase();if(tag==='br')return '\n';const inner=Array.from(node.childNodes).map(walk).join('');if(tag==='td'||tag==='th')return inner.trim()+' | ';if(tag==='tr')return inner+'\n';if(['h1','h2','h3','p','section','div'].includes(tag))return inner+'\n';return inner;}return walk(div).replace(/\n[ \t]+/g,'\n').replace(/\n{3,}/g,'\n\n').trim();}
-function standaloneDoc(kind){return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Pesquisa Guiada: ${kind}</title><style>body{font:16px/1.55 Georgia,serif;max-width:900px;margin:2rem auto;padding:0 1rem}h1,h2{color:#172f60}h2{border-bottom:1px solid #ddd}h3{font-size:1.08rem}section{break-inside:avoid-page}.print-p{white-space:pre-wrap}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;text-align:left;padding:8px}.print-box{border:1px solid #ddd;padding:12px;margin:12px 0} @media print{body{margin:0;max-width:none}}</style></head><body>${exportContent(kind)}</body></html>`;}
+function standaloneDoc(kind){return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Guia de escrita: ${esc(kind)}</title><style>body{font:16px/1.55 Georgia,serif;max-width:900px;margin:2rem auto;padding:0 1rem}h1,h2{color:#1466B8}h2{border-bottom:1px solid #ddd}h3{font-size:1.08rem}section{break-inside:avoid-page}.print-p{white-space:pre-wrap}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;text-align:left;padding:8px}.print-box{border:1px solid #ddd;padding:12px;margin:12px 0} @media print{body{margin:0;max-width:none}}</style></head><body>${exportContent(kind)}</body></html>`;}
 function printDoc(kind){R.getElementById('printArea').innerHTML=exportContent(kind);closeModal();setTimeout(()=>(document.body.classList.add('imprimindo-guia'),window.print()),100);}
 function downloadBackup(){flush();const data={format:'scriptorium-pesquisa-guiada',schema:2,exportedAt:new Date().toISOString(),state:copy(state)};download('pesquisa-guiada-backup-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(data,null,2),'application/json;charset=utf-8');notify('Backup JSON baixado. Guarde-o fora deste navegador.');}
 function migrateImported(obj){if(obj?.format==='scriptorium-pesquisa-guiada'&&obj.schema===2&&obj.state?.values&&obj.state?.records)return obj.state;
   if(obj?.values&&obj?.checks){const s=emptyState();s.values=obj.values;s.criteria=obj.checks;s.active=obj.activeStage||1;return s;}throw Error('Arquivo sem formato reconhecido.');}
 function doImport(file){if(!file)return;if(file.size>8*1024*1024){notify('Backup acima do limite de 8 MB.');return;}const reader=new FileReader();reader.onload=()=>{try{const candidate=migrateImported(JSON.parse(reader.result));askConfirm('Importar backup','O backup substituirá o projeto que está aberto. Uma cópia do estado atual será guardada na lixeira local. Deseja continuar?','Importar backup',()=>{safeTrash();const preserved=state.theme,font=state.font;state={...emptyState(),...candidate};state.theme=preserved;state.font=font;state.active=Math.min(8,Math.max(1,Number(state.active)||1));if(flush()){closeModal();render();notify('Backup importado. Revise os modelos estruturados e os campos.');}else{notify('Falha ao gravar backup importado: exporte os dados.');}},true);}catch(e){notify('Falha na importação: '+e.message);}};reader.readAsText(file,'utf-8');}
 function safeTrash(){try{localStorage.setItem(TRASH_KEY,JSON.stringify({date:dateNow(),state:copy(state)}));return true}catch(e){savingError=true;updateStatus();return false;}}
-function restoreVersion(id){const ver=state.versions.find(v=>v.id===id);if(!ver||!ver.snapshot)return;askConfirm('Restaurar versão',`Restaurar a cópia de ${esc(ver.date)} (“${esc(ver.label)}”)? O estado atual será antes registrado como versão recuperável.`,'Restaurar',()=>{snapshot('Antes de restaurar '+ver.label,state.active,'Snapshot automático de segurança.');const oldVersions=state.versions;const oldTheme=state.theme,oldFont=state.font;Object.assign(state,copy(ver.snapshot));state.versions=oldVersions;state.theme=oldTheme;state.font=oldFont;flush();closeModal();render();notify('Versão restaurada e estado anterior preservado.');});}
+function restoreVersion(id){const ver=state.versions.find(v=>v.id===id);if(!ver||!ver.snapshot)return;askConfirm('Restaurar versão',`Restaurar a cópia de ${ver.date} (“${ver.label}”)? O estado atual será guardado antes como versão recuperável.`,'Restaurar',()=>{snapshot('Antes de restaurar '+ver.label,state.active,'Snapshot automático de segurança.');const oldVersions=state.versions;const oldTheme=state.theme,oldFont=state.font;Object.assign(state,copy(ver.snapshot));state.versions=oldVersions;state.theme=oldTheme;state.font=oldFont;flush();closeModal();render();notify('Versão restaurada e estado anterior preservado.');});}
 function fillExamplesEmpty(){const count=STAGES.reduce((a,s)=>a+s.fields.filter(f=>f.example&&!val(f.key)).length,0);askConfirm('Inserir exemplos','Inserir até '+count+' exemplos somente nos campos que estão vazios? Campos já preenchidos e checklists serão preservados. Os exemplos são ilustrativos e não podem ser usados como evidência científica.','Inserir apenas nos vazios',()=>{snapshot('Antes de inserir exemplos',state.active,'Cópia preventiva.');markChanged(state.active);for(const s of STAGES)for(const f of s.fields)if(f.example&&!val(f.key))state.values[f.key]=f.example;flush();closeModal();render();notify('Exemplos inseridos somente nos campos vazios.');});}
 function actionHandler(btn){const a=btn.dataset.action;const rec=btn.dataset.rec,item=btn.dataset.item;
+  const openMenu=btn.closest('details.more-menu');if(openMenu)openMenu.open=false;
+  if(a==='set-tipo'){const tipo=btn.dataset.tipo;if(tipo===state.tipo)return;for(const id of [6,7,8])for(const k of Object.keys(state.criteria))if(k.startsWith(id+':'))delete state.criteria[k];state.tipo=tipo;applyMode();scheduleSave();render();notify(tipo==='artigo'?'Modo Artigo científico selecionado (etapas 6 a 8 adaptadas).':'Modo Projeto de pesquisa selecionado (etapas 6 a 8 com produto e cronograma).');return;}
+  if(a==='open-articles'){window.ScriptoriumNavegar?.('3');return;}
   if(a==='tab'){state.tab=btn.dataset.tab;flush();render();return;}
-  if(a==='jump'){state.active=Math.min(8,Math.max(1,Number(btn.dataset.stage)||1));state.tab='entender';flush();closeModal();render();HOST.scrollIntoView({behavior:'smooth',block:'start'});return;}
+  if(a==='jump'){state.active=Math.min(8,Math.max(1,Number(btn.dataset.stage)||1));state.tab='entender';flush();closeModal();render();R.getElementById('stageSheet')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
   if(a==='glossary'){glossaryModal();return;}if(a==='help'){helpModal();return;}if(a==='examples'){examplesModal();return;}if(a==='versions'){versionModal();return;}if(a==='audit'){openAudit();return;}if(a==='export'){exportModal();return;}if(a==='backup'){backupModal();return;}if(a==='settings'){settingsModal();return;}
   if(a==='close-modal'){closeModal();return;}if(a==='do-confirm'){const fn=pendingConfirm;pendingConfirm=null;if(fn)fn();return;}
   if(a==='field-example'){fieldExampleModal(btn.dataset.field);return;}
   if(a==='insert-example'){const f=STAGES.flatMap(s=>s.fields).find(f=>f.key===btn.dataset.field);if(!f||!f.example)return;const fill=()=>{snapshot('Antes de inserir exemplo',state.active,'Cópia preventiva.');markChanged(state.active);state.values[f.key]=f.example;flush();closeModal();render();notify('Exemplo inserido. Revise o texto antes de utilizá-lo.');};if(isFilled(f.key))askConfirm('Confirmar substituição','O campo já contém texto. Substituí-lo pelo exemplo? Uma versão será preservada antes da alteração.','Substituir campo',fill,true);else fill();return;}
   if(a==='fill-examples'){fillExamplesEmpty();return;}
   if(a==='add-rec'){markChanged(state.active);state.records[rec]=recs(rec);state.records[rec].push({id:uid()});scheduleSave();render();const details=R.querySelector(`#repeat-${rec} details:last-of-type`);if(details)details.open=true;return;}
-  if(a==='remove-rec'){askConfirm('Remover registro','Remover este registro de '+esc(REPEAT[rec]?.model||'modelo')+'? Será criada uma versão recuperável antes da remoção.','Remover registro',()=>{snapshot('Antes de remover registro',state.active,'Cópia preventiva.');markChanged(state.active);state.records[rec]=recs(rec).filter(r=>r.id!==item);flush();closeModal();render();notify('Registro removido; versão anterior preservada.');},true);return;}
-  if(a==='snapshot'){modal('Guardar versão recuperável',`<label for="snapshotNote" class="bold">Qual foi a principal mudança?</label><input id="snapshotNote" class="form-control" placeholder="Ex.: revisão da pergunta após fichamentos">`,`<button class="btn" data-action="close-modal">Cancelar</button><button class="btn blue" data-action="save-version">Salvar versão</button>`);return;}
+  if(a==='remove-rec'){askConfirm('Remover registro','Remover este registro de '+(REPEAT[rec]?.model||'modelo')+'? Será criada uma versão recuperável antes da remoção.','Remover registro',()=>{snapshot('Antes de remover registro',state.active,'Cópia preventiva.');markChanged(state.active);state.records[rec]=recs(rec).filter(r=>r.id!==item);flush();closeModal();render();notify('Registro removido; versão anterior preservada.');},true);return;}
+  if(a==='snapshot'){modal('Guardar versão recuperável',`<label for="snapshotNote" class="bold">Qual foi a principal mudança?</label><input id="snapshotNote" class="form-control" placeholder="Ex.: revisão da pergunta após fichamentos">`,`<button type="button" class="btn" data-action="close-modal">Cancelar</button><button type="button" class="btn primary" data-action="save-version">Salvar versão</button>`);return;}
   if(a==='save-version'){const note=plain(R.getElementById('versionNote')?.value||R.getElementById('snapshotNote')?.value);snapshot('Versão '+(state.versions.length+1),state.active,note||'Cópia manual sem descrição');flush();versionModal();notify('Versão completa guardada no histórico.');return;}
   if(a==='restore-version'){restoreVersion(btn.dataset.version);return;}
   if(a==='review'){reviewModal();return;}
@@ -503,8 +1258,8 @@ function actionHandler(btn){const a=btn.dataset.action;const rec=btn.dataset.rec
   if(a==='toggle-theme'){state.theme=state.theme==='dark'?'light':'dark';flush();render();settingsModal();return;}
   if(a==='font-up'||a==='font-down'||a==='font-reset'){state.font=a==='font-reset'?1:Math.max(.88,Math.min(1.3,+(state.font+(a==='font-up'?.08:-.08)).toFixed(2)));flush();render();settingsModal();return;}
   if(a==='download-json'){downloadBackup();return;}if(a==='import-json'){R.getElementById('importJSON').click();return;}
-  if(a==='restore-trash'){let old;try{old=JSON.parse(localStorage.getItem(TRASH_KEY)||'null')}catch(e){}if(!old?.state)return;askConfirm('Recuperar projeto anterior','Restaurar a cópia local de '+esc(old.date)+'? O atual será preservado na lixeira antes de restaurar.','Restaurar cópia',()=>{const oldState=copy(old.state);safeTrash();state={...emptyState(),...oldState};flush();closeModal();render();notify('Cópia anterior restaurada.');});return;}
-  if(a==='reset-project'){modal('Confirmar limpeza do projeto',`<p>Para limpar os campos, digite <strong>APAGAR</strong>. O sistema tentará guardar antes uma cópia local recuperável. <strong>Baixe um backup JSON</strong> para maior segurança.</p><label for="resetInput">Confirmação</label><input class="form-control" id="resetInput" autocomplete="off" placeholder="Digite APAGAR">`,`<button class="btn" data-action="close-modal">Cancelar</button><button class="btn danger" data-action="reset-final">Limpar e preservar cópia local</button>`);return;}
+  if(a==='restore-trash'){let old;try{old=JSON.parse(localStorage.getItem(TRASH_KEY)||'null')}catch(e){}if(!old?.state)return;askConfirm('Recuperar projeto anterior','Restaurar a cópia local de '+old.date+'? O atual será preservado na lixeira antes de restaurar.','Restaurar cópia',()=>{const oldState=copy(old.state);safeTrash();state={...emptyState(),...oldState};flush();closeModal();render();notify('Cópia anterior restaurada.');});return;}
+  if(a==='reset-project'){modal('Confirmar limpeza do projeto',`<p>Para limpar os campos, digite <strong>APAGAR</strong>. O sistema tentará guardar antes uma cópia local recuperável. <strong>Baixe um backup JSON</strong> para maior segurança.</p><label for="resetInput">Confirmação</label><input class="form-control" id="resetInput" autocomplete="off" placeholder="Digite APAGAR">`,`<button type="button" class="btn" data-action="close-modal">Cancelar</button><button type="button" class="btn danger" data-action="reset-final">Limpar e preservar cópia local</button>`);return;}
   if(a==='reset-final'){if(plain(R.getElementById('resetInput')?.value)!=='APAGAR'){notify('Digite APAGAR para confirmar.');return;}if(!safeTrash()){notify('A cópia preventiva falhou. Baixe um backup antes de limpar.');return;}const theme=state.theme,font=state.font;state=emptyState();state.theme=theme;state.font=font;flush();closeModal();render();notify('Novo projeto iniciado. Cópia anterior disponível na área Backup.');return;}
   if(a==='download-text'){const kind=exportKind();download('pesquisa-guiada-'+kind+'.txt',textExport(kind),'text/plain;charset=utf-8');return;}
   if(a==='download-html'){const kind=exportKind();download('pesquisa-guiada-'+kind+'.html',standaloneDoc(kind),'text/html;charset=utf-8');return;}
@@ -575,11 +1330,9 @@ const GuiaApp={
     state={...emptyState(),...remote};lastKnownWrite=state.changedAt||0;try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}applyMode();render();},
   refresh(){updateStatus();}
 };
-R.getElementById('tipoTrabalho').addEventListener('change',e=>{const tipo=e.target.value;if(tipo===state.tipo)return;
-  for(const id of [6,7,8])for(const k of Object.keys(state.criteria))if(k.startsWith(id+':'))delete state.criteria[k];
-  state.tipo=tipo;applyMode();scheduleSave();render();notify(tipo==='artigo'?'Guia de artigo: as etapas 6 a 8 tratam de resultados, escrita e submissão.':'Guia de projeto: etapas 6 a 8 com produto, escrita do projeto e validação (M1 a M12).');});
 load();applyMode();if(!lastKnownWrite&&!savingError)persist();render();
 const CONTA=window.ScriptoriumConta;if(CONTA){NUVEM.conta(CONTA.usuario());CONTA.aoMudar(u=>NUVEM.conta(u));}
+window.ScriptoriumProjetos?.aoMudar(()=>renderProjectBridge());
 
 }
 window.ScriptoriumGuia={montar};
