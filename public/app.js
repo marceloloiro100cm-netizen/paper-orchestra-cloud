@@ -1539,7 +1539,58 @@ function articleCard(p) {
   const open = el('button', 'Ver etapas', 'btn alt'); open.type = 'button'; open.setAttribute('aria-expanded', 'false');
   const detail = document.createElement('div'); detail.className = 'mcp-detail'; detail.hidden = true;
   open.addEventListener('click', () => openMcpProject(p, detail, open));
-  actions.append(open); head.append(info, actions); card.append(head);
+  const shareBtn = el('button', p.tem_link_orientacao ? 'Link da orientação (ativo)' : 'Compartilhar com orientador(a)', 'btn alt');
+  shareBtn.type = 'button'; shareBtn.setAttribute('aria-expanded', 'false');
+  const shareBox = document.createElement('div'); shareBox.className = 'advisor-box'; shareBox.hidden = true;
+  shareBtn.addEventListener('click', () => {
+    const show = shareBox.hidden;
+    shareBox.hidden = !show;
+    shareBtn.setAttribute('aria-expanded', String(show));
+    if (show && !shareBox.dataset.ready) {
+      shareBox.dataset.ready = '1';
+      shareBox.append(el('p', 'Gere um link temporário (somente leitura) para seu orientador acompanhar etapas, conferências e referências sem precisar criar conta. Você pode revogar quando quiser.', 'subtle'));
+      const noteIn = document.createElement('input');
+      noteIn.type = 'text'; noteIn.maxLength = 600;
+      noteIn.placeholder = 'Recado ou dúvida opcional para a orientação (ex.: confira se a metodologia está alinhada)';
+      noteIn.style.marginBottom = '8px';
+      const row = document.createElement('div'); row.className = 'actions'; row.style.margin = '0';
+      const st = el('span', p.tem_link_orientacao ? `Link ativo (expira em ${new Date(p.link_orientacao_expira).toLocaleDateString('pt-BR')}).` : '', 'subtle');
+      const urlOut = document.createElement('input'); urlOut.type = 'text'; urlOut.readOnly = true; urlOut.className = 'hidden'; urlOut.style.marginTop = '8px';
+      const genBtn = el('button', p.tem_link_orientacao ? 'Gerar novo link (14 dias)' : 'Gerar link de leitura (14 dias)', 'btn'); genBtn.type = 'button';
+      const copyBtn = el('button', 'Copiar link', 'btn alt hidden'); copyBtn.type = 'button';
+      const revBtn = el('button', 'Revogar link', 'btn alt'); revBtn.type = 'button';
+      if (!p.tem_link_orientacao) revBtn.classList.add('hidden');
+      genBtn.addEventListener('click', async () => {
+        genBtn.disabled = true; st.textContent = 'Gerando link seguro…';
+        try {
+          const data = await (await request(`/mcp-conta/projetos/${p.projeto}/orientacao/link`, {
+            method: 'POST', body: JSON.stringify({ dias: 14, nota: noteIn.value.trim() }),
+          })).json();
+          urlOut.value = data.url; urlOut.classList.remove('hidden'); copyBtn.classList.remove('hidden'); revBtn.classList.remove('hidden');
+          shareBtn.textContent = 'Link da orientação (ativo)';
+          st.textContent = `✓ Link criado! Válido até ${new Date(data.expira_em).toLocaleDateString('pt-BR')}.`;
+        } catch (e) { st.textContent = e.message; }
+        finally { genBtn.disabled = false; }
+      });
+      copyBtn.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(urlOut.value); st.textContent = '✓ Link copiado! Agora é só enviar para o(a) orientador(a).'; }
+        catch (_) { urlOut.select(); st.textContent = 'Selecione e copie o link acima.'; }
+      });
+      revBtn.addEventListener('click', async () => {
+        revBtn.disabled = true;
+        try {
+          await request(`/mcp-conta/projetos/${p.projeto}/orientacao/link`, { method: 'DELETE' });
+          urlOut.value = ''; urlOut.classList.add('hidden'); copyBtn.classList.add('hidden'); revBtn.classList.add('hidden');
+          shareBtn.textContent = 'Compartilhar com orientador(a)';
+          st.textContent = 'Link revogado. Ninguém mais consegue abrir o endereço anterior.';
+        } catch (e) { st.textContent = e.message; }
+        finally { revBtn.disabled = false; }
+      });
+      row.append(genBtn, copyBtn, revBtn, st);
+      shareBox.append(noteIn, row, urlOut);
+    }
+  });
+  actions.append(shareBtn, open); head.append(info, actions); card.append(head, shareBox);
 
   const step = p.proximo_passo;
   if (step) {
@@ -2314,8 +2365,109 @@ if (typeof auth.authStateReady === 'function') {
   });
 }
 
+// Onda 3: glossário contextual inline, tour acolhedor de 3 passos e visão pública para orientação.
+const INLINE_GLOSSARY = {
+  doi: 'DOI (Identificador Digital de Objeto): é como o "CPF" de um artigo científico (ex.: 10.1590/...). Quando existe, o Scriptorium busca os dados oficiais automaticamente sem erros.',
+  bibtex: 'BibTeX (.bib): é um arquivo simples de texto que guarda os dados das referências (autor, título, ano, revista) para montar a bibliografia ABNT automaticamente.',
+  parafrase: 'Paráfrase é explicar a ideia do autor com as suas próprias palavras (mantendo a citação). Citação direta copia o trecho entre aspas, palavra por palavra.',
+  proveniencia: 'Proveniência: é o relatório transparente que comprova quais fontes sustentam o texto e se houve revisão em conversa independente — muito útil para a orientação e a banca.',
+  word: 'Word (.docx): arquivo editável em padrão ABNT (Times New Roman 12, espaçamento 1,5) para seu orientador comentar com Controle de Alterações no Word ou Google Docs.',
+};
+for (const btn of document.querySelectorAll('[data-glossary]')) {
+  btn.addEventListener('click', () => {
+    const pop = $('glossary-pop'); if (!pop) return;
+    const key = btn.dataset.glossary;
+    const isSame = btn.getAttribute('aria-expanded') === 'true';
+    for (const b of document.querySelectorAll('[data-glossary]')) b.setAttribute('aria-expanded', 'false');
+    if (isSame) { pop.classList.add('hidden'); return; }
+    btn.setAttribute('aria-expanded', 'true');
+    pop.textContent = INLINE_GLOSSARY[key] || '';
+    pop.classList.remove('hidden');
+  });
+}
+function syncWelcomeTour(uid) {
+  const tour = $('welcome-tour'); if (!tour || !uid) return;
+  try {
+    const seen = localStorage.getItem('scriptorium_tour_seen_' + uid) === '1';
+    tour.classList.toggle('hidden', seen);
+  } catch (_) {}
+}
+$('welcome-tour-dismiss')?.addEventListener('click', () => {
+  $('welcome-tour')?.classList.add('hidden');
+  if (user?.uid) { try { localStorage.setItem('scriptorium_tour_seen_' + user.uid, '1'); } catch (_) {} }
+});
+
+async function loadAdvisorShareView() {
+  const token = new URLSearchParams(location.search).get('orientacao');
+  if (!token) return false;
+  const view = $('advisor-share-view'), body = $('adv-view-body');
+  if (!view || !body) return false;
+  view.classList.remove('hidden');
+  $('login-panel')?.classList.add('hidden');
+  $('workspace')?.classList.add('hidden');
+  $('session-restoring')?.classList.add('hidden');
+  $('adv-view-print')?.addEventListener('click', () => window.print());
+  try {
+    const res = await fetch('/api/orientacao/' + encodeURIComponent(token));
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      $('adv-view-title').textContent = 'Link indisponível';
+      body.textContent = err.detail || 'Este link de orientação expirou ou foi revogado pelo estudante.';
+      return true;
+    }
+    const d = await res.json();
+    $('adv-view-title').textContent = d.titulo || 'Trabalho acadêmico';
+    $('adv-view-meta').textContent = `${d.tipo || 'Texto acadêmico'} · ${d.pdf_final ? 'Versão final (todas as travas aprovadas)' : 'Em elaboração / rascunho'} · link válido até ${new Date(d.expira_em).toLocaleDateString('pt-BR')}`;
+    body.replaceChildren();
+    if (d.nota_estudante) {
+      const note = document.createElement('div'); note.className = 'advisor-box'; note.style.marginBottom = '14px';
+      note.append(el('strong', 'Recado / dúvida do estudante: '), document.createTextNode(d.nota_estudante));
+      body.append(note);
+    }
+    if (d.pergunta) {
+      body.append(el('h3', 'Pergunta e recorte do trabalho'), el('p', d.pergunta));
+    }
+    if ((d.etapas || []).length) {
+      body.append(el('h3', 'Andamento das etapas'));
+      const ul = document.createElement('ul');
+      for (const e of d.etapas) {
+        ul.append(el('li', `${e.status === 'aceita' ? '✓' : '○'} ${e.titulo}${e.independencia === 'outra_ia' ? ' (revisado por outra IA)' : ''}`));
+      }
+      body.append(ul);
+    }
+    if ((d.provas || []).length) {
+      body.append(el('h3', 'O que o Scriptorium conferiu'));
+      const ul = document.createElement('ul');
+      for (const p of d.provas) ul.append(el('li', p));
+      body.append(ul);
+    }
+    body.append(el('h3', `Referências confirmadas (${(d.referencias_confirmadas || []).length})`));
+    if ((d.referencias_confirmadas || []).length) {
+      const ul = document.createElement('ul');
+      for (const r of d.referencias_confirmadas) ul.append(el('li', `${r.autor ? r.autor + ' · ' : ''}${r.titulo || r.chave}${r.ano ? ' (' + r.ano + ')' : ''}`));
+      body.append(ul);
+    } else {
+      body.append(el('p', 'Nenhuma referência confirmada ainda.', 'subtle'));
+    }
+    if ((d.referencias_pendentes || []).length) {
+      body.append(el('h3', `Referências ainda pendentes de conferência (${d.referencias_pendentes.length})`));
+      const ul = document.createElement('ul');
+      for (const r of d.referencias_pendentes) ul.append(el('li', `${r.titulo || r.chave} (${r.nivel})`));
+      body.append(ul);
+    }
+  } catch (e) {
+    $('adv-view-title').textContent = 'Não foi possível carregar';
+    body.textContent = 'Verifique a conexão e tente recarregar a página.';
+  }
+  return true;
+}
+const IS_ADVISOR_SHARE = new URLSearchParams(location.search).has('orientacao');
+if (IS_ADVISOR_SHARE) { loadAdvisorShareView(); }
+
 onAuthStateChanged(auth, async (current) => {
+  if (IS_ADVISOR_SHARE) return;
   user = current;
+  syncWelcomeTour(current?.uid);
   $('session-restoring')?.classList.add('hidden');
   // Guia de escrita: mesma conta do site; com login, a aba do guia substitui o botão do cabeçalho.
   window.ScriptoriumConta?.definir(current);

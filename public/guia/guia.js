@@ -619,16 +619,23 @@ const MARKUP=`
 
     <div class="guide-top-meta">
       <span id="saveStatus" class="status-bar" role="status" aria-live="polite">Carregando…</span>
-      <div class="progress-wrap">
-        <span id="projectInfo">0/8 etapas preenchidas</span>
-        <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="flex" style="gap:14px">
+        <div class="segmented" role="radiogroup" aria-label="Nível de apoio durante a escrita">
+          <button type="button" class="seg-btn" id="supInicial" role="radio" aria-checked="true" data-action="set-support" data-level="inicial">Apoio inicial</button>
+          <button type="button" class="seg-btn" id="supInter" role="radio" aria-checked="false" data-action="set-support" data-level="intermediario">Intermediário</button>
+          <button type="button" class="seg-btn" id="supAuto" role="radio" aria-checked="false" data-action="set-support" data-level="autonomo">Autônomo</button>
+        </div>
+        <div class="progress-wrap">
+          <span id="projectInfo">0/8 etapas preenchidas</span>
+          <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        </div>
       </div>
     </div>
 
     <div id="projectBridge" class="project-bridge" hidden></div>
 
-    <details class="tools-menu">
-      <summary>Mais ferramentas (dicionário, exemplos, versões e tamanho da letra) ▾</summary>
+    <details class="tools-menu" id="toolsMenu">
+      <summary aria-expanded="false">Mais ferramentas (dicionário, exemplos, versões e tamanho da letra) ▾</summary>
       <div class="tools-menu-grid">
         <button type="button" class="btn sm" data-action="audit">Conferir coerência</button>
         <button type="button" class="btn sm" data-action="examples">Ver exemplos prontos</button>
@@ -1021,11 +1028,11 @@ const plain=s=>String(s??'').trim();
 const val=k=>plain(state.values[k]);
 const isFilled=k=>Boolean(val(k));
 const copy=o=>JSON.parse(JSON.stringify(o));
-function emptyState(){return {schema:2,tipo:'artigo',active:1,tab:'entender',theme:'light',font:1,values:{},records:{},criteria:{},evidence:{},reviews:{},versions:[],changedAt:Date.now(),startedAt:Date.now()};}
+function emptyState(){return {schema:2,tipo:'artigo',active:1,tab:'entender',theme:'light',font:1,supportLevel:'inicial',values:{},records:{},criteria:{},evidence:{},decisions:{},reviews:{},versions:[],changedAt:Date.now(),startedAt:Date.now()};}
 let state=emptyState(), saveTimer=null, savingError=false, writeConflict=false, lastKnownWrite=0, toastTimer=null, lastModalFocus=null, lastAutosnap=0;
 function load(){try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){const got=JSON.parse(raw);if(got&&got.schema===2&&got.values&&got.records){state={...emptyState(),...got};lastKnownWrite=state.changedAt||0;return;}}}catch(e){savingError=true;}
   try{const old=localStorage.getItem(OLD_KEY);if(old){const orig=JSON.parse(old);state.values={...orig.values};state.criteria={...orig.checks};state.active=Math.min(8,Math.max(1,Number(orig.activeStage)||1));state.tab=orig.subTab||'entender';state.theme=orig.theme||'light';state.font=orig.fontScale||1;state.versions.push({id:uid(),label:'Migração de campos antigos',date:dateNow(),stage:0,snapshot:snap(),note:'Migração preliminar dos campos da versão 1, mantendo os dados originais intactos. Revise os novos modelos estruturados.'});persist();}}catch(e){/* usuário poderá usar importação manual */}}
-function snap(){return copy({values:state.values,records:state.records,criteria:state.criteria,evidence:state.evidence,reviews:state.reviews});}
+function snap(){return copy({values:state.values,records:state.records,criteria:state.criteria,evidence:state.evidence,decisions:state.decisions||{},reviews:state.reviews});}
 function snapshot(label='Cópia manual',stage=state.active,note=''){state.versions.push({id:uid(),label,date:dateNow(),stage,note,snapshot:snap()});if(state.versions.length>MAX_VERSIONS)state.versions=state.versions.slice(-MAX_VERSIONS);return state.versions[state.versions.length-1];}
 function persist(){try{const stored=localStorage.getItem(STORAGE_KEY);if(stored){const x=JSON.parse(stored);if(x.changedAt>lastKnownWrite){writeConflict=true;savingError=true;updateStatus();return false;}}if(writeConflict){savingError=true;updateStatus();return false;}state.changedAt=Date.now();localStorage.setItem(STORAGE_KEY,JSON.stringify(state));lastKnownWrite=state.changedAt;savingError=false;if(NUVEM)NUVEM.agendar();updateStatus();return true;}catch(e){savingError=true;updateStatus();return false;}}
 function scheduleSave(){const s=R.getElementById('saveStatus');if(s)s.textContent='● Alterações locais ainda não gravadas…';clearTimeout(saveTimer);saveTimer=setTimeout(persist,320);}
@@ -1121,16 +1128,31 @@ function renderEntender(s){
     </div>
   </div>`;
 }
+function supportLevel(){return ['inicial','intermediario','autonomo'].includes(state.supportLevel)?state.supportLevel:'inicial';}
+function syncSupportUI(){
+  const lvl=supportLevel();
+  [['supInicial','inicial'],['supInter','intermediario'],['supAuto','autonomo']].forEach(([id,k])=>{
+    const el=R.getElementById(id);if(!el)return;
+    el.classList.toggle('active',lvl===k);el.setAttribute('aria-checked',String(lvl===k));
+  });
+}
 function renderInputControl(field,v,context={}){
   const key=field.key,typ=field.type||'textarea';
+  const lvl=supportLevel();
   const att=context.rec?`data-rec="${esc(context.rec)}" data-item="${esc(context.item)}" data-key="${esc(key)}"`:`data-field="${esc(key)}"`;
   const id=`ctrl-${context.rec||'simple'}-${context.item||'s'}-${key}`.replace(/[^a-zA-Z0-9_-]/g,'-');
   const hintId=`hint-${id}`;const hint=context.rec?'':field.plainHint;
   let input='';
   if(typ==='select'){input=`<select id="${id}" ${att} aria-describedby="${hintId}"><option value="">Escolha uma opção…</option>${(field.options||[]).map(o=>`<option value="${esc(o)}" ${v===o?'selected':''}>${esc(o)}</option>`).join('')}</select>`;}
-  else if(typ==='textarea'){input=`<textarea id="${id}" ${att} rows="${context.rec?3:4}" aria-describedby="${hintId}" placeholder="${esc(field.placeholder||'Escreva aqui com suas palavras…')}">${esc(v)}</textarea>`;}
-  else{input=`<input id="${id}" ${att} type="${['date','month','number','text'].includes(typ)?typ:'text'}" value="${esc(v)}" aria-describedby="${hintId}" placeholder="${esc(field.placeholder||'')}">`;}
-  return `<div class="field"><div class="field-label"><label for="${id}">${esc(field.label)}</label>${!context.rec&&field.example?`<button class="btn sm" data-action="field-example" data-field="${esc(key)}" type="button">Ver exemplo</button>`:''}</div><p id="${hintId}" class="hint">${esc(hint||'Escreva com suas palavras, sem pressa: você pode editar depois.')}</p>${input}</div>`;
+  else if(typ==='textarea'){input=`<textarea id="${id}" ${att} rows="${context.rec?3:4}" aria-describedby="${hintId}" placeholder="${esc(lvl==='autonomo'?'Escreva aqui…':(field.placeholder||'Escreva aqui com suas palavras…'))}">${esc(v)}</textarea>`;}
+  else{input=`<input id="${id}" ${att} type="${['date','month','number','text'].includes(typ)?typ:'text'}" value="${esc(v)}" aria-describedby="${hintId}" placeholder="${esc(lvl==='autonomo'?'':(field.placeholder||''))}">`;}
+  const tools=[];
+  if(!context.rec&&lvl!=='autonomo'&&hint)tools.push(`<button class="btn sm ghost" data-action="field-hint" data-field="${esc(key)}" type="button">Pista</button>`);
+  if(!context.rec&&lvl!=='autonomo'&&field.example)tools.push(`<button class="btn sm" data-action="field-example" data-field="${esc(key)}" type="button">${lvl==='inicial'?'Ver exemplo':'Exemplo'}</button>`);
+  const hintMarkup=lvl==='inicial'
+    ?`<p id="${hintId}" class="hint">${esc(hint||'Escreva com suas palavras, sem pressa: você pode editar depois.')}</p>`
+    :`<p id="${hintId}" class="hint sr-only">${esc(hint||'Campo de escrita autoral.')}</p>`;
+  return `<div class="field"><div class="field-label"><label for="${id}">${esc(field.label)}</label>${tools.length?`<div class="flex" style="gap:6px">${tools.join('')}</div>`:''}</div>${hintMarkup}${input}</div>`;
 }
 function renderStandard(s,onlyKeys=null){let fields=s.fields;if(onlyKeys)fields=fields.filter(f=>onlyKeys.includes(f.key));const body=fields.map(f=>renderInputControl(f,state.values[f.key]||'')).join('');return `<div class="fieldgroup">${body}</div>`;}
 function renderRepeat(name){
@@ -1158,7 +1180,7 @@ function renderPreencher(s){let body='';if(s.id===3){body=renderRepeat('searchBl
   else body=renderStandard(s);
   return `<div class="section-max section-gap"><div class="notice"><strong>Escreva no seu tempo:</strong> tudo o que você digita fica salvo automaticamente. Você pode sair e voltar depois sem perder nada.</div>${renderLegacy(s)}${body}<div class="action-footer"><button type="button" class="btn" data-action="examples">Ver exemplos prontos</button><button type="button" class="btn primary" data-action="tab" data-tab="conferir">Revisar e avançar →</button></div></div>`;}
 function renderConferir(s){const p=info(s.id);const items=s.criteria.map((c,i)=>{const k=`${s.id}:${i}`;return `<div class="check-card"><input type="checkbox" id="check-${s.id}-${i}" data-check="${esc(k)}" ${state.criteria[k]?'checked':''}><div><label for="check-${s.id}-${i}">${esc(c)}</label><textarea class="check-note" rows="2" data-evidence="${esc(k)}" aria-label="Anotação para o critério ${i+1}" placeholder="Anotação opcional (o que já está pronto ou o que falta revisar)…">${esc(state.evidence[k]||'')}</textarea></div></div>`;}).join('');
-const rev=state.reviews[s.id];return `<div class="section-max section-gap"><div class="card warning"><span class="eyebrow">Revisão pessoal desta etapa</span><p class="small" style="margin:6px 0">Marque cada item abaixo quando sentir que ele está bem resolvido no seu texto. Você pode avançar e voltar quando quiser.</p><div class="status-steps">${['Em andamento','Preenchida','Conferida','Revisão da orientação'].map((q,i)=>`<span class="status-step ${(i===0&&p.count>0)||(i===1&&p.complete)||(i===2&&p.complete&&p.allChecked)||(i===3&&rev&&rev.result==='revisado')?'on':''}">${q}</span>`).join('')}</div></div><h3>Lista de conferência</h3><div class="small muted">Preenchido: ${p.count} de ${p.max} blocos · Marcados: ${s.criteria.filter((_,i)=>state.criteria[`${s.id}:${i}`]).length} de ${s.criteria.length}</div>${items}<div class="card white"><h3>Comentário da orientação (opcional)</h3>${rev?.stale?'<div class="notice" style="margin-bottom:10px">Você editou esta etapa depois do último parecer registrado.</div>':''}<p class="small">${rev?'Último registro: '+esc(rev.reviewer)+' · '+esc(rev.date)+': '+esc(rev.comment):'Nenhum comentário registrado ainda.'}</p><button type="button" class="btn sm" data-action="review">Registrar comentário recebido</button></div><div class="action-footer"><button type="button" class="btn" data-action="snapshot">Guardar uma versão</button><div class="flex"><button type="button" class="btn" data-action="jump" data-stage="${Math.max(1,s.id-1)}" ${s.id===1?'disabled':''}>← Etapa anterior</button><button type="button" class="btn primary" data-action="jump" data-stage="${Math.min(8,s.id+1)}">${s.id===8?'Concluir revisão':'Ir para a Etapa '+Math.min(8,s.id+1)+' →'}</button></div></div></div>`;}
+const rev=state.reviews[s.id];const dec=(state.decisions||{})[s.id]||'';return `<div class="section-max section-gap"><div class="card warning"><span class="eyebrow">Revisão pessoal desta etapa</span><p class="small" style="margin:6px 0">Marque cada item abaixo quando sentir que ele está bem resolvido no seu texto. Você pode avançar e voltar quando quiser.</p><div class="status-steps">${['Em andamento','Preenchida','Conferida','Revisão da orientação'].map((q,i)=>`<span class="status-step ${(i===0&&p.count>0)||(i===1&&p.complete)||(i===2&&p.complete&&p.allChecked)||(i===3&&rev&&rev.result==='revisado')?'on':''}">${q}</span>`).join('')}</div></div><h3>Lista de conferência</h3><div class="small muted">Preenchido: ${p.count} de ${p.max} blocos · Marcados: ${s.criteria.filter((_,i)=>state.criteria[`${s.id}:${i}`]).length} de ${s.criteria.length}</div>${items}<div class="card white"><span class="eyebrow">Aprendizagem visível (opcional)</span><h3 style="margin-top:4px">Por que tomei estas decisões nesta etapa?</h3><p class="small muted">Explique em 2 ou 3 linhas por que escolheu este recorte, autor ou método. Isso fortalece sua autoria e ajuda na reunião de orientação e na banca.</p><textarea class="form-control" rows="3" data-decision="${s.id}" aria-label="Justificativa das decisões da etapa ${s.id}" placeholder="Ex.: escolhi este método porque permite acompanhar a turma real durante um semestre…">${esc(dec)}</textarea></div><div class="card white"><h3>Comentário da orientação (opcional)</h3>${rev?.stale?'<div class="notice" style="margin-bottom:10px">Você editou esta etapa depois do último parecer registrado.</div>':''}<p class="small">${rev?'Último registro: '+esc(rev.reviewer)+' · '+esc(rev.date)+': '+esc(rev.comment):'Nenhum comentário registrado ainda.'}</p><button type="button" class="btn sm" data-action="review">Registrar comentário recebido</button></div><div class="action-footer"><button type="button" class="btn" data-action="snapshot">Guardar uma versão</button><div class="flex"><button type="button" class="btn" data-action="jump" data-stage="${Math.max(1,s.id-1)}" ${s.id===1?'disabled':''}>← Etapa anterior</button><button type="button" class="btn primary" data-action="jump" data-stage="${Math.min(8,s.id+1)}">${s.id===8?'Concluir revisão':'Ir para a Etapa '+Math.min(8,s.id+1)+' →'}</button></div></div></div>`;}
 function buildGuidePlan(){
   const titulo=val('tituloFinal')||val('tituloProvisorio')||val('tema');
   const obs=recs('objectives').map((o,i)=>plain(o.texto)?`${i+1}. ${plain(o.texto)}`:'').filter(Boolean);
@@ -1190,18 +1212,38 @@ function renderProjectBridge(){
   box.innerHTML=`${left}<div class="flex">${btns.join('')}</div>`;
 }
 function markChanged(stageId){const deps=stageId===2?[2,4,5,6,7,8]:stageId===3?[3,4,5,6,7,8]:stageId===4?[4,5,6,7,8]:stageId===5?[5,6,7,8]:stageId===6?[6,7,8]:stageId===7?[7,8]:[stageId];let invalidated=false;for(const id of deps){for(let i=0;i<byStage(id).criteria.length;i++){const k=`${id}:${i}`;if(state.criteria[k]){state.criteria[k]=false;invalidated=true;}}if(state.reviews[id]&&!state.reviews[id].stale){state.reviews[id].stale=true;invalidated=true;}}if(invalidated)notify('Como houve alterações, revise os critérios relacionados quando puder.');}
-function render(){HOST.dataset.theme=temaDoSite();HOST.style.setProperty('--font',state.font);renderHeader();renderChain();renderStations();renderProjectBridge();R.getElementById('stageBody').innerHTML=state.tab==='entender'?renderEntender(byStage(state.active)):state.tab==='preencher'?renderPreencher(byStage(state.active)):renderConferir(byStage(state.active));updateStatus();}
+function render(){HOST.dataset.theme=temaDoSite();HOST.style.setProperty('--font',state.font);syncSupportUI();renderHeader();renderChain();renderStations();renderProjectBridge();R.getElementById('stageBody').innerHTML=state.tab==='entender'?renderEntender(byStage(state.active)):state.tab==='preencher'?renderPreencher(byStage(state.active)):renderConferir(byStage(state.active));updateStatus();}
 
 function modal(title,content,buttons=''){lastModalFocus=R.activeElement;R.getElementById('modalMount').innerHTML=`<div class="modal-wrap" id="modalBackdrop"><div class="modal" id="activeModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1"><div class="modal-header"><div id="modalTitle" class="modal-title">${esc(title)}</div><button type="button" class="btn sm" data-action="close-modal" aria-label="Fechar janela">✕</button></div><div class="modal-content">${content}</div>${buttons?`<div class="modal-footer">${buttons}</div>`:''}</div></div>`;R.getElementById('activeModal').focus();}
 function closeModal(){R.getElementById('modalMount').innerHTML='';if(lastModalFocus&&lastModalFocus.focus)lastModalFocus.focus();}
 function askConfirm(title,question,confirmText,onConfirm,danger=false){pendingConfirm=onConfirm;modal(title,`<p>${esc(question)}</p><p class="small muted">Seus dados anteriores podem ser recuperados em "Versões salvas" ou por cópia de segurança.</p>`,`<button type="button" class="btn" data-action="close-modal">Cancelar</button><button type="button" class="btn ${danger?'danger':'primary'}" data-action="do-confirm">${esc(confirmText)}</button>`);}
 let pendingConfirm=null;
+function keyTerms(text){
+  const stop=new Set(['sobre','entre','como','qual','quais','para','pelo','pela','pelos','pelas','com','sem','uma','uns','umas','dos','das','nos','nas','este','esta','esse','essa','isto','isso','mais','menos','pode','podem','medida','maneira','forma','pesquisa','estudo','analisar','compreender','investigar','avaliar','identificar']);
+  return [...new Set((text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(/[^a-z0-9]+/).filter(w=>w.length>=5&&!stop.has(w)))];
+}
+function fieldHintModal(key){
+  const st=STAGES.find(s=>s.fields.some(f=>f.key===key));
+  const f=st?.fields.find(x=>x.key===key);if(!f)return;
+  const qs=(st?.guidingQuestions||[]).slice(0,2);
+  modal('Pista para pensar · '+f.label,
+    `<div class="card"><span class="eyebrow">Passo 1: pense com suas palavras</span><p class="small" style="margin:6px 0 0">${esc(f.plainHint||'Escreva uma primeira versão curta e simples.')}</p></div>${qs.length?`<div class="card white" style="margin-top:12px"><h4>Perguntas que ajudam a destravar</h4><ul class="helper-list">${qs.map(q=>`<li>${esc(q)}</li>`).join('')}</ul></div>`:''}`,
+    `<button type="button" class="btn" data-action="close-modal">Voltar e escrever</button>${f.example?`<button type="button" class="btn primary" data-action="field-example" data-field="${esc(key)}">Quero ver um exemplo</button>`:''}`);
+}
 function audit(){const arr=[];const put=(lvl,title,text,step)=>arr.push({lvl,title,text,step});const q=val('pergunta');const og=val('objetivoGeral');const tema=val('tema');
   if(!val('problema'))put('high','Problema sem descrição','Descreva sujeitos, contexto e evidências iniciais.',2);
   if(q&&/^(é |existe |há |pode |funciona |vale |será )/i.test(q))put('warn','Questão possivelmente binária','Reformule para investigação aberta, quando pertinente ao desenho.',2);
   if(!q)put('high','Questão ausente','A questão de pesquisa deve orientar as etapas posteriores.',2);
   if(tema.split(/\s+/).filter(Boolean).length>8)put('warn','Tema extenso','Prefira expressão curta em vez de título completo.',2);
   if(!val('indiciosProblema'))put('warn','Indícios da situação não registrados','Diferencie inquietação pessoal de evidências documentadas.',2);
+  if(q&&og){
+    const qt=keyTerms(q), ot=new Set(keyTerms(og));
+    const shared=qt.filter(w=>ot.has(w)).length;
+    if(qt.length>=3&&shared/qt.length<0.25)put('warn','Possível desalinhamento entre Pergunta e Objetivo Geral','Os termos centrais da pergunta (Etapa 2) quase não aparecem no objetivo geral (Etapa 4). Verifique se atingir o objetivo realmente responde à pergunta e registre sua decisão.',4);
+  }
+  if(val('estrategia')&&/(estudo de caso|pesquisa-a[cç][aã]o|dbr|design-based)/i.test(val('estrategia'))&&!val('participantes')){
+    put('warn','Estratégia empírica sem participantes definidos','A estratégia escolhida envolve pessoas ou contexto real, mas o campo de participantes ainda está vazio na Etapa 5.',5);
+  }
   if(recs('searchRuns').length===0)put('high','Protocolo da revisão ausente','Registre buscas com base, data, expressão, filtros e seleção (M3).',3);
   const rr=recs('readings').filter(r=>plain(r.referencia)&&plain(r.metodo)&&plain(r.resultados));if(rr.length<5)put('warn','Leitura aprofundada insuficiente para o guia','A disciplina recomenda pelo menos cinco trabalhos centrais registrados no M4.',3);
   if(recs('theories').filter(r=>plain(r.autor)&&plain(r.conceito)).length<2)put('warn','Referencial não hierarquizado','Indique pelo menos dois autores/conceitos centrais e suas funções analíticas.',3);
@@ -1240,7 +1282,7 @@ function readableField(f){const v=val(f.key);return `<section><h3>${esc(f.label)
 function recordPrint(name){const c=REPEAT[name];return `<section><h2>${esc(c.model)} · ${esc(c.title)}</h2>${recs(name).length?recs(name).map((r,i)=>`<div class="print-box"><h3>Registro ${i+1}</h3>${c.fields.map(([key,label])=>`<p class="print-p"><strong>${esc(label)}:</strong> ${htmlLines(r[key]||'(vazio)')}</p>`).join('')}</div>`).join(''):'<p class="empty">Nenhum registro preenchido.</p>'}</section>`;}
 function m9HTML(){return renderM9().replace(/class="card white"/g,'class="print-box"');}
 function exportContent(kind){let result=`<div class="small">Scriptorium MPIE · Guia de escrita · Gerado em ${esc(dateNow())}</div><h1>${kind==='resumo'?'Resumo para a orientação: M6, M9 e M10':kind==='projeto'?(isArticle()?'Artigo: versão de trabalho':'Projeto de pesquisa: versão de trabalho'):'Memorial formativo de decisões'}</h1><p class="small">Conteúdo autoral registrado no guia. Campos não preenchidos são indicados. Revisão acadêmica não substituída.</p>`;
-  if(kind==='resumo'){result+=`<h2>Quadro 1: Referencial (M6)</h2>`+recs('theories').map((x,i)=>`<p class="print-p">${i+1}. ${esc(x.conceito)}: ${esc(x.autor)} · ${esc(x.aspecto)}</p>`).join('')+`<h2>Quadro 2: Projeto (M9, síntese adaptada)</h2>`+m9HTML()+(isArticle()?`<h2>Resultados e discussão</h2>`:`<h2>Quadro 3: Produto (M10)</h2>`)+byStage(6).fields.map(readableField).join('')+`<h2>Roteiro de apresentação</h2>`+presentation();return result;}
+  if(kind==='resumo'){const decs=STAGES.map(s=>(state.decisions||{})[s.id]?`<p class="print-p"><strong>Etapa ${s.id} (${esc(STAGE_LABELS[s.id])}):</strong> ${htmlLines(state.decisions[s.id])}</p>`:'').filter(Boolean).join('');result+=`<h2>Quadro 1: Referencial (M6)</h2>`+recs('theories').map((x,i)=>`<p class="print-p">${i+1}. ${esc(x.conceito)}: ${esc(x.autor)} · ${esc(x.aspecto)}</p>`).join('')+`<h2>Quadro 2: Projeto (M9, síntese adaptada)</h2>`+m9HTML()+(isArticle()?`<h2>Resultados e discussão</h2>`:`<h2>Quadro 3: Produto (M10)</h2>`)+byStage(6).fields.map(readableField).join('')+(decs?`<h2>Justificativas metodológicas do estudante</h2>`+decs:'')+`<h2>Roteiro de apresentação</h2>`+presentation();return result;}
   if(kind==='projeto'&&isArticle()){const sections=[['Título','tituloFinal'],['Resumo','sec_resumo'],['Palavras-chave','palavrasChave'],['Introdução','sec_introducao'],['Revisão de literatura','sec_revisao'],['Referencial teórico','sec_referencial'],['Metodologia','sec_metodologia'],['Resultados','sec_resultados'],['Discussão','sec_discussao'],['Considerações finais','sec_conclusao'],['Referências','sec_referencias']];result+=`<p class="small">Revista-alvo: ${esc(val('revistaAlvo')||'não definida')}</p>`+sections.map(([name,key])=>`<section><h2>${esc(name)}</h2><div class="print-p">${htmlLines(val(key)||'[Não preenchido]')}</div></section>`).join('');return result;}
   if(kind==='projeto'){result+=`<h2>Identificação</h2>`+byStage(1).fields.map(readableField).join('');const sections=[['Título','tituloFinal'],['Introdução','sec_introducao'],['Revisão de literatura','sec_revisao'],['Justificativa','sec_justificativa'],['Objetivos','sec_objetivos'],['Referencial teórico','sec_referencial'],['Metodologia','sec_metodologia'],['Produto técnico-tecnológico','sec_produto'],['Referências','sec_referencias']];result+=sections.map(([name,key])=>`<section><h2>${esc(name)}</h2><div class="print-p">${htmlLines(val(key)||'[Não preenchido]')}</div></section>`).join('')+recordPrint('timeline');return result;}
   for(const s of STAGES){result+=`<section><h2>Etapa ${s.id}: ${esc(s.title)}</h2><p class="small">Estado: ${esc(info(s.id).label)}. Modelos: ${esc(s.models)}.</p>`+s.fields.map(readableField).join('');for(const [key,c] of Object.entries(REPEAT))if(c.stage===s.id)result+=recordPrint(key);if(s.id===5){const obs=recs('objectives');result+='<h2>M8 · Matriz metodológica</h2>'+obs.map(o=>`<div class="print-box"><h3>${esc(o.texto)}</h3>${Object.entries((state.records.methodLinks||{})[o.id]||{}).map(([key,v])=>`<p><strong>${esc(key)}:</strong> ${htmlLines(v)}</p>`).join('')}</div>`).join('');}if(s.id===8)result+=m9HTML();}
@@ -1261,6 +1303,8 @@ function fillExamplesEmpty(){const count=STAGES.reduce((a,s)=>a+s.fields.filter(
 function actionHandler(btn){const a=btn.dataset.action;const rec=btn.dataset.rec,item=btn.dataset.item;
   const openMenu=btn.closest('details.more-menu');if(openMenu)openMenu.open=false;
   if(a==='set-tipo'){const tipo=btn.dataset.tipo;if(tipo===state.tipo)return;for(const id of [6,7,8])for(const k of Object.keys(state.criteria))if(k.startsWith(id+':'))delete state.criteria[k];state.tipo=tipo;applyMode();scheduleSave();render();notify(tipo==='artigo'?'Modo Artigo científico selecionado (etapas 6 a 8 adaptadas).':'Modo Projeto de pesquisa selecionado (etapas 6 a 8 com produto e cronograma).');return;}
+  if(a==='set-support'){const lvl=btn.dataset.level;if(!['inicial','intermediario','autonomo'].includes(lvl)||lvl===state.supportLevel)return;state.supportLevel=lvl;scheduleSave();render();notify(lvl==='inicial'?'Apoio inicial ativado: dicas, pistas e exemplos visíveis.':lvl==='intermediario'?'Apoio intermediário: pistas sob demanda antes de exemplos.':'Modo autônomo: sem dicas automáticas, ideal para praticar sozinho.');return;}
+  if(a==='field-hint'){fieldHintModal(btn.dataset.field);return;}
   if(a==='open-articles'){window.ScriptoriumNavegar?.('3');return;}
   if(a==='send-to-project'){const plan=buildGuidePlan();if(!plan.titulo&&!plan.pergunta){notify('Preencha pelo menos o tema ou a pergunta antes de levar o plano.');return;}window.ScriptoriumPonteGuia?.enviar(plan);return;}
   if(a==='tab'){state.tab=btn.dataset.tab;flush();render();return;}
@@ -1292,7 +1336,9 @@ R.addEventListener('click',ev=>{const btn=ev.target.closest('[data-action]');if(
 R.addEventListener('input',ev=>{const el=ev.target;if(el.dataset.field){markChanged(state.active);state.values[el.dataset.field]=el.value;scheduleSave();}
   else if(el.dataset.rec){const obj=recs(el.dataset.rec).find(r=>r.id===el.dataset.item);if(obj){markChanged(state.active);obj[el.dataset.key]=el.value;scheduleSave();}}
   else if(el.dataset.matrix){if(!state.records.methodLinks||Array.isArray(state.records.methodLinks))state.records.methodLinks={};if(!state.records.methodLinks[el.dataset.matrix])state.records.methodLinks[el.dataset.matrix]={};markChanged(state.active);state.records.methodLinks[el.dataset.matrix][el.dataset.matrixKey]=el.value;scheduleSave();}
-  else if(el.dataset.evidence){state.evidence[el.dataset.evidence]=el.value;scheduleSave();}});
+  else if(el.dataset.evidence){state.evidence[el.dataset.evidence]=el.value;scheduleSave();}
+  else if(el.dataset.decision){if(!state.decisions||typeof state.decisions!=='object')state.decisions={};state.decisions[el.dataset.decision]=el.value;scheduleSave();}});
+R.getElementById('toolsMenu')?.addEventListener('toggle',e=>{const sum=e.target.querySelector('summary');if(sum)sum.setAttribute('aria-expanded',String(e.target.open));});
 R.addEventListener('change',ev=>{const el=ev.target;if(el.dataset.check){state.criteria[el.dataset.check]=Boolean(el.checked);flush();render();}
   else if(el.dataset.field||el.dataset.rec||el.dataset.matrix){flush();/* Não recriar botões ao perder foco: isso cancelaria cliques de navegação. */}
 });
