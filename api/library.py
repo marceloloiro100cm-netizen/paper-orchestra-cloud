@@ -91,15 +91,17 @@ def validate_signature(data: bytes, suffix: str) -> None:
             raise HTTPException(422, "Arquivos de texto precisam estar codificados em UTF-8.") from None
 
 
-def exposed(record: dict) -> dict:
+def exposed(record: dict, *, include_notes: bool = True) -> dict:
     out = {key: record.get(key) for key in (
         "id", "name", "format", "size", "collection", "description", "sha256",
         "created_at", "archived_at", "status", "origin", "guard", "bib_entry",
     )}
+    notes = record.get("study_notes") or []
     out["role"] = record.get("role") or ""
     out["reading_status"] = record.get("reading_status") or "a_ler"
     out["exclude_reason"] = record.get("exclude_reason") or ""
-    out["study_notes"] = record.get("study_notes") or []
+    out["study_notes_count"] = len(notes)
+    out["study_notes"] = notes if include_notes else []
     out["abnt"] = format_abnt_bundle(record.get("bib_entry"), str(record.get("name") or ""))
     return out
 
@@ -187,15 +189,23 @@ def make_library_router(db, bucket, verify_user: Callable, fetch: Callable | Non
         return item
 
     @router.get("/items")
-    def list_items(user: dict = dependencies):
+    def list_items(summary: bool = Query(default=False), user: dict = dependencies):
         docs = collection.where("owner_uid", "==", user["uid"]).limit(500).stream()
         records = [doc.to_dict() for doc in docs]
-        items = [exposed(r) for r in records if r.get("status") == "active"]
+        items = [exposed(r, include_notes=not summary) for r in records if r.get("status") == "active"]
         items.sort(key=lambda i: i.get("created_at") or "", reverse=True)
         # M13: arquivos retidos aparecem para o dono, com o motivo, mas não são selecionáveis.
-        held = [exposed(r) for r in records if r.get("status") == "quarantined"]
+        held = [exposed(r, include_notes=False) for r in records if r.get("status") == "quarantined"]
         held.sort(key=lambda i: i.get("created_at") or "", reverse=True)
         return {"items": items, "quarantined": held[:50], "max_items": MAX_ITEMS_PER_OWNER}
+
+    @router.get("/items/{item_id}")
+    def get_item(item_id: str, user: dict = dependencies):
+        """Retorna os detalhes completos de uma fonte (incluindo todos os fichamentos)."""
+        item = owned(item_id, user)
+        if item.get("status") != "active":
+            raise HTTPException(404, "Arquivo não encontrado.")
+        return {"item": exposed(item, include_notes=True)}
 
     @router.post("/items", status_code=201)
     async def upload_file(
@@ -203,6 +213,7 @@ def make_library_router(db, bucket, verify_user: Callable, fetch: Callable | Non
         filename: str = Query(min_length=4, max_length=200),
         collection_name: str = Query(default="Geral", max_length=60, alias="collection"),
         description: str = Query(default="", max_length=300),
+        allow_duplicate: bool = Query(default=False),
         user: dict = dependencies,
     ):
         name, suffix = safe_filename(filename)
@@ -216,6 +227,15 @@ def make_library_router(db, bucket, verify_user: Callable, fetch: Callable | Non
                 raise HTTPException(413, "Arquivo acima do limite permitido.")
             chunks.append(chunk)
         data = b"".join(chunks)
+        if data and not allow_duplicate:
+            digest = hashlib.sha256(data).hexdigest()
+            existing = next((i for i in active_items(user["uid"]) if i.get("sha256") == digest), None)
+            if existing is not None:
+                raise HTTPException(
+                    409,
+                    f'Este arquivo já está na sua biblioteca como "{existing.get("name")}". '
+                    "Evitamos duplicar para manter suas referências organizadas.",
+                )
         document = save_library_item(db, bucket, user["uid"], name, suffix, data,
                                      collection_name, description)
         return {"item": exposed(document)}
