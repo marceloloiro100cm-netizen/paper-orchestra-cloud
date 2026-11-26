@@ -325,6 +325,16 @@ def make_library_router(db, bucket, verify_user: Callable, fetch: Callable | Non
         fields, errors = flow.check_reference_proposal(body if isinstance(body, dict) else {})
         if errors:
             raise HTTPException(422, " ".join(errors))
+        # Preserva metadados bibliográficos extras (volume, número, páginas, editora, local, URL)
+        prev_fields = ((item.get("bib_entry") or {}).get("fields") or {})
+        extra_keys = ("volume", "number", "pages", "publisher", "address", "edition", "url", "issn", "isbn")
+        for ek in extra_keys:
+            if isinstance(body, dict) and ek in body:
+                val_ek = str(body.get(ek) or "").strip()[:120]
+                if val_ek:
+                    fields[ek] = val_ek
+            elif prev_fields.get(ek) and ek not in fields:
+                fields[ek] = str(prev_fields[ek]).strip()[:120]
         existing_key = ((item.get("bib_entry") or {}).get("key") or "").strip()
         key = existing_key if existing_key and not existing_key.startswith("fonte_") else flow.stable_bib_key(fields)
         bib_entry = {

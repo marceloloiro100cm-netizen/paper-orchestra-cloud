@@ -1448,7 +1448,7 @@
         </button>
         <button type="button" id="theme-toggle" class="theme-btn" aria-pressed="false" aria-label="Ativar modo escuro">
           <span id="theme-icon" aria-hidden="true">🌙</span>
-          <span id="theme-label">Modo Black</span>
+          <span id="theme-label">Modo Escuro</span>
         </button>
         <button id="logout" class="btn alt hidden" style="padding:7px 12px;font-size:.8rem">Sair</button>
       </div>
@@ -2308,7 +2308,7 @@
           toggle.setAttribute('aria-pressed', 'false');
           toggle.setAttribute('aria-label', 'Ativar modo escuro');
           icon.textContent = '🌙';
-          label.textContent = 'Modo Black';
+          label.textContent = 'Modo Escuro';
           if (themeMeta) themeMeta.setAttribute('content', '#1466B8');
         }
         try { localStorage.setItem('scriptorium_mpie_theme', mode); } catch (_) {}
