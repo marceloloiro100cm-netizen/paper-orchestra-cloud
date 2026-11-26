@@ -1736,6 +1736,40 @@ const GuiaApp={
 };
 load();applyMode();if(!lastKnownWrite&&!savingError)persist();render();
 window.ScriptoriumGuiaResumo=buildGuidePlan;
+window.ScriptoriumGuiaAcoes={
+  adicionarLeituraM4(entry){
+    if(!entry||!plain(entry.referencia))return false;
+    state.records.readings=recs('readings');
+    const refNorm=normalizeAscii(entry.referencia);
+    const exists=state.records.readings.some(r=>normalizeAscii(r.referencia)===refNorm);
+    if(!exists){
+      snapshot('Antes de trazer fonte da Biblioteca para M4',3,'Cópia preventiva automática.');
+      state.records.readings.push({
+        id:uid(),
+        referencia:plain(entry.referencia),
+        link:plain(entry.link||''),
+        paginas:plain(entry.paginas||''),
+        relacao:plain(entry.relacao||''),
+      });
+      markChanged(3);
+    }
+    state.active=3;state.tab='preencher';
+    flush();render();
+    notify(exists?'Esta fonte já estava no quadro M4 (Etapa 3).':'✓ Fonte e fichamentos enviados para o M4 (Etapa 3).');
+    return !exists;
+  },
+  inserirResumoPrisma(texto){
+    const clean=plain(texto);if(!clean)return false;
+    snapshot('Antes de inserir resumo PRISMA na Etapa 3',3,'Cópia preventiva automática.');
+    const prev=val('m5_lacuna');
+    state.values.m5_lacuna=prev?(prev+'\n\n[Resumo PRISMA da Biblioteca]\n'+clean):('[Resumo PRISMA da Biblioteca]\n'+clean);
+    markChanged(3);
+    state.active=3;state.tab='preencher';
+    flush();render();
+    notify('✓ Resumo PRISMA inserido na Etapa 3 do Guia.');
+    return true;
+  },
+};
 const CONTA=window.ScriptoriumConta;if(CONTA){NUVEM.conta(CONTA.usuario());CONTA.aoMudar(u=>{NUVEM.conta(u);renderProjectBridge();});}
 window.ScriptoriumProjetos?.aoMudar(()=>renderProjectBridge());
 window.ScriptoriumBiblioteca?.aoMudar(()=>{if(state.active===7&&state.tab==='preencher')render();});

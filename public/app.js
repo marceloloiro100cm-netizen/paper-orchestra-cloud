@@ -480,9 +480,28 @@ function openLibraryStudyModal(item) {
   body.append(notesSec);
 
   const foot = document.createElement('div'); foot.className = 'modal-foot';
+  const toGuideBtn = el('button', '→ Enviar para M4 (Guia)', 'btn'); toGuideBtn.type = 'button';
+  toGuideBtn.title = 'Cria automaticamente um registro de leitura (M4) na Etapa 3 do Guia com a referência ABNT e seus fichamentos';
+  toGuideBtn.addEventListener('click', () => {
+    const notes = item.study_notes || [];
+    const refText = (item.abnt && item.abnt.reference) || item.name;
+    const doi = ((item.bib_entry && item.bib_entry.fields && item.bib_entry.fields.doi) || (item.origin && item.origin.doi) || '');
+    const pages = notes.map(n => n.page).filter(Boolean).join(', ');
+    const rel = notes.map(n => [n.page ? `p. ${n.page}:` : '', n.note || n.quote].filter(Boolean).join(' ')).join('\n');
+    close();
+    window.ScriptoriumNavegar?.('0');
+    setTimeout(() => {
+      window.ScriptoriumGuiaAcoes?.adicionarLeituraM4({
+        referencia: refText,
+        link: doi ? `https://doi.org/${doi}` : '',
+        paginas: pages,
+        relacao: rel,
+      });
+    }, 60);
+  });
   const doneBtn = el('button', 'Fechar', 'btn alt'); doneBtn.type = 'button';
   doneBtn.addEventListener('click', close);
-  foot.append(doneBtn);
+  foot.append(toGuideBtn, doneBtn);
   box.append(head, body, foot);
   back.append(box);
   document.body.append(back);
@@ -2293,7 +2312,13 @@ $('open-prisma-summary')?.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(d.resumo_metodologico || ''); copyMsg.textContent = '✓ Copiado!'; }
       catch (_) { copyMsg.textContent = 'Selecione o texto acima para copiar.'; }
     });
-    bar.append(cBtn, copyMsg);
+    const toGuidePrisma = el('button', '→ Inserir na Etapa 3 do Guia', 'btn alt'); toGuidePrisma.type = 'button';
+    toGuidePrisma.addEventListener('click', () => {
+      close();
+      window.ScriptoriumNavegar?.('0');
+      setTimeout(() => window.ScriptoriumGuiaAcoes?.inserirResumoPrisma(d.resumo_metodologico || ''), 60);
+    });
+    bar.append(cBtn, toGuidePrisma, copyMsg);
     body.append(bar);
   } catch (e) { body.textContent = 'Não foi possível gerar o resumo: ' + e.message; }
 });

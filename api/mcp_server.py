@@ -796,9 +796,10 @@ def open_pass(store: Store, uid: str, code: str, model: str, client: str) -> dic
     head = store.new_head(project, stage_def["cabeca"], stage_def["key"], client, model)
     return {"projeto": project["id"], "etapa": stage_def["key"], "titulo": stage_def["titulo"],
             "cabeca": head["id"],
+            "modo_pedagogico": pedagogical_mode_of(project),
             "aviso": (f"Esta conversa é a cabeça {head['id']} ({stage_def['cabeca']}). Use "
                       f"cabeca=\"{head['id']}\" e projeto=\"{project['id']}\" nas chamadas seguintes."),
-            "instrucoes": flow.brief(stage_def, project.get("language", "pt-BR")),
+            "instrucoes": _apply_pedagogical_guardrail(flow.brief(stage_def, project.get("language", "pt-BR")), project),
             "material": stage_material(store, project, stage_def["key"])}
 
 
