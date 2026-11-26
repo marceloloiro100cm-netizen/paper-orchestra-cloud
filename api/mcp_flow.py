@@ -128,12 +128,29 @@ TEMPLATES = {
         "secoes": ["Introdução", "Referencial teórico", "Metodologia", "Resultados e discussão",
                    "Considerações finais"],
         "resumo": "resumo",
+        "usa_capitulos": False,
+    },
+    "abnt-dissertacao": {
+        "nome": "Dissertação de mestrado ABNT (abntex2)",
+        "secoes": ["Introdução", "Revisão de literatura", "Referencial teórico",
+                   "Procedimentos metodológicos", "Resultados, produto educacional e discussão",
+                   "Considerações finais"],
+        "resumo": "resumo",
+        "usa_capitulos": True,
+    },
+    "abnt-tcc": {
+        "nome": "TCC / Monografia de graduação ABNT (abntex2)",
+        "secoes": ["Introdução", "Referencial teórico", "Metodologia",
+                   "Resultados e discussão", "Considerações finais"],
+        "resumo": "resumo",
+        "usa_capitulos": True,
     },
     "artigo-simples": {
         "nome": "Artigo simples (article)",
         "secoes": ["Introdução", "Trabalhos relacionados", "Método", "Resultados", "Discussão",
                    "Conclusão"],
         "resumo": "abstract",
+        "usa_capitulos": False,
     },
 }
 
@@ -176,8 +193,9 @@ STAGES = [
         "formato": "latex", "min": 6000,
         "instrucoes": (
             "Você é a cabeça REDATORA. Escreva o corpo do texto em LaTeX a partir do plano e das "
-            "evidências aceitas: comece pelo ambiente de resumo indicado e siga com \\section{...} para "
-            "cada seção do modelo. Cite com \\cite{chave} (ou \\citeonline{chave} no modelo ABNT). "
+            "evidências aceitas: comece pelo ambiente de resumo indicado e siga com \\section{...} "
+            "(ou \\chapter{...} nos modelos de dissertação e TCC ABNT) para cada seção/capítulo do modelo. "
+            "Cite com \\cite{chave} (ou \\citeonline{chave} no modelo ABNT). "
             "Prefira paráfrases com autoria analítica (teto orientativo: até 8 citações diretas por mil palavras). "
             "Entregue só o corpo: sem preâmbulo, \\documentclass, \\usepackage, \\begin{document}, "
             "\\bibliography, macros (\\def, \\newcommand) nem \\input/\\include; o Scriptorium monta o "
@@ -221,7 +239,7 @@ STAGE_KEYS = [s["key"] for s in STAGES]
 BY_KEY = {s["key"]: s for s in STAGES}
 
 
-MODES = ("artigo", "revisao_sistematica")
+MODES = ("artigo", "dissertacao", "tcc", "revisao_sistematica")
 
 
 def stages_for(mode: str = "artigo") -> list[dict]:
@@ -549,7 +567,7 @@ def quality_report(latex: str, bib_keys: set[str]) -> dict:
     words = len(re.findall(r"[A-Za-zÀ-ÿ0-9]+", plain_text))
     quotes = final_quotes(latex)
     per_1k = round(len(quotes) * 1000 / max(words, 1), 1)
-    sections = re.split(r"\\section\*?\{([^}]*)\}", body)
+    sections = re.split(r"\\(?:chapter|section)\*?\{([^}]*)\}", body)
     short_sections = []
     for i in range(1, len(sections), 2):
         sec_name = sections[i].strip()
@@ -671,9 +689,13 @@ def validate_latex(content: str, bib_keys: set[str], minimum: int, template: str
                       ". O Scriptorium monta preâmbulo e bibliografia.")
     if "^^" in (content or ""):
         errors.append("Sequências ^^ não são permitidas.")
-    sections = len(re.findall(r"\\section\*?\{", content or ""))
+    sections = len(re.findall(r"\\(?:chapter|section)\*?\{", content or ""))
     if sections < 3:
-        errors.append("O corpo precisa de pelo menos 3 seções (\\section{...}).")
+        tpl_info = TEMPLATES.get(template, TEMPLATES["abnt-artigo"])
+        if tpl_info.get("usa_capitulos"):
+            errors.append("O corpo precisa de pelo menos 3 capítulos ou seções (\\chapter{...} ou \\section{...}).")
+        else:
+            errors.append("O corpo precisa de pelo menos 3 seções (\\section{...}).")
     env = TEMPLATES.get(template, TEMPLATES["abnt-artigo"])["resumo"]
     if not re.search(r"\\begin\{" + env + r"\}", content or ""):
         errors.append(f"Inclua o ambiente \\begin{{{env}}} ... \\end{{{env}}}.")

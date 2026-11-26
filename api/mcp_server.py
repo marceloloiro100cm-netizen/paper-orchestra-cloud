@@ -255,7 +255,7 @@ class Store:
         if cached and cached[0] == stamp and time.monotonic() - cached[1] < 60:
             return json.loads(json.dumps(cached[2]))
         data = self._json(self.prefix(project) + "/references.json", []) or []
-        if pid and stamp:
+        if pid and stamp and data:
             if len(self._refs_cache) > 128:
                 self._refs_cache.clear()
             self._refs_cache[pid] = (stamp, time.monotonic(), json.loads(json.dumps(data)))
@@ -865,13 +865,18 @@ def build_server(store: Store, public_url: str) -> MCPServer:
     @server.tool()
     async def criar_projeto(titulo: str, pergunta: str, ids_das_fontes: list[str],
                             idioma: Literal["pt-BR", "en"] = "pt-BR",
-                            modelo: Literal["abnt-artigo", "artigo-simples"] = "abnt-artigo",
-                            tipo: Literal["artigo", "revisao_sistematica"] = "artigo") -> dict:
-        """Cria um projeto com até 20 fontes da biblioteca. tipo="revisao_sistematica" segue protocolo,
+                            modelo: Literal["abnt-artigo", "abnt-dissertacao", "abnt-tcc", "artigo-simples"] = "abnt-artigo",
+                            tipo: Literal["artigo", "dissertacao", "tcc", "revisao_sistematica"] = "artigo") -> dict:
+        """Cria um projeto (artigo, dissertação de mestrado, TCC ou revisão sistemática) com até 20 fontes da biblioteca.
+        tipo="dissertacao" ou "tcc" usa capítulos ABNT (abntex2); tipo="revisao_sistematica" segue protocolo,
         triagem dupla às cegas (kappa), consenso, qualidade e extração, síntese por QP e PRISMA 2020 antes
         da redação. O Scriptorium lê as fontes e monta as referências oficiais (alguns minutos, sem IA);
         depois use proxima_etapa."""
         uid = _uid()
+        if tipo == "dissertacao" and modelo == "abnt-artigo":
+            modelo = "abnt-dissertacao"
+        elif tipo == "tcc" and modelo == "abnt-artigo":
+            modelo = "abnt-tcc"
         record = await run(partial(store.create_project, uid, titulo, pergunta, ids_das_fontes, idioma, modelo, tipo))
         return {"projeto": record["id"], "status": record["status"],
                 "instrucao": "Fontes em leitura. Chame estado_do_projeto em um ou dois minutos e depois proxima_etapa."}

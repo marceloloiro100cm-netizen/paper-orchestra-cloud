@@ -14,13 +14,34 @@ from typing import Callable
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
+import docx_export
 import mcp_flow as flow
 import mcp_review as review
 import mcp_student as student
 from mcp_server import MCP_PATH, Falha, Store, compile_project, mode, project_state, review_context
 
-FILES = {"scriptorium.pdf": "application/pdf", "scriptorium.tex": "text/x-tex",
-         "references.bib": "text/x-bibtex", "proveniencia.json": "application/json"}
+FILES = {
+    "scriptorium.pdf": "application/pdf",
+    "scriptorium.docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "scriptorium.tex": "text/x-tex",
+    "references.bib": "text/x-bibtex",
+    "proveniencia.json": "application/json",
+}
+WORK_LABELS = {
+    "artigo": "Artigo científico",
+    "dissertacao": "Dissertação de mestrado",
+    "tcc": "TCC / Monografia de graduação",
+    "revisao_sistematica": "Revisão sistemática",
+}
+
+
+class NewProject(BaseModel):
+    titulo: str = Field(min_length=3, max_length=120)
+    pergunta: str = Field(min_length=20, max_length=4000)
+    fontes: list[str] = Field(min_length=1, max_length=20)
+    idioma: str = "pt-BR"
+    modelo: str = "abnt-artigo"
+    tipo: str = "artigo"
 
 
 class FinalSynthesis(BaseModel):
@@ -87,6 +108,23 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
         # Onda 1 (G1): evita N leituras sequenciais no GCS quando há vários projetos.
         with ThreadPoolExecutor(max_workers=min(6, len(projects))) as pool:
             return {"projetos": list(pool.map(for_student, projects))}
+
+    @router.post("/projetos", status_code=201)
+    def create_project_site(payload: NewProject, user: dict = dependency):
+        """Onda 2: cria artigo, dissertação ou TCC direto pelo site (com ou sem plano do Guia)."""
+        modelo = payload.modelo
+        if payload.tipo == "dissertacao" and modelo == "abnt-artigo":
+            modelo = "abnt-dissertacao"
+        elif payload.tipo == "tcc" and modelo == "abnt-artigo":
+            modelo = "abnt-tcc"
+        try:
+            record = store.create_project(
+                user["uid"], payload.titulo, payload.pergunta, payload.fontes,
+                payload.idioma, modelo, payload.tipo,
+            )
+        except Falha as exc:
+            raise HTTPException(422, str(exc)) from None
+        return for_student(record)
 
     @router.get("/projetos/{project_id}")
     def get_project(project_id: str, user: dict = dependency):
@@ -177,9 +215,25 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
         except Falha as exc:
             raise HTTPException(409, str(exc)) from None
 
+    def _project_docx_bytes(project: dict, refs: list[dict] | None = None) -> bytes | None:
+        prefix = f"{Store.prefix(project)}/final/"
+        docx_blob = store.bucket.blob(prefix + "scriptorium.docx")
+        if docx_blob.exists():
+            return docx_blob.download_as_bytes()
+        tex_blob = store.bucket.blob(prefix + "scriptorium.tex")
+        if not tex_blob.exists():
+            return None
+        tex = tex_blob.download_as_bytes().decode("utf-8", errors="replace")
+        ref_list = refs if refs is not None else store.references(project)
+        is_final = student.final_pdf(project, len(flow.pending_refs(ref_list)))
+        return docx_export.build_docx(
+            project.get("title") or project["id"], tex, ref_list,
+            is_final=is_final, work_label=WORK_LABELS.get(mode(project), "Artigo científico"),
+        )
+
     @router.get("/projetos/{project_id}/pacote-orientacao.zip")
     def advisor_package(project_id: str, user: dict = dependency):
-        """Pacote para orientação (pág. 10): PDF, BibTeX, proveniência e resumo legível em um só ZIP."""
+        """Pacote para orientação: PDF, Word (.docx), BibTeX, proveniência e resumo legível em um só ZIP."""
         project = owned(project_id, user)
         prefix = f"{Store.prefix(project)}/final/"
         refs = store.references(project)
@@ -190,6 +244,9 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
                 blob = store.bucket.blob(prefix + name)
                 if blob.exists():
                     zf.writestr(name, blob.download_as_bytes())
+            docx_bytes = _project_docx_bytes(project, refs)
+            if docx_bytes:
+                zf.writestr("scriptorium.docx", docx_bytes)
             lines = [
                 f"# Pacote para orientação — {project.get('title') or project['id']}",
                 "",
@@ -271,6 +328,13 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
             project = store.project(user["uid"], project_id)
         except Falha:
             raise HTTPException(404, "Projeto não encontrado.") from None
+        if name == "scriptorium.docx":
+            docx_bytes = _project_docx_bytes(project)
+            if not docx_bytes:
+                raise HTTPException(404, "Word (.docx) disponível assim que o texto for compilado.")
+            return Response(content=docx_bytes, media_type=FILES[name],
+                            headers={"Content-Disposition": 'attachment; filename="scriptorium.docx"',
+                                     "Cache-Control": "no-store"})
         blob = store.bucket.blob(f"{Store.prefix(project)}/final/{name}")
         if not blob.exists():
             raise HTTPException(404, "Arquivo indisponível para este projeto.")
