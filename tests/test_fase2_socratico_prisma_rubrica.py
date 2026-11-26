@@ -138,6 +138,52 @@ class Fase2BackendTests(unittest.TestCase):
         })
         self.assertEqual(rblocked.status_code, 404)
 
+    def test_delete_mcp_project_cleans_artifacts_revokes_link_and_preserves_library(self):
+        sid = "d" * 32
+        lib_blob = f"library/{self.user['uid']}/{sid}/original.pdf"
+        self.bucket.blob(lib_blob).upload_from_string(b"%PDF-1.4 original library file")
+        self.db.collection("library_items").document(sid).create({
+            "id": sid, "owner_uid": self.user["uid"], "name": "Fonte.pdf",
+            "format": "pdf", "sha256": "e" * 64, "size": 512,
+            "object_path": lib_blob, "status": "active",
+        })
+        store = mcp_server.Store(self.db, self.bucket, lambda *a, **kw: None, lambda _: True)
+        app = FastAPI()
+        app.include_router(make_mcp_site_router(store, lambda: self.user, "https://scriptoriummpie.web.app"))
+        app.include_router(make_advisor_public_router(store))
+        client = TestClient(app)
+
+        rc = client.post("/api/mcp-conta/projetos", json={
+            "titulo": "Texto de teste para exclusão",
+            "pergunta": "Como avaliar a exclusão segura de textos escritos sem apagar fontes?",
+            "fontes": [sid], "tipo": "artigo", "modelo": "abnt-artigo",
+        })
+        self.assertEqual(rc.status_code, 201)
+        pid = rc.json()["projeto"]
+
+        # Enquanto preparando -> bloqueia exclusão (409)
+        rbusy = client.delete(f"/api/mcp-conta/projetos/{pid}")
+        self.assertEqual(rbusy.status_code, 409)
+
+        # Marca concluído, grava artefatos do projeto e cria link de orientação
+        store.update_project(pid, status="concluido")
+        art_blob = f"mcp/{self.user['uid']}/{pid}/final/scriptorium.pdf"
+        self.bucket.blob(art_blob).upload_from_string(b"%PDF-1.4 generated")
+        rl = client.post(f"/api/mcp-conta/projetos/{pid}/orientacao/link", json={"dias": 7})
+        token = rl.json()["url"].split("orientacao=")[1]
+
+        # Exclui o texto com sucesso
+        rdel = client.delete(f"/api/mcp-conta/projetos/{pid}")
+        self.assertEqual(rdel.status_code, 200)
+        self.assertTrue(rdel.json()["deleted"])
+        self.assertEqual(rdel.json()["files_removed"], 1)
+
+        # Projeto sumiu, artefato do projeto sumiu, link foi revogado, MAS a fonte da Biblioteca está intacta!
+        self.assertEqual(client.get(f"/api/mcp-conta/projetos/{pid}").status_code, 404)
+        self.assertFalse(self.bucket.blob(art_blob).exists())
+        self.assertEqual(client.get(f"/api/orientacao/{token}").status_code, 404)
+        self.assertTrue(self.bucket.blob(lib_blob).exists())
+
     def test_frontend_fase2_contracts_and_no_emdash_in_guia(self):
         html = (ROOT / "public" / "index.html").read_text(encoding="utf-8")
         app_js = (ROOT / "public" / "app.js").read_text(encoding="utf-8")

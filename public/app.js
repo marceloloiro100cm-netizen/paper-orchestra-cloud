@@ -1930,7 +1930,30 @@ function articleCard(p) {
       shareBox.append(noteIn, row, urlOut);
     }
   });
-  actions.append(shareBtn, open); head.append(info, actions); card.append(head, shareBox);
+  const delBtn = el('button', 'Apagar', 'btn alt btn-danger-text');
+  delBtn.type = 'button';
+  delBtn.disabled = busy;
+  delBtn.title = busy
+    ? 'Aguarde terminar a etapa em andamento para apagar este texto.'
+    : 'Apagar este texto de vez (suas fontes na Biblioteca continuam guardadas).';
+  delBtn.setAttribute('aria-label', 'Apagar texto ' + (p.titulo || p.projeto));
+  delBtn.addEventListener('click', async () => {
+    const ok = await confirmAction('Apagar texto?', [
+      `"${p.titulo || p.projeto}" será apagado de vez, incluindo rascunhos, PDF, Word (.docx), etapas, apontamentos e eventual link de orientação.`,
+      'Suas fontes originais na Biblioteca continuam intactas.',
+      'Essa ação não pode ser desfeita.',
+    ], 'Apagar texto');
+    if (!ok) return;
+    delBtn.disabled = true;
+    try {
+      await request(`/mcp-conta/projetos/${p.projeto}`, { method: 'DELETE' });
+      await loadMcpProjects();
+    } catch (e) {
+      delBtn.disabled = false;
+      card.append(el('p', e.message, 'warning'));
+    }
+  });
+  actions.append(shareBtn, open, delBtn); head.append(info, actions); card.append(head, shareBox);
 
   // Fase 2: Seletor de salvaguarda pedagógica (Tutor Socrático / Intermediário / Autônomo)
   const pedRow = document.createElement('div');
