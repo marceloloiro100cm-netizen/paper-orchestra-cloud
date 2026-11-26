@@ -68,6 +68,35 @@ window.ScriptoriumProjetos = window.ScriptoriumProjetos || {
   aoMudar(cb) { this._cbs.push(cb); },
   definir(lista) { this._lista = Array.isArray(lista) ? lista : []; this._cbs.forEach(cb => { try { cb(this._lista); } catch (_) {} }); }
 };
+// Fase 1: Fonte única de verdade da Biblioteca compartilhada com o Guia (/citar, ABNT e Fichamentos).
+const ROLE_LABELS = {
+  '': 'Sem papel definido',
+  marco_teorico: 'Marco Teórico',
+  metodo: 'Método',
+  evidencia: 'Evidência',
+  contraponto: 'Contraponto',
+};
+const READING_LABELS = {
+  a_ler: 'A ler',
+  lido: 'Lido',
+  incluido: 'Incluído no projeto',
+  descartado: 'Descartado',
+};
+window.ScriptoriumBiblioteca = window.ScriptoriumBiblioteca || {
+  _lista: [], _cbs: [],
+  listar() { return this._lista; },
+  aoMudar(cb) { this._cbs.push(cb); },
+  definir(lista) { this._lista = Array.isArray(lista) ? lista : []; this._cbs.forEach(cb => { try { cb(this._lista); } catch (_) {} }); },
+  abrirEstudo(id) {
+    const it = this._lista.find(x => x.id === id);
+    if (it) openLibraryStudyModal(it);
+  },
+  async checarCitacoes(text) {
+    if (!user || !String(text || '').trim()) return null;
+    const r = await request('/library/check-citations', { method: 'POST', body: JSON.stringify({ text }) });
+    return await r.json();
+  },
+};
 let user = null;
 let refreshInterval = null;
 let libraryItems = [];
@@ -160,14 +189,20 @@ function displayLibrary() {
     });
     const name = document.createElement('span'); name.textContent = item.name;
     const bibOk = item.bib_entry && ['doi', 'corrigida_pelo_texto', 'confirmada_pelo_pesquisador', 'confirmada_duas_fontes', 'ficha_da_biblioteca'].includes(item.bib_entry.how);
-    const refPill = el('span', bibOk ? '✓ Referência confirmada' : 'Referência pendente', 'lib-ref-pill' + (bibOk ? '' : ' pending'));
+    const refPill = el('span', bibOk ? '✓ Referência confirmada' : (item.bib_entry ? 'Referência para conferir' : 'Referência pendente'), 'lib-ref-pill' + (bibOk ? '' : ' pending'));
     label.append(check, name);
     const titleLine = document.createElement('div');
     titleLine.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:6px';
     titleLine.append(label, refPill);
+    if (item.role && ROLE_LABELS[item.role]) titleLine.append(el('span', ROLE_LABELS[item.role], 'lib-role-pill'));
+    if (item.reading_status && item.reading_status !== 'a_ler') {
+      titleLine.append(el('span', READING_LABELS[item.reading_status] || item.reading_status, 'lib-status-pill ' + item.reading_status));
+    }
+    const notesCount = (item.study_notes || []).length;
+    if (notesCount) titleLine.append(el('span', `${notesCount} fichamento(s)`, 'lib-status-pill'));
     body.append(titleLine);
     const meta = document.createElement('div');meta.className='library-meta';
-    const bibHint = bibOk && item.bib_entry?.fields?.author ? ` · ${item.bib_entry.fields.author.split(' and ')[0]} (${item.bib_entry.fields.year || '?'})` : '';
+    const bibHint = item.bib_entry?.fields?.author ? ` · ${item.bib_entry.fields.author.split(' and ')[0]} (${item.bib_entry.fields.year || '?'})` : '';
     meta.textContent = (item.collection||'Geral') + ' · ' + String(item.format||'').toUpperCase() +
       ' · ' + (item.size / 1024).toFixed(0) + ' KB' + bibHint;
     body.append(meta);
@@ -176,8 +211,22 @@ function displayLibrary() {
       desc.textContent=item.description;body.append(desc);
     }
     const actions = document.createElement('div');actions.className='library-actions';
+    const studyBtn = document.createElement('button');studyBtn.type='button';
+    studyBtn.textContent = notesCount ? `Fichar / ABNT (${notesCount})` : 'Fichar / ABNT';
+    studyBtn.addEventListener('click', () => openLibraryStudyModal(item));
     const refBtn = document.createElement('button');refBtn.type='button';refBtn.textContent = bibOk ? 'Editar referência' : 'Conferir referência';
     refBtn.addEventListener('click', () => toggleLibraryRefEditor(item, body));
+    const copyCiteBtns = [];
+    if (item.abnt?.cite_parenthetical) {
+      const cBtn = document.createElement('button'); cBtn.type = 'button';
+      cBtn.textContent = `Copiar ${item.abnt.cite_parenthetical}`;
+      cBtn.title = 'Copiar citação ABNT para colar no texto';
+      cBtn.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(item.abnt.cite_parenthetical); libraryMessage('✓ Citação copiada: ' + item.abnt.cite_parenthetical); }
+        catch (_) { libraryMessage(item.abnt.cite_parenthetical); }
+      });
+      copyCiteBtns.push(cBtn);
+    }
     const down = document.createElement('button');down.type='button';down.textContent='Baixar original';
     down.addEventListener('click', async()=>{
       try{
@@ -199,8 +248,245 @@ function displayLibrary() {
     const remove = document.createElement('button');remove.type='button';remove.textContent='Apagar';
     remove.className='library-delete btn-danger-text';
     remove.addEventListener('click',()=>deleteLibraryItem(item));
-    actions.append(refBtn,down,archive,remove);body.append(actions);line.append(body);target.append(line);
+    actions.append(studyBtn, refBtn, ...copyCiteBtns, down, archive, remove);body.append(actions);line.append(body);target.append(line);
   }
+  renderDuplicatesBanner();
+}
+
+function renderDuplicatesBanner() {
+  const box = $('duplicates-banner');
+  if (!box) return;
+  const byKey = new Map();
+  const addKey = (k, item) => { if (!k) return; if (!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(item); };
+  for (const item of libraryItems) {
+    if (item.sha256) addKey('sha:' + item.sha256, item);
+    const f = (item.bib_entry && item.bib_entry.fields) || {};
+    const doi = String(f.doi || (item.origin && item.origin.doi) || '').trim().toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\/|^doi:/i, '');
+    if (doi) addKey('doi:' + doi, item);
+    const title = String(f.title || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    if (title.length >= 12) addKey('ty:' + title + '|' + String(f.year || '').slice(0, 4), item);
+  }
+  const seen = new Set();
+  const groups = [];
+  for (const [k, arr] of byKey.entries()) {
+    if (arr.length < 2) continue;
+    const sig = arr.map(x => x.id).sort().join(',');
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    const reason = k.startsWith('sha:') ? 'mesmo arquivo' : (k.startsWith('doi:') ? 'mesmo DOI' : 'mesmo título e ano');
+    groups.push({ reason, items: arr });
+  }
+  box.replaceChildren();
+  box.classList.toggle('hidden', !groups.length);
+  if (!groups.length) return;
+  const det = document.createElement('details');
+  det.append(el('summary', `⚠ ${groups.length} possível(is) duplicata(s) detectada(s) na biblioteca. Ver e limpar`));
+  for (const g of groups) {
+    const p = el('p', `${g.reason}: ${g.items.map(i => i.name).join(' · ')}`);
+    p.style.margin = '6px 0';
+    det.append(p);
+  }
+  box.append(det);
+}
+
+function openLibraryStudyModal(item) {
+  const back = document.createElement('div');
+  back.className = 'modal-backdrop';
+  back.setAttribute('role', 'dialog'); back.setAttribute('aria-modal', 'true');
+  const box = document.createElement('div'); box.className = 'modal-box study-modal-box';
+  const head = document.createElement('div'); head.className = 'modal-head';
+  const title = el('strong', 'Fichamento & ABNT · ' + item.name); title.id = 'study-modal-title';
+  back.setAttribute('aria-labelledby', 'study-modal-title');
+  const closeX = el('button', '✕', 'btn alt'); closeX.type = 'button'; closeX.setAttribute('aria-label', 'Fechar');
+  head.append(title, closeX);
+
+  const body = document.createElement('div'); body.className = 'modal-body';
+  const close = () => { document.removeEventListener('keydown', onKey); back.remove(); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  closeX.addEventListener('click', close);
+  back.addEventListener('click', (e) => { if (e.target === back) close(); });
+  document.addEventListener('keydown', onKey);
+
+  // 1) Bloco ABNT (cópia em 1 clique — NBR 10520 / 6023)
+  const abntSec = document.createElement('section');
+  if (item.abnt && item.abnt.reference) {
+    abntSec.append(el('strong', 'Citação e Referência ABNT (NBR 6023 / 10520)'));
+    const prev = el('div', item.abnt.reference, 'abnt-preview');
+    const bar = document.createElement('div'); bar.className = 'cite-copy-bar';
+    const copyStatus = el('span', '', 'subtle');
+    const mkCopy = (label, txt) => {
+      const b = el('button', label, 'btn alt'); b.type = 'button'; b.style.padding = '5px 10px'; b.style.fontSize = '.8rem';
+      b.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(txt); copyStatus.textContent = '✓ Copiado!'; }
+        catch (_) { copyStatus.textContent = txt; }
+      });
+      return b;
+    };
+    bar.append(
+      mkCopy(`Copiar ${item.abnt.cite_parenthetical}`, item.abnt.cite_parenthetical),
+      mkCopy(`Copiar ${item.abnt.cite_narrative}`, item.abnt.cite_narrative),
+      mkCopy('Copiar referência ABNT', item.abnt.reference),
+      copyStatus
+    );
+    abntSec.append(prev, bar);
+  } else {
+    abntSec.append(el('p', 'Esta fonte ainda não tem ficha bibliográfica confirmada. Use "Conferir referência" na lista para gerar citação e ABNT automáticas.', 'subtle'));
+  }
+  body.append(abntSec);
+
+  // 2) Organização metodológica (Papel + Status)
+  const orgSec = document.createElement('section');
+  orgSec.style.marginTop = '12px';
+  orgSec.append(el('strong', 'Organização na pesquisa'));
+  const grid = document.createElement('div'); grid.className = 'study-grid'; grid.style.marginTop = '6px';
+  const roleWrap = document.createElement('div');
+  roleWrap.append(el('label', 'Papel metodológico'));
+  const selRole = document.createElement('select');
+  for (const [k, v] of Object.entries(ROLE_LABELS)) selRole.append(new Option(v, k));
+  selRole.value = item.role || '';
+  roleWrap.append(selRole);
+
+  const stWrap = document.createElement('div');
+  stWrap.append(el('label', 'Status de leitura / triagem'));
+  const selStatus = document.createElement('select');
+  for (const [k, v] of Object.entries(READING_LABELS)) selStatus.append(new Option(v, k));
+  selStatus.value = item.reading_status || 'a_ler';
+  stWrap.append(selStatus);
+  grid.append(roleWrap, stWrap);
+
+  const reasonWrap = document.createElement('div'); reasonWrap.style.marginTop = '6px';
+  const inpReason = document.createElement('input'); inpReason.type = 'text'; inpReason.maxLength = 240;
+  inpReason.value = item.exclude_reason || '';
+  inpReason.placeholder = 'Motivo do descarte (opcional, útil para o resumo da revisão)';
+  reasonWrap.append(el('label', 'Motivo de descarte (quando Descartado)'), inpReason);
+  reasonWrap.hidden = selStatus.value !== 'descartado';
+  selStatus.addEventListener('change', () => { reasonWrap.hidden = selStatus.value !== 'descartado'; });
+
+  const orgRow = document.createElement('div'); orgRow.className = 'actions'; orgRow.style.marginTop = '8px';
+  const saveOrg = el('button', 'Salvar organização', 'btn alt'); saveOrg.type = 'button';
+  const orgMsg = el('span', '', 'subtle');
+  saveOrg.addEventListener('click', async () => {
+    saveOrg.disabled = true; orgMsg.textContent = 'Salvando…';
+    try {
+      const r = await (await request(`/library/items/${item.id}/study`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role: selRole.value, reading_status: selStatus.value, exclude_reason: inpReason.value.trim() }),
+      })).json();
+      Object.assign(item, r.item || {});
+      orgMsg.textContent = '✓ Organização salva.';
+      await loadLibrary();
+    } catch (e) { orgMsg.textContent = e.message; }
+    finally { saveOrg.disabled = false; }
+  });
+  orgRow.append(saveOrg, orgMsg);
+  orgSec.append(grid, reasonWrap, orgRow);
+  body.append(orgSec);
+
+  // 3) Fichamentos por página (usados direto no /citar do Guia)
+  const notesSec = document.createElement('section');
+  notesSec.style.marginTop = '16px';
+  notesSec.append(el('strong', 'Fichamentos e citações salvas (conectados ao /citar no Guia)'));
+  const notesList = document.createElement('div'); notesList.style.marginTop = '8px';
+
+  const renderNotes = () => {
+    notesList.replaceChildren();
+    const notes = item.study_notes || [];
+    if (!notes.length) {
+      notesList.append(el('p', 'Nenhum fichamento salvo ainda. Registre abaixo um trecho com página e sua interpretação — ele aparecerá pronto ao digitar /citar no Guia.', 'subtle'));
+      return;
+    }
+    for (const n of notes) {
+      const card = document.createElement('div'); card.className = 'study-note-card';
+      const top = document.createElement('div'); top.style.cssText = 'display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap';
+      const meta = el('strong', (n.page ? `p. ${n.page}` : 'Sem página') + (n.tag ? ` · ${n.tag}` : ''));
+      meta.style.fontSize = '.82rem';
+      top.append(meta);
+      if (item.abnt?.cite_parenthetical && n.page) {
+        const citeWithP = item.abnt.cite_parenthetical.replace(/\)$/, `, p. ${n.page})`);
+        const cBtn = el('button', `Copiar ${citeWithP}`, 'btn alt'); cBtn.type = 'button'; cBtn.style.padding = '3px 8px'; cBtn.style.fontSize = '.75rem';
+        cBtn.addEventListener('click', () => { navigator.clipboard?.writeText(citeWithP).catch(() => {}); });
+        top.append(cBtn);
+      }
+      card.append(top);
+      if (n.quote) card.append(el('blockquote', `“${n.quote}”`, 'study-note-quote'));
+      if (n.note) { const p = el('p', n.note); p.style.margin = '4px 0'; p.style.fontSize = '.88rem'; card.append(p); }
+      const foot = document.createElement('div'); foot.className = 'study-note-foot';
+      const chkLbl = document.createElement('label'); chkLbl.style.cssText = 'display:inline-flex;align-items:center;gap:6px;margin:0;cursor:pointer';
+      const chk = document.createElement('input'); chk.type = 'checkbox'; chk.checked = Boolean(n.support_checked);
+      chk.addEventListener('change', async () => {
+        try {
+          const r = await (await request(`/library/items/${item.id}/notes/${n.id}`, {
+            method: 'PATCH', body: JSON.stringify({ support_checked: chk.checked }),
+          })).json();
+          item.study_notes = r.study_notes || item.study_notes;
+          await loadLibrary();
+        } catch (e) { chk.checked = !chk.checked; alert(e.message); }
+      });
+      chkLbl.append(chk, document.createTextNode('Conferi que a fonte sustenta minha leitura (Nível 3)'));
+      const del = el('button', 'Remover', 'btn alt btn-danger-text'); del.type = 'button'; del.style.padding = '3px 8px'; del.style.fontSize = '.75rem';
+      del.addEventListener('click', async () => {
+        try {
+          const r = await (await request(`/library/items/${item.id}/notes/${n.id}`, { method: 'DELETE' })).json();
+          item.study_notes = r.study_notes || [];
+          renderNotes();
+          await loadLibrary();
+        } catch (e) { alert(e.message); }
+      });
+      foot.append(chkLbl, del);
+      card.append(foot);
+      notesList.append(card);
+    }
+  };
+  renderNotes();
+
+  const form = document.createElement('div'); form.style.cssText = 'margin-top:10px;padding:12px;border:1px dashed var(--border-main);border-radius:10px';
+  const row1 = document.createElement('div'); row1.className = 'study-grid';
+  const inpPage = document.createElement('input'); inpPage.type = 'text'; inpPage.maxLength = 24; inpPage.placeholder = 'Ex.: 47 ou 490-492';
+  const inpTag = document.createElement('input'); inpTag.type = 'text'; inpTag.maxLength = 40; inpTag.placeholder = 'Ex.: autonomia, método, lacuna';
+  const pWrap = document.createElement('div'); pWrap.append(el('label', 'Página(s)'), inpPage);
+  const tWrap = document.createElement('div'); tWrap.append(el('label', 'Etiqueta (opcional)'), inpTag);
+  row1.append(pWrap, tWrap);
+  const inpQuote = document.createElement('textarea'); inpQuote.rows = 2; inpQuote.placeholder = 'Trecho literal da obra (opcional)…';
+  const inpNote = document.createElement('textarea'); inpNote.rows = 2; inpNote.placeholder = 'Sua nota: por que este trecho importa para o seu problema ou método?';
+  const chkNewLbl = document.createElement('label'); chkNewLbl.style.cssText = 'display:inline-flex;align-items:center;gap:6px;margin:8px 0';
+  const chkNew = document.createElement('input'); chkNew.type = 'checkbox'; chkNew.checked = true;
+  chkNewLbl.append(chkNew, document.createTextNode('Conferi o contexto na fonte original (sustentação humana)'));
+  const addRow = document.createElement('div'); addRow.className = 'actions'; addRow.style.marginTop = '6px';
+  const addBtn = el('button', '+ Salvar fichamento', 'btn'); addBtn.type = 'button';
+  const addMsg = el('span', '', 'subtle');
+  addBtn.addEventListener('click', async () => {
+    if (!inpQuote.value.trim() && !inpNote.value.trim()) { addMsg.textContent = 'Escreva um trecho ou uma anotação.'; return; }
+    addBtn.disabled = true; addMsg.textContent = 'Salvando…';
+    try {
+      const r = await (await request(`/library/items/${item.id}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({
+          page: inpPage.value.trim(), tag: inpTag.value.trim(),
+          quote: inpQuote.value.trim(), note: inpNote.value.trim(),
+          support_checked: chkNew.checked,
+        }),
+      })).json();
+      item.study_notes = r.study_notes || [];
+      inpPage.value = ''; inpTag.value = ''; inpQuote.value = ''; inpNote.value = '';
+      addMsg.textContent = '✓ Fichamento salvo e disponível no /citar do Guia!';
+      renderNotes();
+      await loadLibrary();
+    } catch (e) { addMsg.textContent = e.message; }
+    finally { addBtn.disabled = false; }
+  });
+  addRow.append(addBtn, addMsg);
+  form.append(row1, el('label', 'Trecho literal (opcional)'), inpQuote, el('label', 'Sua nota crítica'), inpNote, chkNewLbl, addRow);
+  notesSec.append(notesList, form);
+  body.append(notesSec);
+
+  const foot = document.createElement('div'); foot.className = 'modal-foot';
+  const doneBtn = el('button', 'Fechar', 'btn alt'); doneBtn.type = 'button';
+  doneBtn.addEventListener('click', close);
+  foot.append(doneBtn);
+  box.append(head, body, foot);
+  back.append(box);
+  document.body.append(back);
+  closeX.focus();
 }
 
 async function loadLibrary() {
@@ -209,6 +495,7 @@ async function loadLibrary() {
     const r=await request('/library/items');
     const data=await r.json();
     libraryItems=data.items||[];
+    window.ScriptoriumBiblioteca?.definir(libraryItems);
     writeUiCache(user.uid, { libraryItems });
     // M13: arquivos retidos na verificação de segurança (não podem ser usados).
     const held=data.quarantined||[];const q=$('quarantine-list');
@@ -1850,6 +2137,74 @@ async function aiNotes(itemId, box, start) {
   } catch (e) { area.textContent = e.message; }
 }
 
+// Fase 1: Importação unificada de referências (DOI, BibTeX ou RIS) com detecção de duplicatas.
+$('refs-import')?.addEventListener('click', async () => {
+  const text = ($('refs-text')?.value || '').trim();
+  const msg = $('refs-message');
+  const out = $('refs-results');
+  if (!text) { if (msg) msg.textContent = 'Cole ao menos um DOI, BibTeX ou RIS.'; return; }
+  const btn = $('refs-import'); btn.disabled = true; out?.replaceChildren();
+  if (msg) msg.textContent = 'Importando e verificando duplicatas…';
+  try {
+    const data = await (await request('/library/import-references', {
+      method: 'POST',
+      body: JSON.stringify({
+        text,
+        collection: $('refs-collection')?.value || 'Referências',
+        role: $('refs-role')?.value || '',
+      }),
+    })).json();
+    const c = data.counts || {};
+    if (msg) msg.textContent = `✓ Importadas: ${c.importado || 0} · duplicadas ignoradas: ${c.duplicado || 0} · falhas: ${c.falhou || 0}`;
+    const labels = { importado: '✓ importada', duplicado: '○ duplicada (ignorada)', falhou: '⚠ falhou' };
+    for (const r of data.results || []) {
+      out?.append(el('small', `${labels[r.status] || r.status}: ${r.input || ''}${r.reason ? ' — ' + r.reason : ''}`), document.createElement('br'));
+    }
+    if ((c.importado || 0) > 0 && $('refs-text')) $('refs-text').value = '';
+    await loadLibrary();
+  } catch (e) { if (msg) msg.textContent = e.message; }
+  finally { btn.disabled = false; }
+});
+
+// Fase 1: Modal limpo de exportação ABNT / BibTeX / RIS (compatível com Zotero e Overleaf).
+$('open-export-refs')?.addEventListener('click', () => {
+  const back = document.createElement('div'); back.className = 'modal-backdrop';
+  back.setAttribute('role', 'dialog'); back.setAttribute('aria-modal', 'true');
+  const box = document.createElement('div'); box.className = 'modal-box';
+  const head = document.createElement('div'); head.className = 'modal-head';
+  head.append(el('strong', 'Exportar Referências da Biblioteca'));
+  const close = () => back.remove();
+  const body = document.createElement('div'); body.className = 'modal-body';
+  body.append(el('p', 'Exporte todas as obras com ficha bibliográfica da sua biblioteca em padrão ABNT (NBR 6023:2018), BibTeX (.bib) ou RIS (.ris — compatível com Zotero e Mendeley).', 'subtle'));
+  const chkLbl = document.createElement('label'); chkLbl.style.cssText = 'display:inline-flex;align-items:center;gap:8px;margin:8px 0';
+  const chkInc = document.createElement('input'); chkInc.type = 'checkbox';
+  chkLbl.append(chkInc, document.createTextNode('Exportar somente fontes marcadas como "Incluído no projeto"'));
+  body.append(chkLbl);
+  const st = el('p', '', 'subtle'); body.append(st);
+  const row = document.createElement('div'); row.className = 'actions';
+  const runExport = async (fmt, filename) => {
+    st.textContent = 'Gerando arquivo…';
+    try {
+      const q = `/library/export?fmt=${fmt}${chkInc.checked ? '&only_included=true' : ''}`;
+      await downloadPath(q, filename);
+      st.textContent = `✓ ${filename} baixado.`;
+    } catch (e) { st.textContent = e.message; }
+  };
+  const bAbnt = el('button', 'Lista ABNT (.txt)', 'btn'); bAbnt.type = 'button';
+  bAbnt.addEventListener('click', () => runExport('abnt', 'referencias_abnt.txt'));
+  const bBib = el('button', 'BibTeX (.bib)', 'btn alt'); bBib.type = 'button';
+  bBib.addEventListener('click', () => runExport('bib', 'referencias_scriptorium.bib'));
+  const bRis = el('button', 'RIS / Zotero (.ris)', 'btn alt'); bRis.type = 'button';
+  bRis.addEventListener('click', () => runExport('ris', 'referencias_scriptorium.ris'));
+  row.append(bAbnt, bBib, bRis);
+  body.append(row);
+  const foot = document.createElement('div'); foot.className = 'modal-foot';
+  const fBtn = el('button', 'Fechar', 'btn alt'); fBtn.type = 'button'; fBtn.addEventListener('click', close);
+  foot.append(fBtn); box.append(head, body, foot); back.append(box);
+  back.addEventListener('click', (e) => { if (e.target === back) close(); });
+  document.body.append(back); fBtn.focus();
+});
+
 // Importação de PDFs de acesso aberto por DOI ou link.
 $('oa-import').addEventListener('click', async () => {
   const items = $('oa-items').value.split(/\n+/).map(x => x.trim()).filter(Boolean);
@@ -2574,6 +2929,7 @@ onAuthStateChanged(auth, async (current) => {
     if (cachedUi) {
       if (Array.isArray(cachedUi.libraryItems) && cachedUi.libraryItems.length) {
         libraryItems = cachedUi.libraryItems;
+        window.ScriptoriumBiblioteca?.definir(libraryItems);
         updateSelectedCount(); displayLibrary();
       }
       if (Array.isArray(cachedUi.mcpProjects) && cachedUi.mcpProjects.length) {
@@ -2592,6 +2948,7 @@ onAuthStateChanged(auth, async (current) => {
     if (authInitialized) clearSessionCache();
     accountAccess = null;
     window.ScriptoriumProjetos?.definir([]);
+    window.ScriptoriumBiblioteca?.definir([]);
     $('workspace').classList.remove('access-pending', 'access-setup');
     $('account-panel').classList.add('hidden');
     setAccountPanelOpen(false);
