@@ -67,6 +67,15 @@ def proofs(stages: dict, mode: str, kappa: dict | None = None) -> list[str]:
     return lines
 
 
+def final_pdf(project: dict, to_check: int) -> bool:
+    """PDF final de verdade: compilado com a trava (versão "final") e sem referência pendente.
+
+    Projetos compilados antes de 26/11/2026 têm status "concluido" sem essa conferência.
+    """
+    report = project.get("compile_report") or {}
+    return project.get("status") == "concluido" and report.get("versao") == "final" and not to_check
+
+
 def next_step(project: dict, mode: str, to_check: int) -> dict:
     """O que o estudante faz agora: título, explicação e, quando couber, o pedido pronto para copiar."""
     status = project.get("status")
@@ -84,6 +93,12 @@ def next_step(project: dict, mode: str, to_check: int) -> dict:
     if status == "refazendo_referencias":
         return {"titulo": "Refazendo as referências",
                 "texto": "Leva um ou dois minutos. As chaves já citadas no texto continuam as mesmas."}
+    if status == "concluido" and not final_pdf(project, to_check):
+        pending = (f" Há {to_check} referência(s) ainda não confirmada(s)." if to_check else "")
+        return {"titulo": "PDF gerado antes da conferência das referências",
+                "texto": "Este PDF foi compilado antes das travas da versão final e pode ter referências "
+                         "erradas." + pending + " Refaça as referências, confirme as pendentes e compile de novo.",
+                "pedido": f"Use o Scriptorium: refaça as referências do projeto {title}, {REF_FIX} e compile de novo."}
     if status == "concluido":
         return {"titulo": "PDF final pronto",
                 "texto": "Todas as referências foram confirmadas e o PDF saiu sem erro de LaTeX. Leia com calma "
@@ -126,6 +141,7 @@ def next_step(project: dict, mode: str, to_check: int) -> dict:
 def view(project: dict, mode: str, refs: list[dict], kappa: dict | None = None) -> dict:
     to_check = references_to_check(refs)
     return {"proximo_passo": next_step(project, mode, len(to_check)),
+            "pdf_final": final_pdf(project, len(to_check)),
             "provas": proofs(project.get("stages") or {}, mode, kappa),
             "referencias_a_conferir": to_check,
             "pedido_referencias": (f"Use o Scriptorium: {REF_FIX} do projeto {_quoted(project.get('title'))}."

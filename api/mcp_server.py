@@ -479,6 +479,9 @@ def project_state(store: Store, project: dict) -> dict:
         action = "Compilando o PDF. Consulte de novo em um ou dois minutos."
     elif status == "refazendo_referencias":
         action = "Refazendo as referências. Consulte de novo em um ou dois minutos."
+    elif status == "concluido" and (project.get("compile_report") or {}).get("versao") != "final":
+        action = ("PDF compilado antes das travas da versão final: as referências podem estar erradas. Chame "
+                  "refazer_referencias, confirme as pendentes com corrigir_referencia e chame compilar de novo.")
     elif status == "concluido":
         action = "PDF final pronto: baixe no site, na etapa Seus artigos."
     elif status == "rascunho" and not nxt:
