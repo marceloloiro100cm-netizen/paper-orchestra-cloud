@@ -1673,7 +1673,66 @@
             </div>
           </div>
         </details>
+        <!-- Onda 4: Avaliação ética opcional do PTT (MPIE / IFRS Campus Porto Alegre) -->
+        <details class="gemini-setup" id="pilot-eval-details">
+          <summary id="pilot-eval-title">Avaliação do Scriptorium (Pesquisa MPIE/IFRS — opcional)</summary>
+          <div class="gemini-setup-body">
+            <p class="subtle">O Scriptorium faz parte de uma pesquisa do <strong>Mestrado Profissional em Informática na Educação (MPIE — IFRS Campus Porto Alegre)</strong> sobre democratização da pesquisa científica. Sua resposta é <strong>opcional, anônima</strong> (sem e-mail nem nome no banco de análise) e você pode apagar seus dados quando quiser.</p>
+            <p class="subtle" id="pilot-eval-status" role="status"></p>
+            <div class="check" style="margin:10px 0">
+              <input id="pilot-tcle" type="checkbox">
+              <label for="pilot-tcle"><strong>Li e concordo com o Termo de Consentimento (TCLE):</strong> autorizo o uso anônimo das minhas respostas abaixo exclusivamente para fins acadêmicos da pesquisa no MPIE/IFRS, sabendo que posso retirar o consentimento a qualquer momento.</label>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:10px 0">
+              <div>
+                <label for="pilot-vinculo">Seu vínculo atual</label>
+                <select id="pilot-vinculo">
+                  <option value="graduacao">Estudante de graduação</option>
+                  <option value="mestrado" selected>Estudante de mestrado</option>
+                  <option value="doutorado">Estudante de doutorado</option>
+                  <option value="docente">Docente / Orientador(a)</option>
+                  <option value="outro">Outro</option>
+                </select>
+              </div>
+              <div>
+                <label for="pilot-familiaridade">Familiaridade com ferramentas digitais</label>
+                <select id="pilot-familiaridade">
+                  <option value="iniciante">Iniciante (tenho pouca prática com sistemas técnicos)</option>
+                  <option value="intermediaria" selected>Intermediária (uso editor de texto e internet no dia a dia)</option>
+                  <option value="avancada">Avançada (área de tecnologia ou uso frequente)</option>
+                </select>
+              </div>
+            </div>
+            <h4 style="margin:14px 0 6px">Parte 1 · Facilidade de uso (Escala SUS — 1 = discordo totalmente, 5 = concordo totalmente)</h4>
+            <div id="pilot-sus-list" style="display:flex;flex-direction:column;gap:8px"></div>
+            <h4 style="margin:16px 0 6px">Parte 2 · Sua experiência e autonomia (opcional)</h4>
+            <label for="pilot-ajudou">O que mais ajudou você a organizar ou escrever sua pesquisa?</label>
+            <textarea id="pilot-ajudou" rows="2" maxlength="1500"></textarea>
+            <label for="pilot-dificultou">O que ainda pareceu confuso ou difícil?</label>
+            <textarea id="pilot-dificultou" rows="2" maxlength="1500"></textarea>
+            <label for="pilot-autoria">Você sentiu que manteve sua própria voz e autoria usando o Scriptorium? Por quê?</label>
+            <textarea id="pilot-autoria" rows="2" maxlength="1500"></textarea>
+            <h4 style="margin:16px 0 6px">Parte 3 · Atividade rápida sem IA (transferência de aprendizagem — opcional)</h4>
+            <p class="subtle">Imagine um cenário novo (sem usar IA nem dicas): <em>"Estudantes de um curso técnico noturno relatam dificuldade para acompanhar as aulas à distância por falta de tempo e acesso pelo celular."</em> Como você estruturaria uma pequena pesquisa sobre isso?</p>
+            <label for="pilot-tr-problema">1. Qual é a situação problemática (em 2 linhas)?</label>
+            <textarea id="pilot-tr-problema" rows="2" maxlength="1500"></textarea>
+            <label for="pilot-tr-pergunta">2. Qual seria sua pergunta de pesquisa (única)?</label>
+            <input id="pilot-tr-pergunta" type="text" maxlength="1000" />
+            <label for="pilot-tr-objetivo">3. Qual seria o objetivo geral (começando com verbo no infinitivo)?</label>
+            <input id="pilot-tr-objetivo" type="text" maxlength="1000" />
+            <label for="pilot-tr-coleta">4. Como você coletaria os dados com esses estudantes?</label>
+            <textarea id="pilot-tr-coleta" rows="2" maxlength="1500"></textarea>
+            <div class="actions">
+              <button class="btn" type="button" id="pilot-submit-btn">Enviar avaliação anônima</button>
+              <button class="btn alt hidden" type="button" id="pilot-withdraw-btn">Retirar consentimento e apagar resposta</button>
+              <span class="subtle" id="pilot-message" role="status"></span>
+            </div>
+          </div>
+        </details>
         <div id="admin-invitations" class="hidden">
+          <div class="actions" style="margin-top:0;margin-bottom:12px">
+            <button class="btn alt" type="button" id="admin-pilot-csv">Baixar dados anonimizados do piloto (.csv)</button>
+          </div>
           <label for="invitation-email">Convidar pesquisador pelo e-mail Google</label>
           <input id="invitation-email" type="email" autocomplete="email" placeholder="pesquisador@universidade.br" />
           <div class="actions">
