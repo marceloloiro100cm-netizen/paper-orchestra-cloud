@@ -1159,14 +1159,35 @@ function renderPreencher(s){let body='';if(s.id===3){body=renderRepeat('searchBl
   return `<div class="section-max section-gap"><div class="notice"><strong>Escreva no seu tempo:</strong> tudo o que você digita fica salvo automaticamente. Você pode sair e voltar depois sem perder nada.</div>${renderLegacy(s)}${body}<div class="action-footer"><button type="button" class="btn" data-action="examples">Ver exemplos prontos</button><button type="button" class="btn primary" data-action="tab" data-tab="conferir">Revisar e avançar →</button></div></div>`;}
 function renderConferir(s){const p=info(s.id);const items=s.criteria.map((c,i)=>{const k=`${s.id}:${i}`;return `<div class="check-card"><input type="checkbox" id="check-${s.id}-${i}" data-check="${esc(k)}" ${state.criteria[k]?'checked':''}><div><label for="check-${s.id}-${i}">${esc(c)}</label><textarea class="check-note" rows="2" data-evidence="${esc(k)}" aria-label="Anotação para o critério ${i+1}" placeholder="Anotação opcional (o que já está pronto ou o que falta revisar)…">${esc(state.evidence[k]||'')}</textarea></div></div>`;}).join('');
 const rev=state.reviews[s.id];return `<div class="section-max section-gap"><div class="card warning"><span class="eyebrow">Revisão pessoal desta etapa</span><p class="small" style="margin:6px 0">Marque cada item abaixo quando sentir que ele está bem resolvido no seu texto. Você pode avançar e voltar quando quiser.</p><div class="status-steps">${['Em andamento','Preenchida','Conferida','Revisão da orientação'].map((q,i)=>`<span class="status-step ${(i===0&&p.count>0)||(i===1&&p.complete)||(i===2&&p.complete&&p.allChecked)||(i===3&&rev&&rev.result==='revisado')?'on':''}">${q}</span>`).join('')}</div></div><h3>Lista de conferência</h3><div class="small muted">Preenchido: ${p.count} de ${p.max} blocos · Marcados: ${s.criteria.filter((_,i)=>state.criteria[`${s.id}:${i}`]).length} de ${s.criteria.length}</div>${items}<div class="card white"><h3>Comentário da orientação (opcional)</h3>${rev?.stale?'<div class="notice" style="margin-bottom:10px">Você editou esta etapa depois do último parecer registrado.</div>':''}<p class="small">${rev?'Último registro: '+esc(rev.reviewer)+' · '+esc(rev.date)+': '+esc(rev.comment):'Nenhum comentário registrado ainda.'}</p><button type="button" class="btn sm" data-action="review">Registrar comentário recebido</button></div><div class="action-footer"><button type="button" class="btn" data-action="snapshot">Guardar uma versão</button><div class="flex"><button type="button" class="btn" data-action="jump" data-stage="${Math.max(1,s.id-1)}" ${s.id===1?'disabled':''}>← Etapa anterior</button><button type="button" class="btn primary" data-action="jump" data-stage="${Math.min(8,s.id+1)}">${s.id===8?'Concluir revisão':'Ir para a Etapa '+Math.min(8,s.id+1)+' →'}</button></div></div></div>`;}
+function buildGuidePlan(){
+  const titulo=val('tituloFinal')||val('tituloProvisorio')||val('tema');
+  const obs=recs('objectives').map((o,i)=>plain(o.texto)?`${i+1}. ${plain(o.texto)}`:'').filter(Boolean);
+  const parts=[
+    val('pergunta')&&('Pergunta de pesquisa: '+val('pergunta')),
+    val('problema')&&('Situação problemática: '+val('problema')),
+    val('objetivoGeral')&&('Objetivo geral: '+val('objetivoGeral')),
+    obs.length&&('Objetivos específicos:\n'+obs.join('\n')),
+    val('estrategia')&&('Estratégia metodológica: '+val('estrategia')),
+  ].filter(Boolean);
+  const tipo=isArticle()?'artigo':'dissertacao';
+  return {titulo,pergunta:parts.join('\n\n'),tipo,modelo:tipo==='dissertacao'?'abnt-dissertacao':'abnt-artigo'};
+}
 function renderProjectBridge(){
   const box=R.getElementById('projectBridge');if(!box)return;
   const list=window.ScriptoriumProjetos?.listar()||[];
-  if(!list.length){box.hidden=true;return;}
-  const active=list[0];
-  const step=active.proximo_passo||{};
+  const plan=buildGuidePlan();
+  const hasContent=Boolean(plan.titulo||plan.pergunta);
+  const logged=Boolean(window.ScriptoriumConta?.usuario());
+  if(!list.length&&!(logged&&hasContent)){box.hidden=true;return;}
   box.hidden=false;
-  box.innerHTML=`<div><strong>Seu artigo em andamento:</strong> ${esc(active.titulo||'Sem título')} · <span class="muted">${esc(step.titulo||'Em elaboração')}</span></div><button type="button" class="btn sm" data-action="open-articles">Abrir em Seus artigos →</button>`;
+  const active=list[0];
+  const left=active
+    ?`<div><strong>Seu texto em andamento:</strong> ${esc(active.titulo||'Sem título')} · <span class="muted">${esc((active.proximo_passo||{}).titulo||'Em elaboração')}</span></div>`
+    :`<div><strong>Pronto para começar a escrever?</strong> Leve o plano deste guia direto para criar seu artigo, dissertação ou TCC em ABNT.</div>`;
+  const btns=[];
+  if(logged&&hasContent)btns.push(`<button type="button" class="btn sm primary" data-action="send-to-project">Levar plano para artigo / dissertação →</button>`);
+  if(active)btns.push(`<button type="button" class="btn sm" data-action="open-articles">Abrir em Seus textos</button>`);
+  box.innerHTML=`${left}<div class="flex">${btns.join('')}</div>`;
 }
 function markChanged(stageId){const deps=stageId===2?[2,4,5,6,7,8]:stageId===3?[3,4,5,6,7,8]:stageId===4?[4,5,6,7,8]:stageId===5?[5,6,7,8]:stageId===6?[6,7,8]:stageId===7?[7,8]:[stageId];let invalidated=false;for(const id of deps){for(let i=0;i<byStage(id).criteria.length;i++){const k=`${id}:${i}`;if(state.criteria[k]){state.criteria[k]=false;invalidated=true;}}if(state.reviews[id]&&!state.reviews[id].stale){state.reviews[id].stale=true;invalidated=true;}}if(invalidated)notify('Como houve alterações, revise os critérios relacionados quando puder.');}
 function render(){HOST.dataset.theme=temaDoSite();HOST.style.setProperty('--font',state.font);renderHeader();renderChain();renderStations();renderProjectBridge();R.getElementById('stageBody').innerHTML=state.tab==='entender'?renderEntender(byStage(state.active)):state.tab==='preencher'?renderPreencher(byStage(state.active)):renderConferir(byStage(state.active));updateStatus();}
@@ -1241,6 +1262,7 @@ function actionHandler(btn){const a=btn.dataset.action;const rec=btn.dataset.rec
   const openMenu=btn.closest('details.more-menu');if(openMenu)openMenu.open=false;
   if(a==='set-tipo'){const tipo=btn.dataset.tipo;if(tipo===state.tipo)return;for(const id of [6,7,8])for(const k of Object.keys(state.criteria))if(k.startsWith(id+':'))delete state.criteria[k];state.tipo=tipo;applyMode();scheduleSave();render();notify(tipo==='artigo'?'Modo Artigo científico selecionado (etapas 6 a 8 adaptadas).':'Modo Projeto de pesquisa selecionado (etapas 6 a 8 com produto e cronograma).');return;}
   if(a==='open-articles'){window.ScriptoriumNavegar?.('3');return;}
+  if(a==='send-to-project'){const plan=buildGuidePlan();if(!plan.titulo&&!plan.pergunta){notify('Preencha pelo menos o tema ou a pergunta antes de levar o plano.');return;}window.ScriptoriumPonteGuia?.enviar(plan);return;}
   if(a==='tab'){state.tab=btn.dataset.tab;flush();render();return;}
   if(a==='jump'){state.active=Math.min(8,Math.max(1,Number(btn.dataset.stage)||1));state.tab='entender';flush();closeModal();render();R.getElementById('stageSheet')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
   if(a==='glossary'){glossaryModal();return;}if(a==='help'){helpModal();return;}if(a==='examples'){examplesModal();return;}if(a==='versions'){versionModal();return;}if(a==='audit'){openAudit();return;}if(a==='export'){exportModal();return;}if(a==='backup'){backupModal();return;}if(a==='settings'){settingsModal();return;}
@@ -1331,7 +1353,8 @@ const GuiaApp={
   refresh(){updateStatus();}
 };
 load();applyMode();if(!lastKnownWrite&&!savingError)persist();render();
-const CONTA=window.ScriptoriumConta;if(CONTA){NUVEM.conta(CONTA.usuario());CONTA.aoMudar(u=>NUVEM.conta(u));}
+window.ScriptoriumGuiaResumo=buildGuidePlan;
+const CONTA=window.ScriptoriumConta;if(CONTA){NUVEM.conta(CONTA.usuario());CONTA.aoMudar(u=>{NUVEM.conta(u);renderProjectBridge();});}
 window.ScriptoriumProjetos?.aoMudar(()=>renderProjectBridge());
 
 }

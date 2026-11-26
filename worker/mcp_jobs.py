@@ -60,6 +60,41 @@ ABNT_PREAMBLE = r"""\documentclass[article,12pt,oneside,a4paper,brazil]{abntex2}
 \maketitle
 """
 
+ABNT_BOOK_PREAMBLE = r"""\documentclass[12pt,oneside,a4paper,brazil]{abntex2}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,booktabs,array}
+\usepackage{hyperref,url}
+\usepackage[alf]{abntex2cite}
+\providecommand{\citep}[1]{\cite{#1}}
+\providecommand{\citet}[1]{\citeonline{#1}}
+\providecommand{\citealp}[1]{\cite{#1}}
+\providecommand{\citealt}[1]{\citeonline{#1}}
+\providecommand{\citeauthor}[1]{\citeonline{#1}}
+\providecommand{\citeyear}[1]{\cite{#1}}
+\titulo{%(title)s}
+\autor{%(author)s}
+\instituicao{Instituição e Programa — preencher na versão final}
+\tipotrabalho{%(work_type)s}
+\local{Brasil}
+\data{%(date)s}
+\begin{document}
+\selectlanguage{brazil}
+\imprimircapa
+\begin{titlingpage}
+\centering
+{\large\imprimirinstituicao\par}
+\vspace*{3cm}
+{\large\imprimirautor\par}
+\vspace*{2cm}
+{\Large\bfseries\imprimirtitulo\par}
+\vfill
+{\imprimirlocal, \imprimirdata\par}
+\end{titlingpage}
+"""
+
 SIMPLE_PREAMBLE = r"""\documentclass[12pt,a4paper]{article}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
@@ -176,14 +211,26 @@ def assemble(project: dict, body: str, today: datetime | None = None, draft: lis
     if draft:
         title = ("RASCUNHO: " if project.get("language") != "en" else "DRAFT: ") + title
         body = draft_banner(draft, project.get("language", "pt-BR")) + (body or "")
+    tpl = project.get("template") or "abnt-artigo"
     values = {"title": latex_escape(title),
               "author": "Autoria a preencher pelo pesquisador",
               "date": run_date(project.get("language", "pt-BR"), today),
-              "babel": "english" if project.get("language") == "en" else "brazil"}
-    if project.get("template") == "artigo-simples":
+              "babel": "english" if project.get("language") == "en" else "brazil",
+              "work_type": "Trabalho de Conclusão de Curso (TCC)" if tpl == "abnt-tcc" else "Dissertação de Mestrado"}
+    if tpl == "artigo-simples":
         return (SIMPLE_PREAMBLE % values + body.strip() +
                 "\n\n\\bibliographystyle{plainnat}\n\\bibliography{references}\n\\end{document}\n")
     text = body.strip()
+    if tpl in ("abnt-dissertacao", "abnt-tcc"):
+        # Se a IA usou só \section{...} sem \chapter{...}, promove para capítulos ABNT.
+        if "\\chapter" not in text:
+            text = re.sub(r"\\subsection(\*?\{)", r"\\section\1",
+                          re.sub(r"\\section(\*?\{)", r"\\chapter\1", text))
+        if "\\end{resumo}" in text:
+            text = text.replace("\\end{resumo}", "\\end{resumo}\n\\tableofcontents*\n\\textual", 1)
+        else:
+            text = "\\tableofcontents*\n\\textual\n" + text
+        return ABNT_BOOK_PREAMBLE % values + text + "\n\n\\postextual\n\\bibliography{references}\n\\end{document}\n"
     if "\\end{resumo}" in text:
         text = text.replace("\\end{resumo}", "\\end{resumo}\n\\textual", 1)
     else:

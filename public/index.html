@@ -2032,11 +2032,40 @@
       <section class="panel step-hidden" id="mcp-projects-panel" data-step-panel="3" data-sem-api-only>
         <div class="panel-header">
           <div>
-            <h2>Seus artigos</h2>
-            <p class="subtle" style="margin:4px 0 0">Sua IA escreve na conversa; aqui você vê o que já foi conferido e o que fazer em seguida.</p>
+            <h2>Seus textos (artigos, dissertações e TCCs)</h2>
+            <p class="subtle" style="margin:4px 0 0">Crie aqui usando o que planejou no Guia de Escrita (ou peça à sua IA); acompanhe cada conferência e baixe em PDF ou Word (.docx).</p>
           </div>
           <button id="mcp-projects-refresh" class="btn alt" type="button">Atualizar</button>
         </div>
+        <details class="gemini-setup" id="new-mcp-project-box" style="margin-bottom:16px">
+          <summary>+ Novo artigo, dissertação ou TCC</summary>
+          <div class="gemini-setup-body">
+            <div class="actions" style="margin-top:0;margin-bottom:10px">
+              <button class="btn alt" type="button" id="fill-from-guide">Trazer plano do Guia de Escrita</button>
+              <span class="subtle" id="new-proj-guide-hint" role="status"></span>
+            </div>
+            <label for="new-proj-type">Tipo de trabalho (padrão ABNT)</label>
+            <select id="new-proj-type">
+              <option value="artigo|abnt-artigo">Artigo científico (ABNT)</option>
+              <option value="dissertacao|abnt-dissertacao">Dissertação de mestrado (ABNT — capítulos)</option>
+              <option value="tcc|abnt-tcc">TCC / Monografia de graduação (ABNT — capítulos)</option>
+              <option value="revisao_sistematica|abnt-artigo">Revisão sistemática (ABNT + PRISMA)</option>
+            </select>
+            <label for="new-proj-title">Título provisório</label>
+            <input id="new-proj-title" type="text" maxlength="120" placeholder="Ex.: Democratização da escrita científica no ensino superior" />
+            <label for="new-proj-question">Pergunta de pesquisa, objetivos e foco do texto</label>
+            <textarea id="new-proj-question" rows="4" maxlength="4000" placeholder="Explique em poucas linhas o que você quer investigar e responder neste texto (ou clique em Trazer plano do Guia acima)."></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px">
+              <label style="margin:0">Fontes da sua biblioteca (escolha até 20)</label>
+              <button class="btn alt" type="button" id="new-proj-select-all" style="padding:5px 10px;font-size:0.8rem">Selecionar todas</button>
+            </div>
+            <div id="new-proj-sources" class="subtle" style="max-height:190px;overflow:auto;margin-top:6px;padding:10px;border:1px solid var(--border-main);border-radius:10px;background:var(--bg-surface)">Carregando biblioteca...</div>
+            <div class="actions">
+              <button class="btn" type="button" id="create-mcp-project-btn">Criar e preparar fontes agora</button>
+              <span class="subtle" id="new-proj-status" role="status"></span>
+            </div>
+          </div>
+        </details>
         <div id="mcp-projects" role="status">Carregando...</div>
       </section>
       <section class="panel step-hidden" id="history-panel" data-step-panel="3">

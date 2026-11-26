@@ -131,6 +131,7 @@ $('context-size')?.addEventListener('change', () => {
 });
 
 function displayLibrary() {
+  renderNewProjectSources();
   const target = $('library-list');
   target.replaceChildren();
   const filter = $('library-filter').value.trim().toLowerCase();
@@ -1204,8 +1205,19 @@ async function loadMcp() {
     await loadMcpProjects();
   } catch (_) { $('mcp-details').classList.add('hidden'); /* API anterior ou conta sem acesso */ }
 }
-const MCP_TYPES = {artigo: 'Artigo', revisao_sistematica: 'Revisão sistemática'};
-const MCP_FILES = {'scriptorium.pdf': 'PDF', 'scriptorium.tex': 'LaTeX', 'references.bib': 'BibTeX', 'proveniencia.json': 'Proveniência'};
+const MCP_TYPES = {
+  artigo: 'Artigo científico',
+  dissertacao: 'Dissertação de mestrado',
+  tcc: 'TCC / Monografia',
+  revisao_sistematica: 'Revisão sistemática',
+};
+const MCP_FILES = {
+  'scriptorium.pdf': 'PDF',
+  'scriptorium.docx': 'Word (.docx)',
+  'scriptorium.tex': 'LaTeX',
+  'references.bib': 'BibTeX',
+  'proveniencia.json': 'Proveniência',
+};
 const fmt = (n, d = 0) => (n === null || n === undefined || n === '') ? '–' : Number(n).toLocaleString('pt-BR', {maximumFractionDigits: d, minimumFractionDigits: d});
 
 async function downloadFrom(path, name) {
@@ -1495,8 +1507,14 @@ function articleCard(p) {
     const pdf = el('button', p.pdf_final ? 'Baixar PDF final' : 'Baixar PDF (rascunho)', 'btn'); pdf.type = 'button';
     pdf.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/arquivos/scriptorium.pdf`, 'scriptorium.pdf'));
     actions.append(pdf);
+  }
+  if ((p.arquivos || []).includes('scriptorium.tex') || (p.arquivos || []).includes('scriptorium.pdf')) {
+    const docx = el('button', 'Baixar Word (.docx)', 'btn alt'); docx.type = 'button';
+    docx.title = 'Baixa documento editável em padrão ABNT para abrir no Microsoft Word ou Google Docs.';
+    docx.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/arquivos/scriptorium.docx`, 'scriptorium.docx'));
+    actions.append(docx);
     const pkg = el('button', 'Pacote para orientação (.zip)', 'btn alt'); pkg.type = 'button';
-    pkg.title = 'Baixa PDF, BibTeX, proveniência e resumo legível para enviar à orientação.';
+    pkg.title = 'Baixa PDF, Word (.docx), BibTeX, proveniência e resumo legível para enviar à orientação.';
     pkg.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/pacote-orientacao.zip`, 'pacote_orientacao.zip'));
     actions.append(pkg);
   }
@@ -1611,6 +1629,102 @@ async function loadMcpProjects() {
   if (user) writeUiCache(user.uid, { mcpProjects: projects });
   renderMcpProjectsList(projects);
 }
+function renderNewProjectSources() {
+  const box = $('new-proj-sources'); if (!box) return;
+  const usable = (libraryItems || []).filter(i => ['pdf', 'docx', 'txt'].includes((i.format || '').toLowerCase()));
+  if (!usable.length) {
+    box.textContent = 'Envie primeiro ao menos 1 PDF, DOCX ou TXT na aba Biblioteca.';
+    return;
+  }
+  const prev = new Set([...box.querySelectorAll('input:checked')].map(c => c.value));
+  box.replaceChildren();
+  for (const item of usable) {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 2px;cursor:pointer;font-weight:500;font-size:0.88rem';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = item.id; cb.checked = prev.has(item.id) || (prev.size === 0 && usable.length <= 8);
+    const name = document.createElement('span'); name.textContent = item.name;
+    row.append(cb, name);
+    box.append(row);
+  }
+}
+
+function readGuidePlanFallback() {
+  if (typeof window.ScriptoriumGuiaResumo === 'function') return window.ScriptoriumGuiaResumo();
+  try {
+    const raw = JSON.parse(localStorage.getItem('scriptorium_pesquisa_guiada_v2') || 'null');
+    if (!raw || !raw.values) return null;
+    const v = raw.values;
+    const titulo = (v.tituloFinal || v.tituloProvisorio || v.tema || '').trim();
+    const parts = [
+      v.pergunta && ('Pergunta de pesquisa: ' + v.pergunta.trim()),
+      v.problema && ('Problema: ' + v.problema.trim()),
+      v.objetivoGeral && ('Objetivo geral: ' + v.objetivoGeral.trim()),
+      v.estrategia && ('Estratégia metodológica: ' + v.estrategia.trim()),
+    ].filter(Boolean);
+    if (!titulo && !parts.length) return null;
+    const tipo = raw.tipo === 'projeto' ? 'dissertacao' : 'artigo';
+    return { titulo, pergunta: parts.join('\n\n'), tipo, modelo: tipo === 'dissertacao' ? 'abnt-dissertacao' : 'abnt-artigo' };
+  } catch (_) { return null; }
+}
+
+function applyGuidePlanToForm(plan) {
+  const hint = $('new-proj-guide-hint');
+  const data = plan || readGuidePlanFallback();
+  if (!data || (!data.titulo && !data.pergunta)) {
+    if (hint) hint.textContent = 'Preencha primeiro ao menos o tema ou a pergunta na aba Guia de escrita.';
+    return false;
+  }
+  const box = $('new-mcp-project-box'); if (box) box.open = true;
+  if ($('new-proj-title') && data.titulo) $('new-proj-title').value = data.titulo.slice(0, 120);
+  if ($('new-proj-question') && data.pergunta) $('new-proj-question').value = data.pergunta.slice(0, 4000);
+  if ($('new-proj-type')) {
+    const targetVal = data.tipo === 'dissertacao' ? 'dissertacao|abnt-dissertacao'
+      : data.tipo === 'tcc' ? 'tcc|abnt-tcc' : 'artigo|abnt-artigo';
+    $('new-proj-type').value = targetVal;
+  }
+  renderNewProjectSources();
+  if (hint) hint.textContent = '✓ Plano trazido do Guia de Escrita! Confira as fontes e clique em Criar.';
+  return true;
+}
+
+window.ScriptoriumPonteGuia = {
+  enviar(plan) {
+    window.ScriptoriumNavegar?.('3');
+    applyGuidePlanToForm(plan);
+    $('new-mcp-project-box')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+};
+
+$('fill-from-guide')?.addEventListener('click', () => applyGuidePlanToForm(null));
+$('new-proj-select-all')?.addEventListener('click', () => {
+  const cbs = [...($('new-proj-sources')?.querySelectorAll('input[type="checkbox"]') || [])];
+  const allChecked = cbs.length > 0 && cbs.every(c => c.checked);
+  cbs.slice(0, 20).forEach(c => { c.checked = !allChecked; });
+});
+$('create-mcp-project-btn')?.addEventListener('click', async () => {
+  const btn = $('create-mcp-project-btn'), st = $('new-proj-status');
+  const [tipo, modelo] = ($('new-proj-type')?.value || 'artigo|abnt-artigo').split('|');
+  const titulo = ($('new-proj-title')?.value || '').trim();
+  const pergunta = ($('new-proj-question')?.value || '').trim();
+  const fontes = [...($('new-proj-sources')?.querySelectorAll('input:checked') || [])].map(c => c.value).slice(0, 20);
+  if (titulo.length < 3) { st.textContent = 'Informe um título com pelo menos 3 caracteres.'; return; }
+  if (pergunta.length < 20) { st.textContent = 'Escreva a pergunta ou objetivo (mínimo 20 caracteres).'; return; }
+  if (!fontes.length) { st.textContent = 'Escolha pelo menos 1 fonte da sua biblioteca.'; return; }
+  btn.disabled = true; st.textContent = 'Criando projeto e preparando fontes…';
+  try {
+    await request('/mcp-conta/projetos', {
+      method: 'POST',
+      body: JSON.stringify({ titulo, pergunta, fontes, tipo, modelo, idioma: 'pt-BR' }),
+    });
+    st.textContent = '✓ Criado! O Scriptorium já está lendo suas fontes.';
+    $('new-proj-title').value = ''; $('new-proj-question').value = '';
+    if ($('new-mcp-project-box')) $('new-mcp-project-box').open = false;
+    await loadMcpProjects();
+  } catch (e) { st.textContent = e.message; }
+  finally { btn.disabled = false; }
+});
+
 $('mcp-projects-refresh')?.addEventListener('click', () => loadMcpProjects());
 if (API_MODE && $('step-sub-3')) $('step-sub-3').textContent = 'Histórico, agentes e pareceres';
 $('mcp-create-token')?.addEventListener('click', async () => {
