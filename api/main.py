@@ -5,6 +5,7 @@ As chaves Gemini ficam somente no Cloud Run Job (Secret Manager); não entram aq
 import json
 import os
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Annotated, Literal
@@ -66,6 +67,38 @@ run_client = run_v2.JobsClient()
 bucket = storage_client.bucket(BUCKET)
 app = FastAPI(title="PaperOrchestra Cloud", docs_url=None, redoc_url=None, openapi_url=None)
 
+# Onda 1 (observabilidade leve): mede latência por requisição sem tocar dados pessoais.
+@app.middleware("http")
+async def _timing_header(request, call_next):
+    started = time.perf_counter()
+    response = await call_next(request)
+    response.headers["X-Response-Time-Ms"] = f"{(time.perf_counter() - started) * 1000:.1f}"
+    return response
+
+
+# Onda 1 (G2): cache de curta duração (45s) para evitar 6-8 RPCs repetidos ao
+# Firebase Auth e Firestore na abertura paralela da tela.
+_AUTH_CACHE_TTL = 45.0
+_REVOKED_OK_CACHE: dict[tuple[str, int], float] = {}
+_ACCESS_CACHE: dict[tuple[str, str], tuple[float, dict]] = {}
+
+
+def _cached_access(identity: dict) -> dict:
+    key = (str(identity.get("uid") or ""), str(identity.get("email") or "").lower())
+    now_ts = time.monotonic()
+    hit = _ACCESS_CACHE.get(key)
+    if hit and now_ts - hit[0] < _AUTH_CACHE_TTL:
+        return hit[1]
+    result = get_access(db, identity, ALLOWED_EMAILS)
+    if len(_ACCESS_CACHE) > 256:
+        _ACCESS_CACHE.clear()
+    _ACCESS_CACHE[key] = (now_ts, result)
+    return result
+
+
+def _invalidate_access_cache() -> None:
+    _ACCESS_CACHE.clear()
+
 
 class NewResearch(BaseModel):
     title: str = Field(min_length=3, max_length=120)
@@ -102,8 +135,16 @@ class NewResearch(BaseModel):
 def identified_user(authorization: Annotated[str | None, Header()] = None):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Entre com sua conta Google")
+    raw_token = authorization[7:]
     try:
-        token = auth.verify_id_token(authorization[7:], check_revoked=True)
+        token = auth.verify_id_token(raw_token, check_revoked=False)
+        cache_key = (str(token.get("uid") or ""), int(token.get("iat") or 0))
+        now_ts = time.monotonic()
+        if now_ts - _REVOKED_OK_CACHE.get(cache_key, 0.0) >= _AUTH_CACHE_TTL:
+            token = auth.verify_id_token(raw_token, check_revoked=True)
+            if len(_REVOKED_OK_CACHE) > 512:
+                _REVOKED_OK_CACHE.clear()
+            _REVOKED_OK_CACHE[cache_key] = now_ts
     except Exception:
         raise HTTPException(status_code=401, detail="Sessão inválida ou expirada") from None
     return token
@@ -111,7 +152,7 @@ def identified_user(authorization: Annotated[str | None, Header()] = None):
 
 def current_user(identity: Annotated[dict, Depends(identified_user)]):
     if not (is_admin(identity, ALLOWED_EMAILS) or
-            (BYOK_ENABLED and get_access(db, identity, ALLOWED_EMAILS)["allowed"])):
+            (BYOK_ENABLED and _cached_access(identity)["allowed"])):
         raise HTTPException(status_code=403, detail="Conta não autorizada")
     return identity
 
@@ -266,7 +307,9 @@ def approve_access(request_id: str, user: User):
         raise HTTPException(status_code=503, detail="Convites indisponíveis.")
     if not is_admin(user, ALLOWED_EMAILS):
         raise HTTPException(status_code=403, detail="Somente administradores.")
-    return approve_access_request(db, request_id, user["uid"], ALLOWED_EMAILS)
+    res = approve_access_request(db, request_id, user["uid"], ALLOWED_EMAILS)
+    _invalidate_access_cache()
+    return res
 
 
 @app.put("/api/account/credential")
@@ -289,6 +332,7 @@ def save_personal_credential(payload: GeminiCredential, user: User):
     try:
         saved = store_credential(db, PROJECT, user["uid"], key,
                                   model_access=model_access)
+        _invalidate_access_cache()
         return {**saved, "model_access": model_access}
     except Exception:
         raise HTTPException(status_code=503, detail="Não foi possível guardar a credencial de IA.") from None
@@ -299,7 +343,9 @@ def remove_personal_credential(user: User):
     if not BYOK_ENABLED:
         raise HTTPException(status_code=503, detail="Credenciais individuais indisponíveis até aprovação da infraestrutura.")
     try:
-        return delete_credential(db, PROJECT, user["uid"])
+        res = delete_credential(db, PROJECT, user["uid"])
+        _invalidate_access_cache()
+        return res
     except Exception:
         raise HTTPException(status_code=503, detail="Credencial desativada; não foi possível confirmar a exclusão no cofre.") from None
 
@@ -310,7 +356,9 @@ def invite_researcher(payload: Invitation, user: User):
         raise HTTPException(status_code=503, detail="Convites indisponíveis até aprovação da infraestrutura.")
     if not is_admin(user, ALLOWED_EMAILS):
         raise HTTPException(status_code=403, detail="Apenas administradores podem convidar.")
-    return set_invitation(db, payload.email, True, user["uid"], ALLOWED_EMAILS)
+    res = set_invitation(db, payload.email, True, user["uid"], ALLOWED_EMAILS)
+    _invalidate_access_cache()
+    return res
 
 
 @app.delete("/api/admin/invitations/{email}")
@@ -320,7 +368,9 @@ def revoke_researcher(email: str, user: User):
     if not is_admin(user, ALLOWED_EMAILS):
         raise HTTPException(status_code=403, detail="Apenas administradores podem revogar.")
     try:
-        return set_invitation(db, email, False, user["uid"], ALLOWED_EMAILS)
+        res = set_invitation(db, email, False, user["uid"], ALLOWED_EMAILS)
+        _invalidate_access_cache()
+        return res
     except ValueError:
         raise HTTPException(status_code=422, detail="E-mail inválido.") from None
 

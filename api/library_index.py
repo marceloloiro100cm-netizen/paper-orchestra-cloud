@@ -23,17 +23,42 @@ na API, o que o desenho do BYOK evita; por isso a busca aqui é lexical (BM25).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import tempfile
+from pathlib import Path
 from typing import Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+try:
+    from google.api_core.exceptions import NotFound
+except Exception:  # pragma: no cover
+    NotFound = ()
+
 import library_search
 from library_search import (INDEX_VERSION, MAX_DOCUMENTS, MAX_RESULTS, STOPWORDS, DERIVED,  # noqa: F401
                             build_index, derived_blobs, reading_card, search_index, signature, terms)
+
+_CACHE_DIR = Path(tempfile.gettempdir()) / "scriptorium_libidx_cache"
+_MAX_CACHED_INDEXES = 24
+
+
+def _cache_path(bucket_id: int, uid: str, sig: str) -> Path:
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256(f"{bucket_id}:{uid}:{sig}".encode("utf-8")).hexdigest()[:24]
+    return _CACHE_DIR / f"{digest}.sqlite"
+
+
+def _prune_cache() -> None:
+    try:
+        files = sorted(_CACHE_DIR.glob("*.sqlite"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for stale in files[_MAX_CACHED_INDEXES:]:
+            stale.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def fts_query(text: str) -> str:
@@ -51,6 +76,12 @@ def make_library_index_router(db, bucket, verify_user: Callable):
         docs = db.collection("library_items").where("owner_uid", "==", uid).limit(500).stream()
         return {d["id"]: d for d in (s.to_dict() for s in docs) if d.get("status") == "active"}
 
+    def _read_json(blob):
+        try:
+            return json.loads(blob.download_as_bytes())
+        except (NotFound, KeyError, FileNotFoundError, ValueError):
+            return None
+
     @router.get("/search")
     def search(q: str = Query(min_length=2, max_length=200), user: dict = dependency):
         uid = user["uid"]
@@ -61,31 +92,37 @@ def make_library_index_router(db, bucket, verify_user: Callable):
         index_blob = bucket.blob(f"library/{uid}/index/{INDEX_VERSION}.sqlite")
         meta_blob = bucket.blob(f"library/{uid}/index/{INDEX_VERSION}.json")
         rebuilt = False
-        with tempfile.TemporaryDirectory(prefix="libidx_") as tmp:
-            path = os.path.join(tmp, "index.sqlite")
-            current = None
-            if meta_blob.exists():
-                try:
-                    current = json.loads(meta_blob.download_as_bytes()).get("signature")
-                except ValueError:
-                    current = None
-            if current == sig and index_blob.exists():
-                index_blob.download_to_filename(path)
-                chunks = json.loads(meta_blob.download_as_bytes()).get("chunks", 0)
-            else:
-                documents = []
-                for item_id, blob in blobs.items():
-                    try:
-                        documents.append((items[item_id], json.loads(blob.download_as_bytes())))
-                    except ValueError:
-                        continue
-                chunks = build_index(path, documents)
-                index_blob.upload_from_filename(path, content_type="application/vnd.sqlite3")
-                meta_blob.upload_from_string(json.dumps({"signature": sig, "chunks": chunks,
-                                                         "documents": len(documents)}),
-                                             content_type="application/json")
-                rebuilt = True
-            results = search_index(path, query) if chunks else []
+        # Lê meta_blob uma única vez (antes lia duas vezes por consulta) e mantém cache local em /tmp por assinatura.
+        meta_data = _read_json(meta_blob) if meta_blob.exists() else None
+        current = meta_data.get("signature") if isinstance(meta_data, dict) else None
+        cached = _cache_path(id(bucket), uid, sig)
+        if current == sig and cached.exists() and cached.stat().st_size > 0:
+            chunks = int((meta_data or {}).get("chunks", 0))
+            os.utime(cached, None)
+            results = search_index(str(cached), query) if chunks else []
+        elif current == sig and index_blob.exists():
+            tmp_target = str(cached) + ".tmp"
+            index_blob.download_to_filename(tmp_target)
+            os.replace(tmp_target, cached)
+            _prune_cache()
+            chunks = int((meta_data or {}).get("chunks", 0))
+            results = search_index(str(cached), query) if chunks else []
+        else:
+            documents = []
+            for item_id, blob in blobs.items():
+                parsed = _read_json(blob)
+                if parsed is not None:
+                    documents.append((items[item_id], parsed))
+            tmp_target = str(cached) + ".tmp"
+            chunks = build_index(tmp_target, documents)
+            os.replace(tmp_target, cached)
+            _prune_cache()
+            index_blob.upload_from_filename(str(cached), content_type="application/vnd.sqlite3")
+            meta_blob.upload_from_string(json.dumps({"signature": sig, "chunks": chunks,
+                                                     "documents": len(documents)}),
+                                         content_type="application/json")
+            rebuilt = True
+            results = search_index(str(cached), query) if chunks else []
         return {"results": results, "indexed_documents": len(blobs), "active_documents": len(items),
                 "index_rebuilt": rebuilt,
                 "note": "Documentos entram no índice depois de lidos uma vez numa pesquisa ou diagnóstico."}
