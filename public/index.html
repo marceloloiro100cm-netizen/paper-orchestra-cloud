@@ -1162,6 +1162,19 @@
     .downloads { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
     .downloads button { border: 1px solid var(--border-main); padding: 7px 12px; background: var(--bg-surface); border-radius: 9px; color: var(--text-primary); font-size: 0.8rem; font-weight: 600; }
     .downloads button:hover { border-color: var(--mpie-blue); color: var(--mpie-blue-text); }
+    /* Onda 3: tour acolhedor, glossário contextual e visão de orientação */
+    .welcome-tour { border-left: 4px solid var(--mpie-gold); background: var(--bg-surface); }
+    .tour-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+    .tour-card { padding: 14px 16px; border-radius: 12px; border: 1px solid var(--border-main); background: var(--bg-subtle); }
+    .tour-card strong { display: block; margin-bottom: 4px; color: var(--text-primary); }
+    .tour-card p { margin: 0; font-size: 0.86rem; color: var(--text-secondary); line-height: 1.5; }
+    .glossary-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
+    .glossary-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border-main); background: var(--bg-subtle); color: var(--mpie-blue-text); font-size: 0.8rem; font-weight: 600; cursor: pointer; min-height: 34px; }
+    .glossary-btn:hover, .glossary-btn[aria-expanded="true"] { border-color: var(--mpie-blue); background: var(--mpie-blue-soft); }
+    .glossary-pop { margin-top: 8px; padding: 11px 14px; border-radius: 11px; border: 1px solid var(--ok-border); background: var(--mpie-blue-soft); color: var(--text-primary); font-size: 0.88rem; line-height: 1.5; }
+    .advisor-box { margin-top: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-main); background: var(--bg-subtle); }
+    @media (max-width: 780px) { .tour-grid { grid-template-columns: 1fr; } }
+
     .agent-detail { margin-top: 12px; padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-main); border-radius: 12px; }
     .agent-detail summary { font-weight: 650; color: var(--mpie-blue-text); cursor: pointer; font-size: 0.86rem; }
     .agent-detail > small { display: block; margin: 8px 0; color: var(--text-muted); }
@@ -1432,6 +1445,21 @@
   </header>
 
   <main>
+    <section id="advisor-share-view" class="panel hidden" aria-live="polite">
+      <div class="panel-header">
+        <div>
+          <span class="badge">Visão de orientação · somente leitura</span>
+          <h2 id="adv-view-title" style="margin-top:8px">Carregando projeto compartilhado…</h2>
+          <p id="adv-view-meta" class="subtle" style="margin:4px 0 0"></p>
+        </div>
+        <div class="actions" style="margin:0">
+          <button type="button" class="btn alt" id="adv-view-print">Imprimir / Salvar PDF</button>
+          <a href="/" class="btn alt" style="text-decoration:none">Ir para o Scriptorium</a>
+        </div>
+      </div>
+      <div id="adv-view-body" class="subtle">Aguarde um instante…</div>
+    </section>
+
     <section id="session-restoring" class="panel hidden" role="status" aria-live="polite">
       <span class="session-spinner" aria-hidden="true"></span>
       <div>
@@ -1454,9 +1482,16 @@
       <p id="auth-status" class="subtle" style="margin-top:10px"></p>
     </section>
     <script>
-      // Evita piscar a tela de login quando já há sessão salva neste navegador.
+      // Se for link de orientação (?orientacao=...), mostra o painel de leitura sem pedir login.
+      // Caso contrário, evita piscar a tela de login quando já há sessão salva neste navegador.
       (function () {
         try {
+          var qs = new URLSearchParams(location.search);
+          if (qs.get('orientacao')) {
+            document.getElementById('login-panel').classList.add('hidden');
+            document.getElementById('advisor-share-view').classList.remove('hidden');
+            return;
+          }
           var raw = localStorage.getItem('scriptorium_session_cache_v1');
           if (!raw) return;
           var s = JSON.parse(raw);
@@ -1665,6 +1700,40 @@
           </details>
         </div>
       </section>
+      <!-- Onda 3: Tour acolhedor de 3 passos (sem jargão) para novos estudantes -->
+      <section class="panel welcome-tour hidden" id="welcome-tour" aria-labelledby="welcome-tour-title">
+        <div class="panel-header" style="margin-bottom:6px">
+          <div>
+            <h2 id="welcome-tour-title" style="font-size:1.2rem">Bem-vindo(a) ao Scriptorium: 3 passos simples</h2>
+            <p class="subtle" style="margin:4px 0 0">Você não precisa saber programação nem LaTeX. Siga este caminho no seu ritmo:</p>
+          </div>
+          <button type="button" class="btn alt" id="welcome-tour-dismiss">Entendi, começar agora</button>
+        </div>
+        <div class="tour-grid">
+          <div class="tour-card">
+            <strong>1. Planeje com suas palavras</strong>
+            <p>Abra o <b>Guia de escrita</b> (sem IA) para definir tema, problema, pergunta e objetivos com ajuda passo a passo.</p>
+          </div>
+          <div class="tour-card">
+            <strong>2. Guarde seus PDFs na Biblioteca</strong>
+            <p>Envie os artigos e livros que você leu. O Scriptorium confere as capas para nenhuma referência ser inventada.</p>
+          </div>
+          <div class="tour-card">
+            <strong>3. Monte seu artigo, dissertação ou TCC</strong>
+            <p>Leve seu plano para <b>Seus textos</b>, acompanhe as conferências e baixe em <b>Word (.docx)</b> ou <b>PDF ABNT</b> para a orientação.</p>
+          </div>
+        </div>
+        <div class="glossary-bar" aria-label="Dúvidas sobre termos acadêmicos">
+          <span class="subtle" style="font-size:0.8rem">Algum termo parece técnico? Toque para ver em 2 linhas:</span>
+          <button type="button" class="glossary-btn" data-glossary="doi" aria-expanded="false">? O que é DOI</button>
+          <button type="button" class="glossary-btn" data-glossary="bibtex" aria-expanded="false">? O que é BibTeX</button>
+          <button type="button" class="glossary-btn" data-glossary="parafrase" aria-expanded="false">? Paráfrase vs. citação</button>
+          <button type="button" class="glossary-btn" data-glossary="proveniencia" aria-expanded="false">? O que é Proveniência</button>
+          <button type="button" class="glossary-btn" data-glossary="word" aria-expanded="false">? Por que Word (.docx)</button>
+        </div>
+        <div id="glossary-pop" class="glossary-pop hidden" role="status" aria-live="polite"></div>
+      </section>
+
       <!-- Comece aqui: os três passos do modo sem API, com estado. app.js esconde quando tudo está feito. -->
       <section class="start-strip hidden" id="start-strip" data-sem-api-only aria-labelledby="start-title">
         <h2 id="start-title">Comece aqui</h2>

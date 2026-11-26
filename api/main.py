@@ -28,7 +28,7 @@ from reading_notes_api import make_reading_notes_router
 from retrieval_eval_api import make_retrieval_eval_router
 from oa_import import make_oa_import_router
 from mcp_server import Dispatcher, Store as McpStore, build_app as build_mcp_app
-from mcp_site_api import make_mcp_site_router
+from mcp_site_api import make_advisor_public_router, make_mcp_site_router
 from guide_api import make_guide_router
 
 import firebase_admin
@@ -674,5 +674,6 @@ def allowed_identity(identity: dict) -> bool:
 
 mcp_store = McpStore(db, bucket, start_job, allowed_identity)
 app.include_router(make_mcp_site_router(mcp_store, current_user, PUBLIC_URL))
+app.include_router(make_advisor_public_router(mcp_store))
 # Ponto de entrada do uvicorn: /api/mcp vai para o servidor MCP; o resto, para a API.
 application = Dispatcher(app, build_mcp_app(mcp_store, PUBLIC_URL))

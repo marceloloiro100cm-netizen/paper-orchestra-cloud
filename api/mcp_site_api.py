@@ -67,6 +67,11 @@ class CompileRequest(BaseModel):
     rascunho: bool = False
 
 
+class AdvisorShareRequest(BaseModel):
+    dias: int = Field(default=14, ge=1, le=30)
+    nota: str = Field(default="", max_length=600)
+
+
 def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
     router = APIRouter(prefix="/api/mcp-conta", tags=["mcp"])
     dependency = Depends(verify_user)
@@ -98,7 +103,9 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
         except Exception:  # arquivo ausente ou ilegível: a visão segue sem as referências
             refs = []
         return {**project_state(store, project),
-                **student.view(project, mode(project), refs, project.get("concordancia"))}
+                **student.view(project, mode(project), refs, project.get("concordancia")),
+                "tem_link_orientacao": bool(project.get("advisor_share_id")),
+                "link_orientacao_expira": project.get("advisor_share_expires") or ""}
 
     @router.get("/projetos")
     def list_projects(user: dict = dependency):
@@ -320,6 +327,27 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
                         headers={"Content-Disposition": 'attachment; filename="matriz_extracao.csv"',
                                  "Cache-Control": "no-store"})
 
+    @router.post("/projetos/{project_id}/orientacao/link", status_code=201)
+    def create_advisor_link(project_id: str, payload: AdvisorShareRequest, user: dict = dependency):
+        """Onda 3: gera link temporário (somente leitura) para o(a) orientador(a)."""
+        owned(project_id, user)
+        try:
+            created = store.create_advisor_share(user["uid"], project_id, payload.dias, payload.nota)
+        except Falha as exc:
+            raise HTTPException(404, str(exc)) from None
+        return {
+            "id": created["id"],
+            "url": f"{base}/?orientacao={created['token']}",
+            "expira_em": created["expires_at"],
+        }
+
+    @router.delete("/projetos/{project_id}/orientacao/link")
+    def revoke_advisor_link(project_id: str, user: dict = dependency):
+        """Revoga imediatamente o link de orientação deste projeto."""
+        owned(project_id, user)
+        store.revoke_advisor_share(user["uid"], project_id)
+        return {"revogado": True}
+
     @router.get("/projetos/{project_id}/arquivos/{name}")
     def download(project_id: str, name: str, user: dict = dependency):
         if name not in FILES:
@@ -341,5 +369,48 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
         return Response(content=blob.download_as_bytes(), media_type=FILES[name],
                         headers={"Content-Disposition": f'attachment; filename="{name}"',
                                  "Cache-Control": "no-store"})
+
+    return router
+
+
+def make_advisor_public_router(store: Store):
+    """Onda 3: visão somente leitura para o(a) orientador(a) via link temporário autorizado pelo estudante."""
+    router = APIRouter(prefix="/api/orientacao", tags=["orientacao"])
+
+    @router.get("/{token}")
+    def read_shared_project(token: str, response: Response):
+        found = store.read_advisor_share(token)
+        if not found:
+            raise HTTPException(404, "Link de orientação inválido, expirado ou revogado pelo estudante.")
+        share, project, refs = found["share"], found["project"], found["refs"]
+        state = project_state(store, project)
+        view = student.view(project, mode(project), refs, project.get("concordancia"))
+        pending = view.get("referencias_a_conferir") or []
+        confirmed = [
+            {
+                "chave": r.get("key", ""),
+                "titulo": str((r.get("fields") or {}).get("title") or ""),
+                "autor": str((r.get("fields") or {}).get("author") or ""),
+                "ano": str((r.get("fields") or {}).get("year") or ""),
+            }
+            for r in refs if flow.ref_level(r) == "confirmada"
+        ]
+        response.headers["Cache-Control"] = "no-store"
+        return {
+            "titulo": project.get("title") or "Sem título",
+            "tipo": WORK_LABELS.get(mode(project), "Artigo científico"),
+            "status": project.get("status") or "",
+            "pdf_final": bool(view.get("pdf_final")),
+            "etapas": [{"titulo": e.get("titulo"), "status": e.get("status"), "independencia": e.get("independencia")}
+                       for e in (state.get("etapas") or [])],
+            "provas": view.get("provas") or [],
+            "referencias_confirmadas": confirmed,
+            "referencias_pendentes": [{"chave": r.get("chave"), "titulo": r.get("titulo"), "nivel": r.get("nivel_texto")}
+                                      for r in pending],
+            "nota_estudante": share.get("note") or "",
+            "atualizado_em": project.get("updated_at") or "",
+            "expira_em": share.get("expires_at") or "",
+            "pergunta": str(project.get("question") or "")[:1200],
+        }
 
     return router

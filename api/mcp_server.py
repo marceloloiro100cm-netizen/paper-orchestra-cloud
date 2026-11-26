@@ -16,10 +16,11 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import tempfile
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import partial
 from typing import Callable, Literal
 
@@ -220,6 +221,59 @@ class Store:
     def update_project(self, pid: str, **fields) -> None:
         self._refs_cache.pop(pid, None)
         self.db.collection("mcp_projects").document(pid).update({**fields, "updated_at": now()})
+
+    # ------------------------------------------------------ link de orientação
+    def create_advisor_share(self, uid: str, pid: str, days: int = 14, note: str = "") -> dict:
+        """Onda 3: cria link temporário e revogável somente leitura para o(a) orientador(a)."""
+        project = self.project(uid, pid)
+        days = max(1, min(30, int(days or 14)))
+        self.revoke_advisor_share(uid, pid)
+        token = "adv_" + secrets.token_urlsafe(32)
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        expires = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+        record = {
+            "id": digest[:16], "hash": digest, "owner_uid": uid, "project_id": project["id"],
+            "created_at": now(), "expires_at": expires, "revoked": False,
+            "note": str(note or "").strip()[:600],
+        }
+        self.db.collection("advisor_shares").document(digest).set(record)
+        self.update_project(project["id"], advisor_share_id=digest[:16], advisor_share_expires=expires)
+        return {"id": digest[:16], "token": token, "expires_at": expires}
+
+    def revoke_advisor_share(self, uid: str, pid: str) -> bool:
+        """Revoga imediatamente qualquer link de orientação ativo deste projeto."""
+        project = self.project(uid, pid)
+        revoked_any = False
+        try:
+            col = self.db.collection("advisor_shares")
+            for snap in col.where("owner_uid", "==", uid).stream():
+                rec = snap.to_dict() or {}
+                if rec.get("project_id") == project["id"] and not rec.get("revoked"):
+                    col.document(rec["hash"]).update({"revoked": True, "revoked_at": now()})
+                    revoked_any = True
+        except Exception:
+            pass
+        if project.get("advisor_share_id"):
+            self.update_project(project["id"], advisor_share_id="", advisor_share_expires="")
+        return revoked_any
+
+    def read_advisor_share(self, token: str) -> dict | None:
+        """Lê um link de orientação válido (sem expor e-mail, UID, biblioteca ou tokens)."""
+        if not re.fullmatch(r"adv_[A-Za-z0-9_-]{40,60}", token or ""):
+            return None
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        snap = self.db.collection("advisor_shares").document(digest).get()
+        share = snap.to_dict() if snap.exists else None
+        if not share or share.get("revoked"):
+            return None
+        if str(share.get("expires_at") or "") < now():
+            return None
+        try:
+            project = self.project(share["owner_uid"], share["project_id"])
+        except Falha:
+            return None
+        refs = self.references(project)
+        return {"share": share, "project": project, "refs": refs}
 
     @staticmethod
     def prefix(project: dict) -> str:
