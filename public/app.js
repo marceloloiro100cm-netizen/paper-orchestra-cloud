@@ -1879,6 +1879,70 @@ function articleCard(p) {
   });
   actions.append(shareBtn, open); head.append(info, actions); card.append(head, shareBox);
 
+  // Fase 2: Seletor de salvaguarda pedagógica (Tutor Socrático / Intermediário / Autônomo)
+  const pedRow = document.createElement('div');
+  pedRow.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;font-size:.8rem';
+  const pedLbl = el('span', 'Mediação da IA:', 'subtle');
+  const pedSel = document.createElement('select');
+  pedSel.style.cssText = 'width:auto;padding:4px 8px;font-size:.8rem';
+  pedSel.setAttribute('aria-label', 'Modo pedagógico da IA para ' + (p.titulo || p.projeto));
+  for (const [val, txt] of [
+    ['tutor_socratico', 'Tutor Socrático (perguntas e pistas)'],
+    ['intermediario', 'Intermediário (feedback crítico)'],
+    ['autonomo', 'Autônomo (revisão pontual)'],
+  ]) pedSel.append(new Option(txt, val));
+  pedSel.value = p.modo_pedagogico || 'tutor_socratico';
+  const pedMsg = el('span', '', 'subtle');
+  pedSel.addEventListener('change', async () => {
+    pedSel.disabled = true; pedMsg.textContent = 'Salvando…';
+    try {
+      await request(`/mcp-conta/projetos/${p.projeto}/modo-pedagogico`, {
+        method: 'PATCH', body: JSON.stringify({ modo_pedagogico: pedSel.value }),
+      });
+      pedMsg.textContent = '✓ Modo atualizado.';
+    } catch (e) { pedMsg.textContent = e.message; }
+    finally { pedSel.disabled = false; }
+  });
+  pedRow.append(pedLbl, pedSel, pedMsg);
+  card.append(pedRow);
+
+  // Fase 2: Apontamentos deixados pelo(a) orientador(a) no link compartilhado
+  const advComments = p.comentarios_orientacao || [];
+  if (advComments.length) {
+    const cDet = document.createElement('details');
+    cDet.className = 'advisor-box';
+    cDet.style.marginTop = '10px';
+    const pend = advComments.filter(c => !c.resolved).length;
+    cDet.open = pend > 0;
+    cDet.append(el('summary', `Apontamentos da orientação (${pend} pendente(s) de ${advComments.length})`));
+    const kindLabels = { elogio: '✓ Elogio', sugestao: 'Sugestão', ajuste_obrigatorio: '⚠ Ajuste obrigatório' };
+    for (const c of advComments) {
+      const itemBox = document.createElement('div');
+      itemBox.className = 'study-note-card';
+      itemBox.style.marginTop = '8px';
+      if (c.resolved) itemBox.style.opacity = '0.68';
+      const top = document.createElement('div');
+      top.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;align-items:center';
+      top.append(el('strong', `${c.author || 'Orientador(a)'} · ${c.stage || 'Geral'} · ${kindLabels[c.kind] || c.kind}`));
+      const rBtn = el('button', c.resolved ? '✓ Resolvido (reabrir)' : 'Marcar como resolvido', 'btn alt');
+      rBtn.type = 'button'; rBtn.style.cssText = 'padding:3px 9px;font-size:.76rem';
+      rBtn.addEventListener('click', async () => {
+        rBtn.disabled = true;
+        try {
+          await request(`/mcp-conta/projetos/${p.projeto}/orientacao/comentarios/${c.id}`, {
+            method: 'PATCH', body: JSON.stringify({ resolvido: !c.resolved }),
+          });
+          await loadMcpProjects();
+        } catch (e) { alert(e.message); rBtn.disabled = false; }
+      });
+      top.append(rBtn);
+      const txt = el('p', c.text); txt.style.margin = '6px 0 0';
+      itemBox.append(top, txt);
+      cDet.append(itemBox);
+    }
+    card.append(cDet);
+  }
+
   const step = p.proximo_passo;
   if (step) {
     const next = document.createElement('div'); next.className = 'art-next';
@@ -2021,6 +2085,9 @@ function applyGuidePlanToForm(plan) {
       : data.tipo === 'tcc' ? 'tcc|abnt-tcc' : 'artigo|abnt-artigo';
     $('new-proj-type').value = targetVal;
   }
+  if ($('new-proj-pedagogical') && data.modo_pedagogico) {
+    $('new-proj-pedagogical').value = data.modo_pedagogico;
+  }
   renderNewProjectSources();
   if (hint) hint.textContent = '✓ Plano trazido do Guia de Escrita! Confira as fontes e clique em Criar.';
   return true;
@@ -2050,10 +2117,11 @@ $('create-mcp-project-btn')?.addEventListener('click', async () => {
   if (pergunta.length < 20) { st.textContent = 'Escreva a pergunta ou objetivo (mínimo 20 caracteres).'; return; }
   if (!fontes.length) { st.textContent = 'Escolha pelo menos 1 fonte da sua biblioteca.'; return; }
   btn.disabled = true; st.textContent = 'Criando projeto e preparando fontes…';
+  const modo_pedagogico = $('new-proj-pedagogical')?.value || 'tutor_socratico';
   try {
     await request('/mcp-conta/projetos', {
       method: 'POST',
-      body: JSON.stringify({ titulo, pergunta, fontes, tipo, modelo, idioma: 'pt-BR' }),
+      body: JSON.stringify({ titulo, pergunta, fontes, tipo, modelo, idioma: 'pt-BR', modo_pedagogico }),
     });
     st.textContent = '✓ Criado! O Scriptorium já está lendo suas fontes.';
     $('new-proj-title').value = ''; $('new-proj-question').value = '';
@@ -2164,6 +2232,70 @@ $('refs-import')?.addEventListener('click', async () => {
     await loadLibrary();
   } catch (e) { if (msg) msg.textContent = e.message; }
   finally { btn.disabled = false; }
+});
+
+// Fase 2: Modal de Resumo de Triagem & PRISMA (calculado da Única Fonte de Verdade da Biblioteca).
+$('open-prisma-summary')?.addEventListener('click', async () => {
+  const back = document.createElement('div'); back.className = 'modal-backdrop';
+  back.setAttribute('role', 'dialog'); back.setAttribute('aria-modal', 'true');
+  const box = document.createElement('div'); box.className = 'modal-box study-modal-box';
+  const head = document.createElement('div'); head.className = 'modal-head';
+  head.append(el('strong', 'Resumo de Triagem & Funil PRISMA (Biblioteca)'));
+  const close = () => back.remove();
+  const closeX = el('button', '✕', 'btn alt'); closeX.type = 'button'; closeX.addEventListener('click', close);
+  head.append(closeX);
+  const body = document.createElement('div'); body.className = 'modal-body';
+  body.textContent = 'Calculando resumo diretamente da sua Biblioteca…';
+  const foot = document.createElement('div'); foot.className = 'modal-foot';
+  const fBtn = el('button', 'Fechar', 'btn alt'); fBtn.type = 'button'; fBtn.addEventListener('click', close);
+  foot.append(fBtn); box.append(head, body, foot); back.append(box);
+  back.addEventListener('click', (e) => { if (e.target === back) close(); });
+  document.body.append(back);
+  try {
+    const d = await (await request('/library/prisma-summary')).json();
+    body.replaceChildren();
+    body.append(el('p', 'Números calculados ao vivo diretamente da lista ativa da sua Biblioteca — sem divergência entre telas.', 'subtle'));
+    const stats = document.createElement('div');
+    stats.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0';
+    for (const [lbl, val] of [
+      ['Identificados', d.total_identificados],
+      ['Únicos (est.)', d.unicos_estimados],
+      ['A ler', d.triagem?.a_ler ?? 0],
+      ['Lidos', d.triagem?.lido ?? 0],
+      ['Incluídos', d.triagem?.incluido ?? 0],
+      ['Descartados', d.triagem?.descartado ?? 0],
+      ['Fichamentos', d.fichamentos_total ?? 0],
+      ['Sustentação ✓', d.sustentacao_conferida ?? 0],
+    ]) {
+      const c = document.createElement('div');
+      c.style.cssText = 'border:1px solid var(--border-main);border-radius:10px;padding:10px;background:var(--bg-subtle);text-align:center';
+      const n = el('div', String(val)); n.style.cssText = 'font-size:1.35rem;font-weight:750;color:var(--mpie-blue-text)';
+      const s = el('div', lbl, 'subtle'); s.style.fontSize = '.75rem';
+      c.append(n, s); stats.append(c);
+    }
+    body.append(stats);
+    const roles = d.por_papel || {};
+    const roleLine = el('p', `Distribuição por papel: Marco Teórico (${roles.marco_teorico || 0}) · Método (${roles.metodo || 0}) · Evidência (${roles.evidencia || 0}) · Contraponto (${roles.contraponto || 0}) · Sem papel (${roles.sem_papel || 0}).`, 'subtle');
+    body.append(roleLine);
+    if ((d.motivos_descarte || []).length) {
+      body.append(el('strong', 'Motivos de descarte registrados'));
+      const ul = document.createElement('ul');
+      for (const m of d.motivos_descarte) ul.append(el('li', `${m.motivo}: ${m.quantidade}`));
+      body.append(ul);
+    }
+    body.append(el('strong', 'Texto pronto para a seção de Metodologia / Revisão'));
+    const txtBox = el('div', d.resumo_metodologico || '', 'abnt-preview');
+    body.append(txtBox);
+    const bar = document.createElement('div'); bar.className = 'actions';
+    const copyMsg = el('span', '', 'subtle');
+    const cBtn = el('button', 'Copiar resumo PRISMA', 'btn'); cBtn.type = 'button';
+    cBtn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(d.resumo_metodologico || ''); copyMsg.textContent = '✓ Copiado!'; }
+      catch (_) { copyMsg.textContent = 'Selecione o texto acima para copiar.'; }
+    });
+    bar.append(cBtn, copyMsg);
+    body.append(bar);
+  } catch (e) { body.textContent = 'Não foi possível gerar o resumo: ' + e.message; }
 });
 
 // Fase 1: Modal limpo de exportação ABNT / BibTeX / RIS (compatível com Zotero e Overleaf).
@@ -2772,7 +2904,7 @@ async function loadAdvisorShareView() {
     }
     const d = await res.json();
     $('adv-view-title').textContent = d.titulo || 'Trabalho acadêmico';
-    $('adv-view-meta').textContent = `${d.tipo || 'Texto acadêmico'} · ${d.pdf_final ? 'Versão final (todas as travas aprovadas)' : 'Em elaboração / rascunho'} · link válido até ${new Date(d.expira_em).toLocaleDateString('pt-BR')}`;
+    $('adv-view-meta').textContent = `${d.tipo || 'Texto acadêmico'} · ${d.modo_pedagogico_rotulo || 'Tutor Socrático'} · ${d.pdf_final ? 'Versão final (todas as travas aprovadas)' : 'Em elaboração / rascunho'} · link válido até ${new Date(d.expira_em).toLocaleDateString('pt-BR')}`;
     body.replaceChildren();
     if (d.nota_estudante) {
       const note = document.createElement('div'); note.className = 'advisor-box'; note.style.marginBottom = '14px';
@@ -2810,6 +2942,77 @@ async function loadAdvisorShareView() {
       for (const r of d.referencias_pendentes) ul.append(el('li', `${r.titulo || r.chave} (${r.nivel})`));
       body.append(ul);
     }
+
+    // Fase 2: Comentários da orientação por etapa (sem necessidade de criar conta)
+    const commSec = document.createElement('section');
+    commSec.style.marginTop = '18px';
+    commSec.append(el('h3', 'Apontamentos da orientação por etapa'));
+    const commList = document.createElement('div');
+    const kindLabels = { elogio: '✓ Elogio', sugestao: 'Sugestão', ajuste_obrigatorio: '⚠ Ajuste obrigatório' };
+    const renderAdvComments = (items) => {
+      commList.replaceChildren();
+      if (!items.length) {
+        commList.append(el('p', 'Nenhum apontamento registrado ainda. Deixe um comentário abaixo para o(a) estudante acompanhar no painel.', 'subtle'));
+        return;
+      }
+      for (const c of items) {
+        const card = document.createElement('div'); card.className = 'study-note-card';
+        card.append(el('strong', `${c.author || 'Orientador(a)'} · ${c.stage || 'Geral'} · ${kindLabels[c.kind] || c.kind}${c.resolved ? ' · ✓ Resolvido pelo estudante' : ''}`));
+        const p = el('p', c.text); p.style.margin = '6px 0 0';
+        card.append(p);
+        commList.append(card);
+      }
+    };
+    const commentsState = [...(d.comentarios || [])];
+    renderAdvComments(commentsState);
+
+    const form = document.createElement('div');
+    form.className = 'advisor-box';
+    form.style.marginTop = '12px';
+    form.append(el('strong', 'Deixar apontamento para o(a) estudante'));
+    const g = document.createElement('div'); g.className = 'study-grid'; g.style.marginTop = '8px';
+    const inpName = document.createElement('input'); inpName.type = 'text'; inpName.maxLength = 80; inpName.placeholder = 'Seu nome (ex.: Prof.ª Maria)';
+    const selStage = document.createElement('select');
+    selStage.append(new Option('Geral (visão do trabalho)', 'Geral'));
+    for (const e of (d.etapas || [])) selStage.append(new Option(e.titulo, e.titulo));
+    const selKind = document.createElement('select');
+    selKind.append(new Option('Sugestão', 'sugestao'), new Option('Ajuste obrigatório', 'ajuste_obrigatorio'), new Option('Elogio', 'elogio'));
+    const w1 = document.createElement('div'); w1.append(el('label', 'Orientador(a)'), inpName);
+    const w2 = document.createElement('div'); w2.append(el('label', 'Etapa'), selStage);
+    g.append(w1, w2);
+    const w3 = document.createElement('div'); w3.style.marginTop = '6px'; w3.append(el('label', 'Tipo de apontamento'), selKind);
+    const txtArea = document.createElement('textarea'); txtArea.rows = 3; txtArea.maxLength = 1500;
+    txtArea.placeholder = 'Escreva sua orientação objetiva para esta etapa…';
+    const act = document.createElement('div'); act.className = 'actions';
+    const sendBtn = el('button', 'Enviar apontamento', 'btn'); sendBtn.type = 'button';
+    const sendMsg = el('span', '', 'subtle');
+    sendBtn.addEventListener('click', async () => {
+      if (txtArea.value.trim().length < 4) { sendMsg.textContent = 'Escreva pelo menos 4 caracteres.'; return; }
+      sendBtn.disabled = true; sendMsg.textContent = 'Enviando…';
+      try {
+        const resp = await fetch('/api/orientacao/' + encodeURIComponent(token) + '/comentarios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            autor: inpName.value.trim() || 'Orientador(a)',
+            etapa: selStage.value,
+            tipo: selKind.value,
+            texto: txtArea.value.trim(),
+          }),
+        });
+        const j = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(j.detail || 'Não foi possível enviar.');
+        if (j.comentario) commentsState.push(j.comentario);
+        renderAdvComments(commentsState);
+        txtArea.value = '';
+        sendMsg.textContent = '✓ Apontamento registrado! O estudante já verá no painel.';
+      } catch (e) { sendMsg.textContent = e.message; }
+      finally { sendBtn.disabled = false; }
+    });
+    act.append(sendBtn, sendMsg);
+    form.append(g, w3, el('label', 'Comentário'), txtArea, act);
+    commSec.append(commList, form);
+    body.append(commSec);
   } catch (e) {
     $('adv-view-title').textContent = 'Não foi possível carregar';
     body.textContent = 'Verifique a conexão e tente recarregar a página.';

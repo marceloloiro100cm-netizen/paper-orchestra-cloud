@@ -1858,6 +1858,7 @@
               <button type="button" class="seg-btn" id="view-list-btn">Lista</button>
             </div>
             <button type="button" class="btn alt" id="open-config-cols">⚙ Colunas</button>
+            <button type="button" class="btn alt" id="open-prisma-summary" title="Ver resumo de triagem e funil PRISMA da sua biblioteca">Resumo PRISMA</button>
             <button type="button" class="btn alt" id="open-export-refs" title="Exportar referências da biblioteca em ABNT, BibTeX ou RIS">Exportar ABNT / .bib</button>
             <button class="btn alt" type="button" id="refresh-library">Atualizar</button>
           </div>
@@ -2221,6 +2222,12 @@
               <option value="dissertacao|abnt-dissertacao">Dissertação de mestrado (ABNT — capítulos)</option>
               <option value="tcc|abnt-tcc">TCC / Monografia de graduação (ABNT — capítulos)</option>
               <option value="revisao_sistematica|abnt-artigo">Revisão sistemática (ABNT + PRISMA)</option>
+            </select>
+            <label for="new-proj-pedagogical">Modo de mediação pedagógica da IA (salvaguarda)</label>
+            <select id="new-proj-pedagogical">
+              <option value="tutor_socratico">Apoio inicial · Tutor Socrático (perguntas e pistas antes de sugerir texto)</option>
+              <option value="intermediario">Intermediário · Feedback crítico com justificativa autoral</option>
+              <option value="autonomo">Autônomo · Revisão pontual de coerência e fontes</option>
             </select>
             <label for="new-proj-title">Título provisório</label>
             <input id="new-proj-title" type="text" maxlength="120" placeholder="Ex.: Democratização da escrita científica no ensino superior" />

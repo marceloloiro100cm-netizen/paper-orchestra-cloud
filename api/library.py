@@ -27,6 +27,7 @@ from abnt_refs import (
     item_duplicate_keys,
     normalize_doi,
     parse_references_text,
+    prisma_summary,
     stable_key,
 )
 from upload_guard import inspect as inspect_upload
@@ -566,6 +567,11 @@ def make_library_router(db, bucket, verify_user: Callable, fetch: Callable | Non
         """Lista possíveis duplicatas na biblioteca ativa (mesmo arquivo, DOI ou título+ano)."""
         groups = find_duplicates(active_items(user["uid"]))
         return {"duplicates": groups, "count": len(groups)}
+
+    @router.get("/prisma-summary")
+    def get_prisma_summary(user: dict = dependencies):
+        """Fase 2: resumo de triagem / PRISMA calculado da mesma lista ativa (zero divergência)."""
+        return prisma_summary(active_items(user["uid"]))
 
     @router.get("/export")
     def export_references(

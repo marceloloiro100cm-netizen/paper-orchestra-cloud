@@ -546,3 +546,58 @@ def check_citation_coherence(text: str, library_items: Iterable[dict]) -> dict:
         "abnt_references": abnt_lines,
         "abnt_references_text": "\n\n".join(abnt_lines),
     }
+
+
+def prisma_summary(items: Iterable[dict]) -> dict:
+    """Resumo PRISMA / triagem calculado diretamente da Biblioteca (Única Fonte de Verdade)."""
+    records = list(items)
+    total = len(records)
+    dup_groups = find_duplicates(records)
+    dup_extra = sum(max(0, len(g.get("items") or []) - 1) for g in dup_groups)
+    unicos = max(0, total - dup_extra)
+
+    triagem = {"a_ler": 0, "lido": 0, "incluido": 0, "descartado": 0}
+    por_papel = {"marco_teorico": 0, "metodo": 0, "evidencia": 0, "contraponto": 0, "sem_papel": 0}
+    motivos: dict[str, int] = {}
+    fichamentos_total = 0
+    sustentacao_conferida = 0
+
+    for item in records:
+        st = item.get("reading_status") or "a_ler"
+        triagem[st if st in triagem else "a_ler"] += 1
+        role = item.get("role") or ""
+        por_papel[role if role in por_papel else "sem_papel"] += 1
+        if st == "descartado":
+            reason = str(item.get("exclude_reason") or "").strip() or "Motivo não informado"
+            motivos[reason] = motivos.get(reason, 0) + 1
+        notes = item.get("study_notes") or []
+        fichamentos_total += len(notes)
+        sustentacao_conferida += sum(1 for n in notes if isinstance(n, dict) and n.get("support_checked"))
+
+    motivos_lista = [
+        {"motivo": k, "quantidade": v}
+        for k, v in sorted(motivos.items(), key=lambda kv: (-kv[1], kv[0].lower()))
+    ]
+    avaliados = triagem["lido"] + triagem["incluido"] + triagem["descartado"]
+    motivos_txt = "; ".join(f"{m['motivo']} (n={m['quantidade']})" for m in motivos_lista[:6])
+    resumo = (
+        f"Foram identificados {total} registro(s) na biblioteca do projeto"
+        + (f" ({dup_extra} possível(is) duplicata(s) sinalizada(s), restando {unicos} único(s))" if dup_extra else "")
+        + f". Destes, {avaliados} passaram por leitura/triagem ({triagem['a_ler']} aguardando leitura), "
+        + f"resultando em {triagem['incluido']} fonte(s) incluída(s) no projeto e {triagem['descartado']} descartada(s)"
+        + (f" ({motivos_txt})" if motivos_txt else "")
+        + f". Foram registrados {fichamentos_total} fichamento(s) vinculados a páginas, "
+        + f"dos quais {sustentacao_conferida} com conferência humana de sustentação."
+    )
+    return {
+        "total_identificados": total,
+        "duplicatas_detectadas": dup_extra,
+        "unicos_estimados": unicos,
+        "avaliados": avaliados,
+        "triagem": triagem,
+        "por_papel": por_papel,
+        "motivos_descarte": motivos_lista,
+        "fichamentos_total": fichamentos_total,
+        "sustentacao_conferida": sustentacao_conferida,
+        "resumo_metodologico": resumo,
+    }

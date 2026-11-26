@@ -18,7 +18,10 @@ import docx_export
 import mcp_flow as flow
 import mcp_review as review
 import mcp_student as student
-from mcp_server import MCP_PATH, Falha, Store, compile_project, mode, project_state, review_context
+from mcp_server import (
+    MCP_PATH, PEDAGOGICAL_MODES, Falha, Store, compile_project, mode,
+    pedagogical_mode_of, project_state, review_context,
+)
 
 FILES = {
     "scriptorium.pdf": "application/pdf",
@@ -42,6 +45,22 @@ class NewProject(BaseModel):
     idioma: str = "pt-BR"
     modelo: str = "abnt-artigo"
     tipo: str = "artigo"
+    modo_pedagogico: str = "tutor_socratico"
+
+
+class PedagogicalModeUpdate(BaseModel):
+    modo_pedagogico: str = Field(pattern=r"^(tutor_socratico|intermediario|autonomo)$")
+
+
+class AdvisorCommentIn(BaseModel):
+    autor: str = Field(default="Orientador(a)", max_length=80)
+    etapa: str = Field(default="Geral", max_length=80)
+    tipo: str = Field(default="sugestao", pattern=r"^(elogio|sugestao|ajuste_obrigatorio)$")
+    texto: str = Field(min_length=4, max_length=1500)
+
+
+class AdvisorCommentResolve(BaseModel):
+    resolvido: bool = True
 
 
 class FinalSynthesis(BaseModel):
@@ -102,10 +121,13 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
             refs = store.references(project)
         except Exception:  # arquivo ausente ou ilegível: a visão segue sem as referências
             refs = []
+        comments = list(project.get("advisor_comments") or [])
         return {**project_state(store, project),
                 **student.view(project, mode(project), refs, project.get("concordancia")),
                 "tem_link_orientacao": bool(project.get("advisor_share_id")),
-                "link_orientacao_expira": project.get("advisor_share_expires") or ""}
+                "link_orientacao_expira": project.get("advisor_share_expires") or "",
+                "comentarios_orientacao": comments,
+                "comentarios_pendentes": sum(1 for c in comments if not c.get("resolved"))}
 
     @router.get("/projetos")
     def list_projects(user: dict = dependency):
@@ -118,7 +140,7 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
 
     @router.post("/projetos", status_code=201)
     def create_project_site(payload: NewProject, user: dict = dependency):
-        """Onda 2: cria artigo, dissertação ou TCC direto pelo site (com ou sem plano do Guia)."""
+        """Onda 2 + Fase 2: cria artigo, dissertação ou TCC com modo pedagógico (Tutor Socrático/Intermediário/Autônomo)."""
         modelo = payload.modelo
         if payload.tipo == "dissertacao" and modelo == "abnt-artigo":
             modelo = "abnt-dissertacao"
@@ -127,11 +149,32 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
         try:
             record = store.create_project(
                 user["uid"], payload.titulo, payload.pergunta, payload.fontes,
-                payload.idioma, modelo, payload.tipo,
+                payload.idioma, modelo, payload.tipo, payload.modo_pedagogico,
             )
         except Falha as exc:
             raise HTTPException(422, str(exc)) from None
         return for_student(record)
+
+    @router.patch("/projetos/{project_id}/modo-pedagogico")
+    def update_pedagogical_mode(project_id: str, payload: PedagogicalModeUpdate, user: dict = dependency):
+        """Fase 2: alterna o grau de salvaguarda pedagógica da IA (Tutor Socrático -> Intermediário -> Autônomo)."""
+        owned(project_id, user)
+        store.update_project(project_id, pedagogical_mode=payload.modo_pedagogico)
+        return {
+            "projeto": project_id,
+            "modo_pedagogico": payload.modo_pedagogico,
+            "rotulo": PEDAGOGICAL_MODES[payload.modo_pedagogico]["label"],
+        }
+
+    @router.patch("/projetos/{project_id}/orientacao/comentarios/{comment_id}")
+    def resolve_advisor_comment(project_id: str, comment_id: str, payload: AdvisorCommentResolve,
+                                user: dict = dependency):
+        """Fase 2: estudante marca apontamento da orientação como resolvido (ou pendente)."""
+        try:
+            updated = store.set_advisor_comment_resolved(user["uid"], project_id, comment_id, payload.resolvido)
+        except Falha as exc:
+            raise HTTPException(404, str(exc)) from None
+        return {"comentario": updated}
 
     @router.get("/projetos/{project_id}")
     def get_project(project_id: str, user: dict = dependency):
@@ -408,9 +451,23 @@ def make_advisor_public_router(store: Store):
             "referencias_pendentes": [{"chave": r.get("chave"), "titulo": r.get("titulo"), "nivel": r.get("nivel_texto")}
                                       for r in pending],
             "nota_estudante": share.get("note") or "",
+            "modo_pedagogico": pedagogical_mode_of(project),
+            "modo_pedagogico_rotulo": PEDAGOGICAL_MODES[pedagogical_mode_of(project)]["label"],
+            "comentarios": list(project.get("advisor_comments") or []),
             "atualizado_em": project.get("updated_at") or "",
             "expira_em": share.get("expires_at") or "",
             "pergunta": str(project.get("question") or "")[:1200],
         }
+
+    @router.post("/{token}/comentarios", status_code=201)
+    def post_advisor_comment(token: str, payload: AdvisorCommentIn):
+        """Fase 2: orientador(a) deixa apontamento por etapa sem precisar criar conta."""
+        try:
+            entry = store.add_advisor_comment(token, payload.autor, payload.etapa, payload.tipo, payload.texto)
+        except Falha as exc:
+            raise HTTPException(422, str(exc)) from None
+        if entry is None:
+            raise HTTPException(404, "Link de orientação inválido, expirado ou revogado pelo estudante.")
+        return {"comentario": entry}
 
     return router
