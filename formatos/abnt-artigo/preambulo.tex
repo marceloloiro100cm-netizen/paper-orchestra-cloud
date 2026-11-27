@@ -12,6 +12,9 @@
 \providecommand{\citealt}[1]{\citeonline{#1}}
 \providecommand{\citeauthor}[1]{\citeonline{#1}}
 \providecommand{\citeyear}[1]{\cite{#1}}
+% abnTeX2 1.9.7 (pacote Debian) não define \theforeigntitle, usado pelo resumo no modo artigo;
+% sem isto todo artigo ABNT saía com "Undefined control sequence". Versões novas já o definem.
+\providecommand{\theforeigntitle}{}
 \titulo{%(title)s}
 \autor{%(author)s}
 \local{Brasil}

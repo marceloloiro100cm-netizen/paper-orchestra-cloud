@@ -48,6 +48,8 @@ def check(formato_id: str, language: str) -> list[str]:
         work = Path(tmp)
         (work / "references.bib").write_text(BIB, encoding="utf-8")
         pdf, report = mcp_jobs.compile_tex(work, tex, name="smoke")
+        log_path = work / "smoke.log"
+        log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
     problems = []
     if not pdf:
         problems.append(f"{formato_id} ({language}): sem PDF ({report.get('motivo')})")
@@ -56,7 +58,11 @@ def check(formato_id: str, language: str) -> list[str]:
     if report.get("citacoes_indefinidas"):
         problems.append(f"{formato_id} ({language}): {report['citacoes_indefinidas']} citação(ões) indefinida(s)")
     if problems:
-        problems.append((report.get("log_final") or "")[-1500:])
+        # Contexto do primeiro erro "! ..." do log (o fim do log quase nunca mostra a causa).
+        lines = log.splitlines()
+        first = next((n for n, line in enumerate(lines) if line.startswith("! ")), None)
+        context = lines[max(first - 6, 0):first + 12] if first is not None else lines[-40:]
+        problems.append("\n".join(context))
     return problems
 
 

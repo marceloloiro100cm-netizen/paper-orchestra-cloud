@@ -1,0 +1,40 @@
+name: Normas - build da imagem do worker
+
+# Constrói a imagem do worker como no deploy (com formatos/ copiada) e roda a
+# compilação de exemplo de cada norma (worker/format_smoke.py). Pega no PR o
+# que antes só aparecia no Cloud Build, sem tocar em produção.
+on:
+  pull_request:
+    paths:
+      - formatos/**
+      - worker/Dockerfile
+      - worker/mcp_jobs.py
+      - worker/format_smoke.py
+      - .github/workflows/formatos-build.yml
+  push:
+    branches-ignore: [main]
+    paths:
+      - formatos/**
+      - worker/Dockerfile
+      - worker/mcp_jobs.py
+      - worker/format_smoke.py
+      - .github/workflows/formatos-build.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: Construir a imagem do worker com as normas
+        run: |
+          cp -r formatos worker/formatos
+          docker build --progress=plain -t worker-teste worker 2>&1 | tee build.log
+          exit "${PIPESTATUS[0]}"
+      - name: Trecho final do log em caso de falha
+        if: failure()
+        run: tail -n 200 build.log || true
