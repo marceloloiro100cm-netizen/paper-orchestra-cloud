@@ -34,7 +34,7 @@ As ondas seguem o plano V2 (0: base segura; 1: leitura escalável; 2: busca e ev
 | M22 | FIRE: auditoria iterativa e parada dinâmica | P2 | 4 | parcial | R14 (FIRE (MBZUAI)), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Experimental, ligado em produção em 24/11/2026 (SCRIPTORIUM_V2_FIRE=true, decisão do responsável): até 15 afirmações, 3 ciclos e 40 chamadas; decide só com confiança e evidência citada por ID; limite nunca vira 'apoiada'. Completa o estágio 4 do escudo. Falta conjunto rotulado para medir precisão. |
 | M25 | Revisão adversarial de argumentos | P2 | 4 | implementado | R01 (Projeto Scriptorium (paper-orchestra-cloud)), R07 (LangExtract (Google)) | O parecer Neon recebe só um recorte da matriz de evidências (até 25 afirmações e 2 trechos curtos cada), nunca o texto integral das fontes, e registra esse limite no próprio parecer. |
 | M26 | Importação Zotero somente leitura | P2 | 5 | implementado | R21 (Zotero Web API v3), R22 (Better BibTeX for Zotero), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Importação somente leitura como .bib, incremental (versão do Zotero guardada, chave nunca) e anexos PDF só com consentimento, passando pela verificação de upload (M13). |
-| M27 | Exportação bibliográfica e estilos | P2 | 5 | implementado | R23 (Citation.js), R24 (CSL Styles), R38 (abnTeX2), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Templates ABNT (abnTeX2) no LaTeX e exportação das referências da pesquisa em CSL-JSON e em lista ABNT (NBR 6023:2018), com testes de snapshot. Outros estilos CSL arbitrários exigiriam um processador citeproc. |
+| M27 | Exportação bibliográfica e estilos | P2 | 5 | implementado | R23 (Citation.js), R24 (CSL Styles), R38 (abnTeX2), R49 (biblatex-apa (estilo APA 7 do biblatex) e biber), R01 (Projeto Scriptorium (paper-orchestra-cloud)) | Templates ABNT (abnTeX2) no LaTeX e exportação das referências da pesquisa em CSL-JSON e em lista ABNT (NBR 6023:2018), com testes de snapshot. Outros estilos CSL arbitrários exigiriam um processador citeproc. Desde 27/11/2026 as normas moram em formatos/ (uma pasta por norma, lida pela API, worker, Word e site): ABNT migrada sem mudança no PDF e APA 7 configurável (biblatex-apa no PDF, apa.csl para gerenciadores, referências APA no Word). |
 
 ## Arquivos por módulo
 
@@ -64,4 +64,4 @@ As ondas seguem o plano V2 (0: base segura; 1: leitura escalável; 2: busca e ev
 - **M24:** `worker/source_quality.py`, `api/reviews.py`, `public/app.js`, `worker/manual_reviews.py`
 - **M25:** `worker/neon_review.py`
 - **M26:** `api/zotero_import.py`, `api/library.py`, `public/app.js`
-- **M27:** `worker/templates/abnt-artigo`, `worker/templates/abnt-dissertacao`, `api/csl_export.py`
+- **M27:** `worker/templates/abnt-artigo`, `worker/templates/abnt-dissertacao`, `api/csl_export.py`, `formatos/README.md`, `formatos/apa7/formato.json`, `api/apa_refs.py`, `worker/format_smoke.py`

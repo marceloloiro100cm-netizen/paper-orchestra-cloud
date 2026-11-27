@@ -129,6 +129,20 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
                 "comentarios_orientacao": comments,
                 "comentarios_pendentes": sum(1 for c in comments if not c.get("resolved"))}
 
+    @router.get("/formatos")
+    def list_formats(user: dict = dependency):
+        """Normas que o site oferece (pastas de formatos/), para o seletor de Novo artigo."""
+        return {"formatos": flow.formatos.catalogo(), "padrao": flow.formatos.PADRAO}
+
+    @router.get("/formatos/{formato_id}/estilo.csl")
+    def format_csl(formato_id: str, user: dict = dependency):
+        """Estilo CSL oficial da norma, para usar no Zotero, Mendeley ou Word."""
+        path = flow.formatos.caminho_csl(formato_id) if flow.formatos.existe(formato_id) else None
+        if not path:
+            raise HTTPException(404, "Esta norma não tem estilo CSL.")
+        return Response(path.read_bytes(), media_type="application/vnd.citationstyles.style+xml",
+                        headers={"Content-Disposition": f'attachment; filename="{path.name}"'})
+
     @router.get("/projetos")
     def list_projects(user: dict = dependency):
         projects = store.projects(user["uid"])
@@ -141,15 +155,11 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
     @router.post("/projetos", status_code=201)
     def create_project_site(payload: NewProject, user: dict = dependency):
         """Onda 2 + Fase 2: cria artigo, dissertação ou TCC com modo pedagógico (Tutor Socrático/Intermediário/Autônomo)."""
-        modelo = payload.modelo
-        if payload.tipo == "dissertacao" and modelo == "abnt-artigo":
-            modelo = "abnt-dissertacao"
-        elif payload.tipo == "tcc" and modelo == "abnt-artigo":
-            modelo = "abnt-tcc"
         try:
+            # create_project ajusta a pasta da norma ao tipo (ABNT + dissertação -> abnt-dissertacao).
             record = store.create_project(
                 user["uid"], payload.titulo, payload.pergunta, payload.fontes,
-                payload.idioma, modelo, payload.tipo, payload.modo_pedagogico,
+                payload.idioma, payload.modelo, payload.tipo, payload.modo_pedagogico,
             )
         except Falha as exc:
             raise HTTPException(422, str(exc)) from None
@@ -288,6 +298,7 @@ def make_mcp_site_router(store: Store, verify_user: Callable, public_url: str):
         return docx_export.build_docx(
             project.get("title") or project["id"], tex, ref_list,
             is_final=is_final, work_label=WORK_LABELS.get(mode(project), "Artigo científico"),
+            formato=flow.formatos.obter(project.get("template")), idioma=project.get("language") or "pt-BR",
         )
 
     @router.get("/projetos/{project_id}/pacote-orientacao.zip")

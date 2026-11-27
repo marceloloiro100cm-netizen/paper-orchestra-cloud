@@ -38,7 +38,7 @@ A conta de faturamento Google Cloud que você já usa pode pagar **outro projeto
 ## Limitações conhecidas
 
 - Entrada de **ideia + log experimental** em texto, mais até 8 fontes da **biblioteca privada** (PDF, DOCX, BIB, RIS ou TXT). O texto extraído é limitado (20 mil caracteres por arquivo, 75 mil por pesquisa) e obras longas são truncadas. Figuras enviadas e revisão com controle editorial são evoluções futuras.
-- Templates disponíveis: ICLR e CVPR originais, e `abnt-artigo` e `abnt-dissertacao` (abnTeX2, experimentais). Os modelos ABNT são rascunhos: não garantem conformidade com NBR 6022, 10520 ou 6023 nem com manuais da instituição ou da revista.
+- Normas do modo sem API (MCP): ABNT (artigo, dissertação, TCC) e APA 7 (artigo e revisão, experimental), escolhidas no site em Novo artigo. Cada norma é uma pasta em `formatos/`. No modo antigo com API, os templates são ICLR e CVPR originais, e `abnt-artigo` e `abnt-dissertacao` (abnTeX2, experimentais). Os modelos ABNT são rascunhos: não garantem conformidade com NBR 6022, 10520 ou 6023 nem com manuais da instituição ou da revista.
 - Gemini `3.1-pro-preview` e `3-flash-preview` são os nomes presentes na versão do PaperOrchestra aqui fixada; modelos preview podem deixar de existir ou mudar de preço.
 - Não há cancelamento de Job pelo navegador, alertas de orçamento no aplicativo nem controle de custo por chamada. Limite: uma pesquisa ativa por conta, garantida por uma trava transacional no Firestore (`research_owner_state/{uid}`), inclusive contra cliques ou requisições simultâneas.
 - Se o processo original falhar ao compilar, a pesquisa é marcada como falha. A versão inicial não oferece checkpoints dos agentes nem recomeço de uma etapa isolada.
@@ -59,6 +59,7 @@ A conta de faturamento Google Cloud que você já usa pode pagar **outro projeto
 ```
 api/                  # API FastAPI + verificação de Firebase Auth
 worker/               # job original PaperOrchestra + salvamento no Storage
+formatos/             # normas de formatação (ABNT, APA 7...): uma pasta por norma, ver formatos/README.md
 public/               # interface responsiva para celular
 scripts/deploy-cloud-shell.sh
 firebase.json         # hosting + proxy de /api para Cloud Run

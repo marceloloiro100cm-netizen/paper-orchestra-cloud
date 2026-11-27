@@ -1,0 +1,54 @@
+{
+  "id": "abnt-tcc",
+  "nome": "TCC / Monografia de graduação ABNT (abntex2)",
+  "familia": "ABNT",
+  "descricao": "TCC ou monografia em capítulos nas normas brasileiras (NBR 14724). Usa o mesmo preâmbulo da dissertação.",
+  "status": "estavel",
+  "tipos": [
+    "tcc"
+  ],
+  "no_site": true,
+  "areas": [
+    "Todas as áreas no Brasil",
+    "Exigida por muitas instituições e revistas nacionais"
+  ],
+  "estrutura": {
+    "secoes": [
+      "Introdução",
+      "Referencial teórico",
+      "Metodologia",
+      "Resultados e discussão",
+      "Considerações finais"
+    ],
+    "resumo": "resumo",
+    "usa_capitulos": true
+  },
+  "citacao": {
+    "parentetica": "\\cite{chave}",
+    "narrativa": "\\citeonline{chave}",
+    "exemplos": {
+      "parentetica": "(SILVA; SOUZA, 2020)",
+      "narrativa": "Silva e Souza (2020)"
+    }
+  },
+  "latex": {
+    "preambulo": "abnt-dissertacao/preambulo.tex",
+    "bibliografia": "bibtex",
+    "apos_resumo": "\\tableofcontents*\n\\textual",
+    "fecho": "\\postextual\n\\bibliography{references}",
+    "tipo_trabalho": "Trabalho de Conclusão de Curso (TCC)"
+  },
+  "word": {
+    "referencias": "abnt",
+    "espacamento": 1.5,
+    "margens_cm": {
+      "superior": 3,
+      "esquerda": 3,
+      "inferior": 2,
+      "direita": 2
+    },
+    "recuo_cm": 1.25,
+    "fonte": "Times New Roman",
+    "tamanho_pt": 12
+  }
+}

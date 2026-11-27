@@ -36,7 +36,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R21 | [Zotero Web API v3](https://www.zotero.org/support/dev/web_api/v3/start) | api | sim | termos do serviço | - | M26 |
 | R22 | [Better BibTeX for Zotero](https://github.com/retorquere/zotero-better-bibtex) | biblioteca | não | MIT | - | M26 |
 | R23 | [Citation.js](https://github.com/citation-js/citation-js) | biblioteca | sim | MIT | - | M27 |
-| R24 | [CSL Styles](https://github.com/citation-style-language/styles) | biblioteca | sim | CC-BY-SA-3.0 | - | M27 |
+| R24 | [CSL Styles](https://github.com/citation-style-language/styles) | biblioteca | sim | CC-BY-SA-3.0 | e27b9b7e204b1a40998f774ff05c8a6ed6a5f7d8 | M27 |
 | R25 | [IFRS: Instrução Normativa nº 16/2026 (IA generativa)](https://ifrs.edu.br/documentos/instrucao-normativa-ifrs-n-16-2026/) | normativo | sim | não se aplica | - | M11, M12 |
 | R26 | [PRISMA 2020](https://www.prisma-statement.org/prisma-2020-checklist) | normativo | não | não se aplica | - | M09, M16 |
 | R27 | [OWASP GenAI Security Project](https://genai.owasp.org/) | normativo | sim | não se aplica | - | M13 |
@@ -61,6 +61,7 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R46 | [pdfid (Didier Stevens)](https://blog.didierstevens.com/programs/pdf-tools/) | ferramenta | sim | domínio público (declarado pelo autor) | - | M13 |
 | R47 | [Gemini API: termos adicionais de serviço (uso dos dados)](https://ai.google.dev/gemini-api/terms) | normativo | sim | termos do serviço | - | M11, M21 |
 | R48 | [IFRS: Guia para o uso de Inteligência Artificial Generativa no IFRS (2026)](https://ifrs.edu.br/documentos/instrucao-normativa-ifrs-n-16-2026/) | normativo | sim | não se aplica | - | M11 |
+| R49 | [biblatex-apa (estilo APA 7 do biblatex) e biber](https://github.com/plk/biblatex-apa) | biblioteca | sim | LPPL-1.3c | versão dos pacotes Debian texlive-bibtex-extra e biber da imagem python:3.11-slim | M27 |
 
 ## Fichas
 
@@ -601,20 +602,20 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Avisos de segurança:** https://github.com/citation-style-language/styles/security/advisories
 - **Histórico de mudanças:** -
 - **Licença (SPDX):** CC-BY-SA-3.0
-- **Situação da licença:** a conferir: licença por estilo
+- **Situação da licença:** apa.csl: CC BY-SA 3.0, declarada no próprio arquivo (conferido em 27/11/2026); demais estilos a conferir um a um
 - **Licença dos pesos:** -
-- **Versão fixada:** -
-- **Versão instalada:** -
+- **Versão fixada:** e27b9b7e204b1a40998f774ff05c8a6ed6a5f7d8
+- **Versão instalada:** apa.csl de 2026-02-07 (commit e27b9b7e)
 - **Última versão revisada:** -
-- **Onde é usado:** api/csl_export.py
-- **Política de atualização:** Commit fixado; novos estilos passam por testes de snapshot.
+- **Onde é usado:** api/csl_export.py, formatos/apa7/apa.csl, formatos/apa7/formato.json
+- **Política de atualização:** Commit fixado; ao atualizar um .csl copiado, trocar commit e SHA-256 em formatos/<id>/formato.json e rodar tests/test_formatos.py.
 - **Frequência de revisão:** semestral
 - **Risco:** -
-- **Nota de migração:** Esquema CSL-JSON e estilo ABNT (associacao-brasileira-de-normas-tecnicas) como referência; nenhum arquivo .csl copiado (licença por estilo a conferir antes de embutir um).
+- **Nota de migração:** Esquema CSL-JSON e estilo ABNT como referência em api/csl_export.py. Desde 27/11/2026 o apa.csl (APA 7) está copiado em formatos/apa7/, com commit e SHA-256 em formato.json; o site oferece o download para Zotero, Mendeley e Word. Novos estilos entram como pasta em formatos/ (ver formatos/README.md).
 - **Resultado de benchmark:** -
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
-- **Última checagem:** 2026-11-24
+- **Última checagem:** 2026-11-27
 
 ### R25 · IFRS: Instrução Normativa nº 16/2026 (IA generativa)
 
@@ -1167,3 +1168,26 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
 - **Última checagem:** 2026-11-24
+
+### R49 · biblatex-apa (estilo APA 7 do biblatex) e biber
+
+- **Fonte canônica:** https://github.com/plk/biblatex-apa
+- **Versões:** https://github.com/plk/biblatex-apa/releases
+- **Erros e correções:** https://github.com/plk/biblatex-apa/issues
+- **Avisos de segurança:** https://github.com/plk/biblatex-apa/security/advisories
+- **Histórico de mudanças:** -
+- **Licença (SPDX):** LPPL-1.3c
+- **Situação da licença:** a conferir pelo vigia semanal
+- **Licença dos pesos:** -
+- **Versão fixada:** versão dos pacotes Debian texlive-bibtex-extra e biber da imagem python:3.11-slim
+- **Versão instalada:** -
+- **Última versão revisada:** efb4437b2a58e47f3eb0729699e94b2b983a2291
+- **Onde é usado:** worker/Dockerfile, formatos/apa7/preambulo.tex, worker/format_smoke.py
+- **Política de atualização:** Semestral e a cada troca da imagem base: o build compila um exemplo APA 7 (worker/format_smoke.py) e para se falhar.
+- **Frequência de revisão:** semestral
+- **Risco:** A versão do Debian pode ficar atrás da do GitHub; a lista de referências do PDF depende do biber instalado.
+- **Nota de migração:** Preâmbulo APA 7 em formatos/apa7 usa style=apa, backend=biber. Inclui brazilian-apa.lbx (conferido no repositório em 27/11/2026). Nenhum arquivo copiado: vem dos pacotes do TeX Live.
+- **Resultado de benchmark:** -
+- **Rollback:** -
+- **Responsável:** marceloloiro100cm-netizen
+- **Última checagem:** 2026-11-27

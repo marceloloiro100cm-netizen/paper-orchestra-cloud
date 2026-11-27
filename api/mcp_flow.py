@@ -22,7 +22,15 @@ import hashlib
 import json
 import re
 import secrets
+import sys
 import unicodedata
+from pathlib import Path
+
+try:  # Na imagem, formatos/ é copiado para /app/formatos no deploy.
+    import formatos
+except ModuleNotFoundError:  # Rodando direto do repositório (testes, desenvolvimento).
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    import formatos
 
 FLOW_VERSION = "mcp-flow-1"
 
@@ -122,37 +130,19 @@ def new_head_id() -> str:
 
 
 # ------------------------------------------------------------------ etapas
-TEMPLATES = {
-    "abnt-artigo": {
-        "nome": "Artigo ABNT (abntex2)",
-        "secoes": ["Introdução", "Referencial teórico", "Metodologia", "Resultados e discussão",
-                   "Considerações finais"],
-        "resumo": "resumo",
-        "usa_capitulos": False,
-    },
-    "abnt-dissertacao": {
-        "nome": "Dissertação de mestrado ABNT (abntex2)",
-        "secoes": ["Introdução", "Revisão de literatura", "Referencial teórico",
-                   "Procedimentos metodológicos", "Resultados, produto educacional e discussão",
-                   "Considerações finais"],
-        "resumo": "resumo",
-        "usa_capitulos": True,
-    },
-    "abnt-tcc": {
-        "nome": "TCC / Monografia de graduação ABNT (abntex2)",
-        "secoes": ["Introdução", "Referencial teórico", "Metodologia",
-                   "Resultados e discussão", "Considerações finais"],
-        "resumo": "resumo",
-        "usa_capitulos": True,
-    },
-    "artigo-simples": {
-        "nome": "Artigo simples (article)",
-        "secoes": ["Introdução", "Trabalhos relacionados", "Método", "Resultados", "Discussão",
-                   "Conclusão"],
-        "resumo": "abstract",
-        "usa_capitulos": False,
-    },
-}
+def _template_info(formato_id: str) -> dict:
+    """Visão do formato usada pelo fluxo; os dados vêm de formatos/<id>/formato.json."""
+    dados = formatos.obter(formato_id)
+    est = dados["estrutura"]
+    return {"nome": dados["nome"], "familia": dados["familia"], "secoes": list(est["secoes"]),
+            "resumo": est["resumo"], "usa_capitulos": bool(est.get("usa_capitulos")),
+            "tipos": list(dados["tipos"]), "citacao": dict(dados["citacao"]),
+            "regras": formatos.regras(formato_id)}
+
+
+# Mantido como dicionário para quem consulta flow.TEMPLATES; a fonte é o registro em formatos/.
+TEMPLATES = {fid: _template_info(fid) for fid in formatos.ids()}
+
 
 COMMON_RULES = (
     "Regras do Scriptorium, valem para todas as etapas:\n"
@@ -195,7 +185,7 @@ STAGES = [
             "Você é a cabeça REDATORA. Escreva o corpo do texto em LaTeX a partir do plano e das "
             "evidências aceitas: comece pelo ambiente de resumo indicado e siga com \\section{...} "
             "(ou \\chapter{...} nos modelos de dissertação e TCC ABNT) para cada seção/capítulo do modelo. "
-            "Cite com \\cite{chave} (ou \\citeonline{chave} no modelo ABNT). "
+            "Cite com os comandos de como_citar (parentética e narrativa) e siga regras_do_formato. "
             "Prefira paráfrases com autoria analítica (teto orientativo: até 8 citações diretas por mil palavras). "
             "Entregue só o corpo: sem preâmbulo, \\documentclass, \\usepackage, \\begin{document}, "
             "\\bibliography, macros (\\def, \\newcommand) nem \\input/\\include; o Scriptorium monta o "
@@ -366,7 +356,8 @@ def parse_json(content: str):
 
 
 CITE = re.compile(r"\\(?:cite|citep|citet|citeonline|citealp|citealt|citeauthor|citeyear|"
-                  r"apud|citeyearpar)\*?(?:\[[^\]]*\]){0,2}\{([^}]*)\}")
+                  r"apud|citeyearpar|parencite|textcite|Parencite|Textcite|autocite)\*?"
+                  r"(?:\[[^\]]*\]){0,2}\{([^}]*)\}")
 # O LaTeX entregue pela IA é compilado no worker: nada que leia arquivos, escreva
 # no disco, rode comandos ou redefina macros (inclusive por \csname e ^^).
 FORBIDDEN = re.compile(
@@ -374,7 +365,7 @@ FORBIDDEN = re.compile(
     r"includeonly|InputIfFileExists|usepackage|RequirePackage|documentclass|catcode|special|"
     r"directlua|luaexec|latelua|csname|expandafter|def|edef|gdef|xdef|let|futurelet|newcommand|"
     r"renewcommand|providecommand|DeclareRobustCommand|newenvironment|renewenvironment|"
-    r"bibliography|bibliographystyle|addbibresource|includegraphics|verbatiminput|"
+    r"bibliography|bibliographystyle|addbibresource|printbibliography|includegraphics|verbatiminput|"
     r"lstinputlisting|pdffiledump|pdfximage|pdfobj|scantokens|everyeof|endinput|"
     r"newread|newwrite|loop|jobname|shipout|output|end\s*\{\s*document\s*\}|"
     r"begin\s*\{\s*document\s*\})(?![A-Za-z])")
@@ -989,6 +980,7 @@ def material(stage_key: str, project: dict, board: dict, references: list[dict])
         "projeto": project["id"], "titulo": project.get("title", ""), "pergunta": project.get("question", ""),
         "idioma": project.get("language", "pt-BR"), "modelo": template["nome"],
         "secoes_do_modelo": template["secoes"], "ambiente_de_resumo": template["resumo"],
+        "como_citar": template["citacao"], "regras_do_formato": template["regras"],
         "referencias": refs,
     }
     get = lambda key: (board.get(key) or {}).get("content", "")
