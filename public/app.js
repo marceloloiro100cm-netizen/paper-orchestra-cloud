@@ -1836,7 +1836,7 @@ function articleCard(p) {
   const total = (p.etapas || []).length;
   const done = (p.etapas || []).filter(s => s.status === 'aceita').length;
   info.append(el('strong', p.titulo || p.projeto),
-    el('p', `${MCP_TYPES[p.tipo] || 'Artigo'} · ${done} de ${total} etapas`, 'subtle'));
+    el('p', `${MCP_TYPES[p.tipo] || 'Artigo'} · ${p.norma || 'ABNT'} · ${done} de ${total} etapas`, 'subtle'));
   const bar = document.createElement('div'); bar.className = 'art-progress';
   bar.setAttribute('role', 'progressbar'); bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', String(total));
   bar.setAttribute('aria-valuenow', String(done)); bar.setAttribute('aria-label', `${done} de ${total} etapas`);
@@ -1850,7 +1850,7 @@ function articleCard(p) {
   }
   if ((p.arquivos || []).includes('scriptorium.tex') || (p.arquivos || []).includes('scriptorium.pdf')) {
     const docx = el('button', 'Baixar Word (.docx)', 'btn alt'); docx.type = 'button';
-    docx.title = 'Baixa documento editável em padrão ABNT para abrir no Microsoft Word ou Google Docs.';
+    docx.title = `Baixa documento editável em padrão ${p.norma || 'ABNT'} para abrir no Microsoft Word ou Google Docs.`;
     docx.addEventListener('click', () => downloadFrom(`/mcp-conta/projetos/${p.projeto}/arquivos/scriptorium.docx`, 'scriptorium.docx'));
     actions.append(docx);
     const pkg = el('button', 'Pacote para orientação (.zip)', 'btn alt'); pkg.type = 'button';
@@ -2107,6 +2107,69 @@ async function loadMcpProjects() {
   if (user) writeUiCache(user.uid, { mcpProjects: projects });
   renderMcpProjectsList(projects);
 }
+// Normas de formatação: vêm de formatos/ no repositório (GET /mcp-conta/formatos).
+// O seletor mostra a família (ABNT, APA 7...); a pasta certa sai do tipo de trabalho.
+let projectFormats = [];
+let formatsLoading = null;
+const FALLBACK_FORMATS = [
+  { id: 'abnt-artigo', familia: 'ABNT', tipos: ['artigo', 'revisao_sistematica'], status: 'estavel', areas: [], descricao: 'Normas brasileiras (NBR 6022, 6023 e 10520).', exemplo_citacao: {} },
+  { id: 'abnt-dissertacao', familia: 'ABNT', tipos: ['dissertacao'], status: 'estavel', areas: [], descricao: 'Normas brasileiras (NBR 14724).', exemplo_citacao: {} },
+  { id: 'abnt-tcc', familia: 'ABNT', tipos: ['tcc'], status: 'estavel', areas: [], descricao: 'Normas brasileiras (NBR 14724).', exemplo_citacao: {} },
+];
+function formatsList() { return projectFormats.length ? projectFormats : FALLBACK_FORMATS; }
+function loadFormats() {
+  if (!formatsLoading) {
+    formatsLoading = request('/mcp-conta/formatos').then(r => r.json())
+      .then(data => { projectFormats = data.formatos || []; })
+      .catch(() => { formatsLoading = null; })
+      .finally(() => syncNormaOptions());
+  }
+  return formatsLoading;
+}
+function formatFor(familia, tipo) {
+  return formatsList().find(f => f.familia === familia && f.tipos.includes(tipo)) || null;
+}
+function syncNormaOptions() {
+  const sel = $('new-proj-norma'); if (!sel) return;
+  const tipo = $('new-proj-type')?.value || 'artigo';
+  const current = sel.value || 'ABNT';
+  const families = [...new Set(formatsList().map(f => f.familia))];
+  sel.replaceChildren();
+  for (const fam of families) {
+    const opt = document.createElement('option');
+    const fit = formatFor(fam, tipo);
+    const experimental = formatsList().some(f => f.familia === fam && f.status === 'experimental');
+    opt.value = fam;
+    opt.textContent = fam + (experimental ? ' (experimental)' : '') + (fit ? '' : ' · sem modelo para este tipo');
+    opt.disabled = !fit;
+    sel.append(opt);
+  }
+  const keep = [...sel.options].find(o => o.value === current && !o.disabled);
+  sel.value = keep ? current : ([...sel.options].find(o => !o.disabled)?.value || 'ABNT');
+  renderNormaHint();
+}
+function renderNormaHint() {
+  const hint = $('new-proj-norma-hint'); if (!hint) return;
+  const fmt = formatFor($('new-proj-norma')?.value, $('new-proj-type')?.value || 'artigo');
+  hint.replaceChildren();
+  if (!fmt) return;
+  const parts = [fmt.descricao];
+  const ex = fmt.exemplo_citacao || {};
+  if (ex.parentetica) parts.push(`Citação: ${ex.parentetica} ou ${ex.narrativa}.`);
+  if (fmt.areas?.length) parts.push(`Comum em: ${fmt.areas.join(', ')}.`);
+  hint.append(document.createTextNode(parts.join(' ') + ' '));
+  if (fmt.tem_csl) {
+    const link = document.createElement('button');
+    link.type = 'button'; link.className = 'norma-hint-link';
+    link.textContent = 'Baixar estilo para Zotero/Mendeley (.csl)';
+    link.addEventListener('click', () => downloadPath(`/mcp-conta/formatos/${encodeURIComponent(fmt.id)}/estilo.csl`, `${fmt.id}.csl`));
+    hint.append(link);
+  }
+}
+$('new-proj-type')?.addEventListener('change', syncNormaOptions);
+$('new-proj-norma')?.addEventListener('change', renderNormaHint);
+$('new-mcp-project-box')?.addEventListener('toggle', () => { if ($('new-mcp-project-box').open) loadFormats(); });
+
 function renderNewProjectSources() {
   const box = $('new-proj-sources'); if (!box) return;
   const usable = (libraryItems || []).filter(i => ['pdf', 'docx', 'txt'].includes((i.format || '').toLowerCase()));
@@ -2142,7 +2205,7 @@ function readGuidePlanFallback() {
     ].filter(Boolean);
     if (!titulo && !parts.length) return null;
     const tipo = raw.tipo === 'projeto' ? 'dissertacao' : 'artigo';
-    return { titulo, pergunta: parts.join('\n\n'), tipo, modelo: tipo === 'dissertacao' ? 'abnt-dissertacao' : 'abnt-artigo' };
+    return { titulo, pergunta: parts.join('\n\n'), tipo };
   } catch (_) { return null; }
 }
 
@@ -2157,9 +2220,8 @@ function applyGuidePlanToForm(plan) {
   if ($('new-proj-title') && data.titulo) $('new-proj-title').value = data.titulo.slice(0, 120);
   if ($('new-proj-question') && data.pergunta) $('new-proj-question').value = data.pergunta.slice(0, 4000);
   if ($('new-proj-type')) {
-    const targetVal = data.tipo === 'dissertacao' ? 'dissertacao|abnt-dissertacao'
-      : data.tipo === 'tcc' ? 'tcc|abnt-tcc' : 'artigo|abnt-artigo';
-    $('new-proj-type').value = targetVal;
+    $('new-proj-type').value = ['dissertacao', 'tcc', 'revisao_sistematica'].includes(data.tipo) ? data.tipo : 'artigo';
+    syncNormaOptions();
   }
   if ($('new-proj-pedagogical') && data.modo_pedagogico) {
     $('new-proj-pedagogical').value = data.modo_pedagogico;
@@ -2185,7 +2247,9 @@ $('new-proj-select-all')?.addEventListener('click', () => {
 });
 $('create-mcp-project-btn')?.addEventListener('click', async () => {
   const btn = $('create-mcp-project-btn'), st = $('new-proj-status');
-  const [tipo, modelo] = ($('new-proj-type')?.value || 'artigo|abnt-artigo').split('|');
+  const tipo = $('new-proj-type')?.value || 'artigo';
+  const modelo = formatFor($('new-proj-norma')?.value || 'ABNT', tipo)?.id || 'abnt-artigo';
+  const idioma = $('new-proj-language')?.value === 'en' ? 'en' : 'pt-BR';
   const titulo = ($('new-proj-title')?.value || '').trim();
   const pergunta = ($('new-proj-question')?.value || '').trim();
   const fontes = [...($('new-proj-sources')?.querySelectorAll('input:checked') || [])].map(c => c.value).slice(0, 20);
@@ -2197,7 +2261,7 @@ $('create-mcp-project-btn')?.addEventListener('click', async () => {
   try {
     await request('/mcp-conta/projetos', {
       method: 'POST',
-      body: JSON.stringify({ titulo, pergunta, fontes, tipo, modelo, idioma: 'pt-BR', modo_pedagogico }),
+      body: JSON.stringify({ titulo, pergunta, fontes, tipo, modelo, idioma, modo_pedagogico }),
     });
     st.textContent = '✓ Criado! O Scriptorium já está lendo suas fontes.';
     $('new-proj-title').value = ''; $('new-proj-question').value = '';
@@ -2944,7 +3008,7 @@ const INLINE_GLOSSARY = {
   bibtex: 'BibTeX (.bib): é um arquivo simples de texto que guarda os dados das referências (autor, título, ano, revista) para montar a bibliografia ABNT automaticamente.',
   parafrase: 'Paráfrase é explicar a ideia do autor com as suas próprias palavras (mantendo a citação). Citação direta copia o trecho entre aspas, palavra por palavra.',
   proveniencia: 'Proveniência: é o relatório transparente que comprova quais fontes sustentam o texto e se houve revisão em conversa independente — muito útil para a orientação e a banca.',
-  word: 'Word (.docx): arquivo editável em padrão ABNT (Times New Roman 12, espaçamento 1,5) para seu orientador comentar com Controle de Alterações no Word ou Google Docs.',
+  word: 'Word (.docx): arquivo editável na norma do projeto (ABNT: Times New Roman 12 e espaçamento 1,5; APA 7: espaço duplo e referências com recuo deslocado) para seu orientador comentar com Controle de Alterações no Word ou Google Docs.',
 };
 for (const btn of document.querySelectorAll('[data-glossary]')) {
   btn.addEventListener('click', () => {

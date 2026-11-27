@@ -1,0 +1,58 @@
+% APA 7a edicao (artigo de estudante), montado pelo Scriptorium.
+% Classe article + biblatex-apa (estilo oficial APA 7 do biblatex, compilado com biber).
+% Os campos marcados com %( e )s sao preenchidos pelo Scriptorium; o resto e LaTeX comum.
+\documentclass[12pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[%(babel)s]{babel}
+\usepackage{mathptmx}
+\usepackage{amsmath,amssymb,booktabs,array,url}
+% Margens de 2,54 cm (1 polegada) e espaco duplo em todo o texto.
+\usepackage[a4paper,margin=2.54cm]{geometry}
+\usepackage{setspace}
+\doublespacing
+% Recuo de 1,27 cm (0,5 polegada) em todos os paragrafos, inclusive o primeiro.
+\usepackage{indentfirst}
+\setlength{\parindent}{1.27cm}
+\setlength{\parskip}{0pt}
+% Numero da pagina no canto superior direito.
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyhead[R]{\thepage}\renewcommand{\headrulewidth}{0pt}}
+% Titulos APA sem numeracao: nivel 1 centralizado em negrito, nivel 2 a esquerda em negrito,
+% nivel 3 a esquerda em negrito e italico, nivel 4 recuado em negrito na linha do paragrafo.
+\usepackage{titlesec}
+\setcounter{secnumdepth}{0}
+\titleformat{\section}{\normalfont\normalsize\bfseries\filcenter}{}{0pt}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{}{0pt}{}
+\titleformat{\subsubsection}{\normalfont\normalsize\bfseries\itshape}{}{0pt}{}
+\titleformat{\paragraph}[runin]{\normalfont\normalsize\bfseries}{}{0pt}{}[.]
+\titlespacing*{\section}{0pt}{\baselineskip}{0pt}
+\titlespacing*{\subsection}{0pt}{\baselineskip}{0pt}
+\titlespacing*{\subsubsection}{0pt}{\baselineskip}{0pt}
+\titlespacing*{\paragraph}{1.27cm}{0pt}{0.5em}
+% Resumo em pagina propria, com o rotulo centralizado em negrito e sem recuo.
+\renewenvironment{abstract}{\clearpage\begin{center}\bfseries\abstractname\end{center}\noindent\ignorespaces}{\par\clearpage}
+\usepackage{csquotes}
+\usepackage[style=apa,backend=biber,natbib=true]{biblatex}
+\addbibresource{references.bib}
+% \cite vira parentetica, como as citacoes "(Autor, ano)" da APA.
+\let\cite\parencite
+\providecommand{\citeonline}{\textcite}
+\usepackage[hidelinks]{hyperref}
+\begin{document}
+\begin{titlepage}
+\centering
+\vspace*{3\baselineskip}
+{\bfseries %(title)s\par}
+\vspace{\baselineskip}
+%(author)s\par
+%(afiliacao)s\par
+%(curso)s\par
+%(professor)s\par
+%(date)s\par
+\end{titlepage}
+\setcounter{page}{2}

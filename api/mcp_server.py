@@ -41,6 +41,9 @@ try:
 except Exception:  # pragma: no cover
     _GcsNotFound = ()
 
+# Normas disponíveis (pastas de formatos/); a lista entra no esquema da ferramenta criar_projeto.
+ModeloId = Literal[flow.formatos.ids()]
+
 MCP_PATH = "/api/mcp"
 MAX_ACTIVE_TOKENS = 5
 MAX_PROJECT_SOURCES = 20
@@ -173,6 +176,11 @@ class Store:
             raise Falha(f"Escolha de 1 a {MAX_PROJECT_SOURCES} fontes (use listar_fontes).")
         if template not in flow.TEMPLATES or language not in ("pt-BR", "en") or tipo not in flow.MODES:
             raise Falha("Modelo, idioma ou tipo inválido.")
+        # Mesma norma, pasta certa para o tipo (ABNT artigo + dissertação -> abnt-dissertacao).
+        template = flow.formatos.ajustar_ao_tipo(template, tipo)
+        if not flow.formatos.aceita_tipo(template, tipo):
+            raise Falha(f"A norma {flow.TEMPLATES[template]['familia']} ainda não tem modelo para este tipo de "
+                        "trabalho. Escolha outra norma ou outro tipo.")
         if pedagogical_mode not in PEDAGOGICAL_MODES:
             pedagogical_mode = "tutor_socratico"
         if self._active_jobs(uid) >= MAX_ACTIVE_JOBS:
@@ -701,7 +709,7 @@ PEDAGOGICAL_MODES = {
         "label": "Autônomo · Revisão objetiva",
         "guardrail": (
             "MODO AUTÔNOMO: o estudante conduz a redação com mínima intervenção; limite-se a apontar lacunas "
-            "objetivas de coerência, aderência às fontes e formatação ABNT."
+            "objetivas de coerência, aderência às fontes e formatação na norma do projeto."
         ),
     },
 }
@@ -757,7 +765,8 @@ def project_state(store: Store, project: dict) -> dict:
         action = "Todas as etapas aceitas: chame compilar."
     pm = pedagogical_mode_of(project)
     return {"projeto": project["id"], "titulo": project.get("title"), "status": status,
-            "tipo": mode(project), "modo_pedagogico": pm,
+            "tipo": mode(project), "norma": flow.TEMPLATES.get(project.get("template"), flow.TEMPLATES[flow.formatos.PADRAO])["familia"],
+            "modelo": project.get("template") or flow.formatos.PADRAO, "modo_pedagogico": pm,
             "modo_pedagogico_rotulo": PEDAGOGICAL_MODES[pm]["label"],
             "etapas": _state_summary(project), "proxima_acao": action,
             "arquivos": project.get("files", []), "erro": project.get("error", "")}
@@ -1025,18 +1034,15 @@ def build_server(store: Store, public_url: str) -> MCPServer:
     @server.tool()
     async def criar_projeto(titulo: str, pergunta: str, ids_das_fontes: list[str],
                             idioma: Literal["pt-BR", "en"] = "pt-BR",
-                            modelo: Literal["abnt-artigo", "abnt-dissertacao", "abnt-tcc", "artigo-simples"] = "abnt-artigo",
+                            modelo: ModeloId = "abnt-artigo",
                             tipo: Literal["artigo", "dissertacao", "tcc", "revisao_sistematica"] = "artigo") -> dict:
         """Cria um projeto (artigo, dissertação de mestrado, TCC ou revisão sistemática) com até 20 fontes da biblioteca.
-        tipo="dissertacao" ou "tcc" usa capítulos ABNT (abntex2); tipo="revisao_sistematica" segue protocolo,
+        modelo é a norma (pasta em formatos/): ABNT (abnt-artigo, que vira abnt-dissertacao ou abnt-tcc conforme o
+        tipo), APA 7 (apa7, artigo ou revisão) ou artigo-simples. tipo="revisao_sistematica" segue protocolo,
         triagem dupla às cegas (kappa), consenso, qualidade e extração, síntese por QP e PRISMA 2020 antes
         da redação. O Scriptorium lê as fontes e monta as referências oficiais (alguns minutos, sem IA);
         depois use proxima_etapa."""
         uid = _uid()
-        if tipo == "dissertacao" and modelo == "abnt-artigo":
-            modelo = "abnt-dissertacao"
-        elif tipo == "tcc" and modelo == "abnt-artigo":
-            modelo = "abnt-tcc"
         record = await run(partial(store.create_project, uid, titulo, pergunta, ids_das_fontes, idioma, modelo, tipo))
         return {"projeto": record["id"], "status": record["status"],
                 "instrucao": "Fontes em leitura. Chame estado_do_projeto em um ou dois minutos e depois proxima_etapa."}

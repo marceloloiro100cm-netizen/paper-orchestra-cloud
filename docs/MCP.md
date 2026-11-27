@@ -32,7 +32,7 @@ O modo com chave Gemini continua disponível para quem tiver créditos.
 | Ferramenta | Para quê |
 |---|---|
 | `listar_fontes` | itens da biblioteca (PDF, DOCX, TXT) |
-| `criar_projeto` | título, pergunta, até 20 fontes, idioma, modelo (`abnt-artigo` ou `artigo-simples`); dispara o preparo |
+| `criar_projeto` | título, pergunta, até 20 fontes, idioma, tipo e modelo (a norma: `abnt-artigo`, `apa7` ou `artigo-simples`; a lista vem de `formatos/`); dispara o preparo |
 | `listar_projetos`, `estado_do_projeto` | andamento, quem entregou cada etapa, independência |
 | `proxima_etapa` | papel, instruções e material da etapa atual; emite a cabeça redatora ou o passe |
 | `abrir_passe` | numa conversa nova: cabeça revisora ou verificadora, só com o material da etapa |

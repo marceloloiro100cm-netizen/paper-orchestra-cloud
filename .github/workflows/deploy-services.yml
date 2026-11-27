@@ -6,6 +6,7 @@ on:
     paths:
       - api/**
       - worker/**
+      - formatos/**
       - .github/workflows/deploy-services.yml
   workflow_dispatch:
 
@@ -91,6 +92,10 @@ jobs:
             done
             echo "::error::Build de ${dir} não terminou em 30 minutos."; return 1
           }
+          # As imagens são construídas a partir de api/ e worker/: a pasta única formatos/ vai junto.
+          rm -rf api/formatos worker/formatos
+          cp -r formatos api/formatos
+          cp -r formatos worker/formatos
           build api "$API_IMAGE"
           build worker "$WORKER_IMAGE"
 

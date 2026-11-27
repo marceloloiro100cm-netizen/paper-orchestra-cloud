@@ -1,4 +1,7 @@
-"""Exportação de manuscritos LaTeX do Scriptorium para Word (.docx) editável em padrão ABNT.
+"""Exportação de manuscritos LaTeX do Scriptorium para Word (.docx) editável na norma do projeto.
+
+ABNT é o padrão. Com `formato` (formatos/<id>/formato.json), margens, espaçamento, recuo,
+títulos, citações e referências seguem a norma escolhida (ex.: APA 7 via apa_refs.py).
 
 Zero dependências externas (usa apenas zipfile + xml.sax.saxutils da biblioteca padrão),
 para que orientadores e estudantes não nativos digitais possam revisar com Controle de
@@ -10,6 +13,8 @@ import io
 import re
 import zipfile
 from xml.sax.saxutils import escape
+
+import apa_refs
 
 CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -80,6 +85,10 @@ STYLES_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 CITE_ONLINE = re.compile(r"\\(?:citeonline|citet|citealt|citeauthor)\*?(?:\[[^\]]*\]){0,2}\{([^}]*)\}")
 CITE_PAREN = re.compile(r"\\(?:cite|citep|citealp|citeyear|citeyearpar|apud)\*?(?:\[[^\]]*\]){0,2}\{([^}]*)\}")
+# APA (biblatex): guarda os argumentos opcionais para página e "como citado em".
+APA_NARRATIVE = re.compile(r"\\(?:textcite|Textcite|citeonline|citet|citealt|citeauthor)\*?((?:\[[^\]]*\]){0,2})\{([^}]*)\}")
+APA_PAREN = re.compile(r"\\(?:parencite|Parencite|autocite|cite|citep|citealp|citeyear|citeyearpar)\*?"
+                       r"((?:\[[^\]]*\]){0,2})\{([^}]*)\}")
 
 
 def _surname(author_raw: str) -> str:
@@ -111,8 +120,28 @@ def _cite_label(keys_str: str, ref_map: dict[str, dict], online: bool) -> str:
     return ", ".join(parts) if online else "(" + "; ".join(parts) + ")"
 
 
-def _clean_latex_inline(text: str, ref_map: dict[str, dict]) -> str:
+def _apa_cite(opts: str, keys_str: str, ref_map: dict[str, dict], narrative: bool, language: str) -> str:
+    args = [a.replace("~", " ").strip() for a in re.findall(r"\[([^\]]*)\]", opts or "")]
+    pre, post = (args[0], args[1]) if len(args) == 2 else ("", args[0] if args else "")
+    keys = [k.strip() for k in keys_str.split(",") if k.strip()]
+    labels = [apa_refs.cite_label(ref_map.get(k), k, narrative=narrative, language=language) for k in keys]
+    if not labels:
+        return ""
+    if narrative:
+        text = ", ".join(labels)
+        return text[:-1] + f", {post})" if post and text.endswith(")") else text
+    inner = "; ".join(sorted(labels, key=str.lower))
+    return "(" + (pre + " " if pre else "") + inner + (", " + post if post else "") + ")"
+
+
+def _clean_latex_inline(text: str, ref_map: dict[str, dict], cite_style: str = "abnt",
+                        language: str = "pt-BR") -> str:
     s = re.sub(r"(?m)(?<!\\)%.*$", "", text or "")
+    # \par vira espaço antes de desembrulhar \textit{...}, senão "\par\textit{X}" some inteiro.
+    s = re.sub(r"\\par(?![A-Za-z])\s*", " ", s)
+    if cite_style == "apa7":
+        s = APA_NARRATIVE.sub(lambda m: _apa_cite(m.group(1), m.group(2), ref_map, True, language), s)
+        s = APA_PAREN.sub(lambda m: _apa_cite(m.group(1), m.group(2), ref_map, False, language), s)
     s = CITE_ONLINE.sub(lambda m: _cite_label(m.group(1), ref_map, online=True), s)
     s = CITE_PAREN.sub(lambda m: _cite_label(m.group(1), ref_map, online=False), s)
     s = s.replace("``", "\u201c").replace("''", "\u201d")
@@ -174,18 +203,57 @@ def _format_abnt_reference(ref: dict) -> str:
     return " ".join(pieces)
 
 
-def _xml_paragraph(text: str, style: str = "Normal", indent_first: bool = False) -> str:
+def _xml_paragraph(text: str, style: str = "Normal", indent_first: bool = False, first_line: int = 709) -> str:
     clean = escape((text or "").strip())
     if not clean:
         return ""
     ppr = [f'<w:pStyle w:val="{style}"/>']
     if indent_first and style == "Normal":
-        # Recuo de primeira linha ABNT: 1,25 cm (~709 twips).
-        ppr.append('<w:ind w:firstLine="709"/>')
+        # Recuo de primeira linha: ABNT 1,25 cm (~709 twips); outras normas pelo formato.json.
+        ppr.append(f'<w:ind w:firstLine="{first_line}"/>')
     return f'<w:p><w:pPr>{"".join(ppr)}</w:pPr><w:r><w:t xml:space="preserve">{clean}</w:t></w:r></w:p>'
 
 
-def _extract_body_blocks(tex: str, ref_map: dict[str, dict]) -> list[tuple[str, str]]:
+def _xml_runs_paragraph(runs: list[tuple[str, bool]], style: str = "Reference") -> str:
+    """Parágrafo com trechos em itálico (título do periódico, volume, livro)."""
+    parts = []
+    for text, italic in runs:
+        if not text:
+            continue
+        rpr = "<w:rPr><w:i/></w:rPr>" if italic else ""
+        parts.append(f'<w:r>{rpr}<w:t xml:space="preserve">{escape(text)}</w:t></w:r>')
+    if not parts:
+        return ""
+    return f'<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr>{"".join(parts)}</w:p>'
+
+
+def _twips(cm: float) -> int:
+    return round(float(cm) * 567)
+
+
+def _styles_xml(word: dict | None) -> str:
+    """ABNT usa STYLES_XML como está; outras normas trocam fonte, espaçamento e títulos."""
+    if not word or word.get("referencias", "abnt") == "abnt":
+        return STYLES_XML
+    line = str(round(240 * float(word.get("espacamento", 1.5))))
+    size = str(round(2 * float(word.get("tamanho_pt", 12))))
+    font = escape(str(word.get("fonte") or "Times New Roman"), {'"': "&quot;"})
+    hanging = str(_twips(word.get("recuo_cm", 1.27)))
+    xml = STYLES_XML.replace('w:line="360"', f'w:line="{line}"').replace('w:after="120"/>', 'w:after="0"/>', 1)
+    xml = xml.replace("Times New Roman", font).replace('<w:sz w:val="24"/><w:szCs w:val="24"/>',
+                                                       f'<w:sz w:val="{size}"/><w:szCs w:val="{size}"/>')
+    xml = xml.replace('<w:jc w:val="both"/>', '<w:jc w:val="left"/>', 1)
+    # APA: nível 1 centralizado em negrito (sem caixa alta); referências com recuo deslocado.
+    xml = xml.replace('<w:jc w:val="left"/><w:keepNext/></w:pPr>\n    <w:rPr><w:b/><w:caps/>',
+                      '<w:jc w:val="center"/><w:keepNext/></w:pPr>\n    <w:rPr><w:b/>', 1)
+    xml = xml.replace('<w:pPr><w:spacing w:line="240" w:lineRule="auto" w:after="160"/><w:jc w:val="left"/></w:pPr>',
+                      f'<w:pPr><w:spacing w:line="{line}" w:lineRule="auto" w:after="0"/>'
+                      f'<w:ind w:left="{hanging}" w:hanging="{hanging}"/><w:jc w:val="left"/></w:pPr>', 1)
+    return xml
+
+
+def _extract_body_blocks(tex: str, ref_map: dict[str, dict], cite_style: str = "abnt",
+                         language: str = "pt-BR", abstract_heading: str = "Abstract") -> list[tuple[str, str]]:
     """Extrai blocos estruturados (estilo, texto) de um .tex completo ou corpo LaTeX."""
     src = tex or ""
     if "\\begin{document}" in src:
@@ -194,17 +262,19 @@ def _extract_body_blocks(tex: str, ref_map: dict[str, dict]) -> list[tuple[str, 
         src = src.split("\\end{document}", 1)[0]
     if "\\postextual" in src:
         src = src.split("\\postextual", 1)[0]
-    src = re.sub(r"\\begin\{titlingpage\}.*?\\end\{titlingpage\}", "", src, flags=re.S)
-    src = re.sub(r"(?m)^\\(?:selectlanguage|imprimircapa|maketitle|tableofcontents\*?|textual|bibliographystyle|bibliography)\b.*$", "", src)
+    src = re.sub(r"\\begin\{(titlingpage|titlepage)\}.*?\\end\{\1\}", "", src, flags=re.S)
+    src = re.sub(r"\\begin\{center\}\\bfseries[^\n]*?\\end\{center\}", "", src)
+    src = re.sub(r"(?m)^\\(?:selectlanguage|imprimircapa|maketitle|tableofcontents\*?|textual|bibliographystyle|bibliography|printbibliography|clearpage|setcounter)\b.*$", "", src)
+    clean = lambda text: _clean_latex_inline(text, ref_map, cite_style, language)
 
     blocks: list[tuple[str, str]] = []
     # Resumo / Abstract
-    for env_name, heading in (("resumo", "Resumo"), ("abstract", "Abstract")):
+    for env_name, heading in (("resumo", "Resumo"), ("abstract", abstract_heading)):
         m = re.search(rf"\\begin\{{{env_name}\}}(.*?)\\end\{{{env_name}\}}", src, flags=re.S)
         if m:
             blocks.append(("Heading1", heading))
             for para in re.split(r"\n\s*\n", m.group(1)):
-                t = _clean_latex_inline(para, ref_map)
+                t = clean(para)
                 if t:
                     blocks.append(("Normal", t))
             src = src[:m.start()] + "\n" + src[m.end():]
@@ -215,7 +285,7 @@ def _extract_body_blocks(tex: str, ref_map: dict[str, dict]) -> list[tuple[str, 
     for m in token_re.finditer(src):
         before = src[pos:m.start()]
         for para in re.split(r"\n\s*\n", before):
-            t = _clean_latex_inline(para, ref_map)
+            t = clean(para)
             if t:
                 blocks.append(("Normal", t))
         if m.group(1):
@@ -226,24 +296,30 @@ def _extract_body_blocks(tex: str, ref_map: dict[str, dict]) -> list[tuple[str, 
                 style = "Heading2"
             elif "\\chapter" in src and level == "subsection":
                 style = "Heading3"
-            heading_txt = _clean_latex_inline(m.group(2), ref_map)
+            heading_txt = clean(m.group(2))
             if heading_txt:
                 blocks.append((style, heading_txt))
         elif m.group(3):
-            item_txt = _clean_latex_inline(m.group(3), ref_map)
+            item_txt = clean(m.group(3))
             if item_txt:
                 blocks.append(("Normal", "• " + item_txt))
         pos = m.end()
     for para in re.split(r"\n\s*\n", src[pos:]):
-        t = _clean_latex_inline(para, ref_map)
+        t = clean(para)
         if t:
             blocks.append(("Normal", t))
     return blocks
 
 
 def build_docx(title: str, tex: str, refs: list[dict] | None = None, *,
-               is_final: bool = True, work_label: str = "Artigo científico") -> bytes:
-    """Gera bytes de um arquivo Word (.docx) editável em padrão ABNT."""
+               is_final: bool = True, work_label: str = "Artigo científico",
+               formato: dict | None = None, idioma: str = "pt-BR") -> bytes:
+    """Gera bytes de um arquivo Word (.docx) editável; ABNT sem `formato`, senão a norma indicada."""
+    word = (formato or {}).get("word") or {}
+    style_refs = word.get("referencias", "abnt")
+    norma = (formato or {}).get("familia") or "ABNT"
+    first_line = _twips(word.get("recuo_cm", 1.25)) if word else 709
+    abstract_heading = "Abstract" if not formato or idioma == "en" else "Resumo"
     ref_list = list(refs or [])
     ref_map = {str(r.get("key") or ""): r for r in ref_list if r.get("key")}
     paragraphs = []
@@ -253,23 +329,30 @@ def build_docx(title: str, tex: str, refs: list[dict] | None = None, *,
             style="Notice",
         ))
     paragraphs.append(_xml_paragraph(title or "Manuscrito Scriptorium MPIE", style="Title"))
-    paragraphs.append(_xml_paragraph(f"{work_label} · Documento editável em padrão ABNT (Scriptorium MPIE)", style="Notice"))
+    paragraphs.append(_xml_paragraph(f"{work_label} · Documento editável em padrão {norma} (Scriptorium MPIE)", style="Notice"))
 
-    for style, text in _extract_body_blocks(tex, ref_map):
+    for style, text in _extract_body_blocks(tex, ref_map, style_refs, idioma, abstract_heading):
         is_bullet = text.startswith("• ")
-        paragraphs.append(_xml_paragraph(text, style=style, indent_first=(style == "Normal" and not is_bullet)))
+        paragraphs.append(_xml_paragraph(text, style=style, indent_first=(style == "Normal" and not is_bullet),
+                                         first_line=first_line))
 
     if ref_list:
-        paragraphs.append(_xml_paragraph("Referências", style="Heading1"))
-        formatted = sorted((_format_abnt_reference(r) for r in ref_list), key=lambda s: s.lower())
-        for line in formatted:
-            paragraphs.append(_xml_paragraph(line, style="Reference"))
+        paragraphs.append(_xml_paragraph("References" if idioma == "en" and formato else "Referências", style="Heading1"))
+        if style_refs == "apa7":
+            for ref in sorted(ref_list, key=apa_refs.sort_key):
+                paragraphs.append(_xml_runs_paragraph(apa_refs.reference_runs(ref, idioma)))
+        else:
+            formatted = sorted((_format_abnt_reference(r) for r in ref_list), key=lambda s: s.lower())
+            for line in formatted:
+                paragraphs.append(_xml_paragraph(line, style="Reference"))
 
     # Margens ABNT A4: superior 3cm (1701), esquerda 3cm (1701), inferior 2cm (1134), direita 2cm (1134).
+    margins = {"superior": 3, "direita": 2, "inferior": 2, "esquerda": 3, **(word.get("margens_cm") or {})}
+    top, right, bottom, left = (_twips(margins[k]) for k in ("superior", "direita", "inferior", "esquerda"))
     sect_pr = (
         '<w:sectPr>'
         '<w:pgSz w:w="11906" w:h="16838"/>'
-        '<w:pgMar w:top="1701" w:right="1134" w:bottom="1134" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/>'
+        f'<w:pgMar w:top="{top}" w:right="{right}" w:bottom="{bottom}" w:left="{left}" w:header="708" w:footer="708" w:gutter="0"/>'
         '</w:sectPr>'
     )
     document_xml = (
@@ -284,6 +367,6 @@ def build_docx(title: str, tex: str, refs: list[dict] | None = None, *,
         zf.writestr("[Content_Types].xml", CONTENT_TYPES.encode("utf-8"))
         zf.writestr("_rels/.rels", RELS.encode("utf-8"))
         zf.writestr("word/_rels/document.xml.rels", DOC_RELS.encode("utf-8"))
-        zf.writestr("word/styles.xml", STYLES_XML.encode("utf-8"))
+        zf.writestr("word/styles.xml", _styles_xml(word).encode("utf-8"))
         zf.writestr("word/document.xml", document_xml.encode("utf-8"))
     return buf.getvalue()

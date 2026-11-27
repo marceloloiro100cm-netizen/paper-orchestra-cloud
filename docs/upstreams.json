@@ -547,19 +547,23 @@
       "github": "citation-style-language/styles",
       "track": "commits",
       "license_spdx": "CC-BY-SA-3.0",
-      "license_status": "a conferir: licença por estilo",
+      "license_status": "apa.csl: CC BY-SA 3.0, declarada no próprio arquivo (conferido em 27/11/2026); demais estilos a conferir um a um",
       "adopted": true,
       "modules": [
         "M27"
       ],
-      "update_policy": "Commit fixado; novos estilos passam por testes de snapshot.",
+      "update_policy": "Commit fixado; ao atualizar um .csl copiado, trocar commit e SHA-256 em formatos/<id>/formato.json e rodar tests/test_formatos.py.",
       "review_frequency": "semestral",
       "owner": "marceloloiro100cm-netizen",
-      "last_checked": "2026-11-24",
+      "last_checked": "2026-11-27",
       "used_in": [
-        "api/csl_export.py"
+        "api/csl_export.py",
+        "formatos/apa7/apa.csl",
+        "formatos/apa7/formato.json"
       ],
-      "migration_note": "Esquema CSL-JSON e estilo ABNT (associacao-brasileira-de-normas-tecnicas) como referência; nenhum arquivo .csl copiado (licença por estilo a conferir antes de embutir um)."
+      "migration_note": "Esquema CSL-JSON e estilo ABNT como referência em api/csl_export.py. Desde 27/11/2026 o apa.csl (APA 7) está copiado em formatos/apa7/, com commit e SHA-256 em formato.json; o site oferece o download para Zotero, Mendeley e Word. Novos estilos entram como pasta em formatos/ (ver formatos/README.md).",
+      "pinned": "e27b9b7e204b1a40998f774ff05c8a6ed6a5f7d8",
+      "installed_version": "apa.csl de 2026-02-07 (commit e27b9b7e)"
     },
     {
       "id": "R25",
@@ -1145,6 +1149,32 @@
       "owner": "marceloloiro100cm-netizen",
       "last_checked": "2026-11-24",
       "migration_note": "Recebido do responsável em 24/11/2026 (13 páginas). Seção 4.1 define o preenchimento do Anexo I: identificação, trabalho, cada uso com ferramenta e versão, finalidade, etapa e conteúdo; autorização do servidor; compromisso. Seção 7 reforça que dados sensíveis não vão para IA que possa treinar com eles."
+    },
+    {
+      "id": "R49",
+      "name": "biblatex-apa (estilo APA 7 do biblatex) e biber",
+      "kind": "biblioteca",
+      "canonical_url": "https://github.com/plk/biblatex-apa",
+      "github": "plk/biblatex-apa",
+      "license_spdx": "LPPL-1.3c",
+      "license_status": "a conferir pelo vigia semanal",
+      "pinned": "versão dos pacotes Debian texlive-bibtex-extra e biber da imagem python:3.11-slim",
+      "adopted": true,
+      "modules": [
+        "M27"
+      ],
+      "used_in": [
+        "worker/Dockerfile",
+        "formatos/apa7/preambulo.tex",
+        "worker/format_smoke.py"
+      ],
+      "update_policy": "Semestral e a cada troca da imagem base: o build compila um exemplo APA 7 (worker/format_smoke.py) e para se falhar.",
+      "review_frequency": "semestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-27",
+      "latest_reviewed": "efb4437b2a58e47f3eb0729699e94b2b983a2291",
+      "risk": "A versão do Debian pode ficar atrás da do GitHub; a lista de referências do PDF depende do biber instalado.",
+      "migration_note": "Preâmbulo APA 7 em formatos/apa7 usa style=apa, backend=biber. Inclui brazilian-apa.lbx (conferido no repositório em 27/11/2026). Nenhum arquivo copiado: vem dos pacotes do TeX Live."
     }
   ],
   "modules": [
@@ -1760,6 +1790,7 @@
         "R23",
         "R24",
         "R38",
+        "R49",
         "R01"
       ],
       "depends_on": [
@@ -1771,9 +1802,13 @@
       "files": [
         "worker/templates/abnt-artigo",
         "worker/templates/abnt-dissertacao",
-        "api/csl_export.py"
+        "api/csl_export.py",
+        "formatos/README.md",
+        "formatos/apa7/formato.json",
+        "api/apa_refs.py",
+        "worker/format_smoke.py"
       ],
-      "next_step": "Templates ABNT (abnTeX2) no LaTeX e exportação das referências da pesquisa em CSL-JSON e em lista ABNT (NBR 6023:2018), com testes de snapshot. Outros estilos CSL arbitrários exigiriam um processador citeproc."
+      "next_step": "Templates ABNT (abnTeX2) no LaTeX e exportação das referências da pesquisa em CSL-JSON e em lista ABNT (NBR 6023:2018), com testes de snapshot. Outros estilos CSL arbitrários exigiriam um processador citeproc. Desde 27/11/2026 as normas moram em formatos/ (uma pasta por norma, lida pela API, worker, Word e site): ABNT migrada sem mudança no PDF e APA 7 configurável (biblatex-apa no PDF, apa.csl para gerenciadores, referências APA no Word)."
     }
   ]
 }

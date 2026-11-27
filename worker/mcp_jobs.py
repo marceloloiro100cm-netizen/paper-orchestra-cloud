@@ -17,10 +17,17 @@ import json
 import os
 import re
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import bib_integrity
+
+try:  # Na imagem, formatos/ é copiado para /app/formatos no deploy.
+    import formatos
+except ModuleNotFoundError:  # Rodando direto do repositório (testes, desenvolvimento).
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    import formatos
 
 # Mesma lista do api/mcp_flow.py (tests/test_mcp_jobs.py impede divergência):
 # a API já recusa estes comandos; aqui é a segunda barreira antes do TeX.
@@ -29,7 +36,7 @@ FORBIDDEN = re.compile(
     r"includeonly|InputIfFileExists|usepackage|RequirePackage|documentclass|catcode|special|"
     r"directlua|luaexec|latelua|csname|expandafter|def|edef|gdef|xdef|let|futurelet|newcommand|"
     r"renewcommand|providecommand|DeclareRobustCommand|newenvironment|renewenvironment|"
-    r"bibliography|bibliographystyle|addbibresource|includegraphics|verbatiminput|"
+    r"bibliography|bibliographystyle|addbibresource|printbibliography|includegraphics|verbatiminput|"
     r"lstinputlisting|pdffiledump|pdfximage|pdfobj|scantokens|everyeof|endinput|"
     r"newread|newwrite|loop|jobname|shipout|output|end\s*\{\s*document\s*\}|"
     r"begin\s*\{\s*document\s*\})(?![A-Za-z])")
@@ -37,79 +44,7 @@ FORBIDDEN = re.compile(
 MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro",
           "outubro", "novembro", "dezembro"]
 
-ABNT_PREAMBLE = r"""\documentclass[article,12pt,oneside,a4paper,brazil]{abntex2}
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage[brazil]{babel}
-\usepackage{lmodern}
-\usepackage{amsmath,amssymb,booktabs,array}
-\usepackage{hyperref,url}
-\usepackage[alf]{abntex2cite}
-\providecommand{\citep}[1]{\cite{#1}}
-\providecommand{\citet}[1]{\citeonline{#1}}
-\providecommand{\citealp}[1]{\cite{#1}}
-\providecommand{\citealt}[1]{\citeonline{#1}}
-\providecommand{\citeauthor}[1]{\citeonline{#1}}
-\providecommand{\citeyear}[1]{\cite{#1}}
-\titulo{%(title)s}
-\autor{%(author)s}
-\local{Brasil}
-\data{%(date)s}
-\begin{document}
-\selectlanguage{brazil}
-\maketitle
-"""
-
-ABNT_BOOK_PREAMBLE = r"""\documentclass[12pt,oneside,a4paper,brazil]{abntex2}
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage[brazil]{babel}
-\usepackage{lmodern}
-\usepackage{amsmath,amssymb,booktabs,array}
-\usepackage{hyperref,url}
-\usepackage[alf]{abntex2cite}
-\providecommand{\citep}[1]{\cite{#1}}
-\providecommand{\citet}[1]{\citeonline{#1}}
-\providecommand{\citealp}[1]{\cite{#1}}
-\providecommand{\citealt}[1]{\citeonline{#1}}
-\providecommand{\citeauthor}[1]{\citeonline{#1}}
-\providecommand{\citeyear}[1]{\cite{#1}}
-\titulo{%(title)s}
-\autor{%(author)s}
-\instituicao{Instituição e Programa — preencher na versão final}
-\tipotrabalho{%(work_type)s}
-\local{Brasil}
-\data{%(date)s}
-\begin{document}
-\selectlanguage{brazil}
-\imprimircapa
-\begin{titlingpage}
-\centering
-{\large\imprimirinstituicao\par}
-\vspace*{3cm}
-{\large\imprimirautor\par}
-\vspace*{2cm}
-{\Large\bfseries\imprimirtitulo\par}
-\vfill
-{\imprimirlocal, \imprimirdata\par}
-\end{titlingpage}
-"""
-
-SIMPLE_PREAMBLE = r"""\documentclass[12pt,a4paper]{article}
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage[%(babel)s]{babel}
-\usepackage{lmodern}
-\usepackage{amsmath,amssymb,booktabs,array,url}
-\usepackage[hidelinks]{hyperref}
-\usepackage[authoryear,round]{natbib}
-\providecommand{\citeonline}[1]{\citet{#1}}
-\title{%(title)s}
-\author{%(author)s}
-\date{%(date)s}
-\begin{document}
-\maketitle
-"""
+# Preâmbulos, estrutura e fecho de cada norma ficam em formatos/<id>/ (ver formatos/README.md).
 
 
 def latex_escape(text: str) -> str:
@@ -211,31 +146,27 @@ def assemble(project: dict, body: str, today: datetime | None = None, draft: lis
     if draft:
         title = ("RASCUNHO: " if project.get("language") != "en" else "DRAFT: ") + title
         body = draft_banner(draft, project.get("language", "pt-BR")) + (body or "")
-    tpl = project.get("template") or "abnt-artigo"
-    values = {"title": latex_escape(title),
+    fmt = formatos.obter(project.get("template"))
+    lat, language = fmt["latex"], project.get("language", "pt-BR")
+    values = {**formatos.textos(fmt["id"], language),
+              "title": latex_escape(title),
               "author": "Autoria a preencher pelo pesquisador",
-              "date": run_date(project.get("language", "pt-BR"), today),
-              "babel": "english" if project.get("language") == "en" else "brazil",
-              "work_type": "Trabalho de Conclusão de Curso (TCC)" if tpl == "abnt-tcc" else "Dissertação de Mestrado"}
-    if tpl == "artigo-simples":
-        return (SIMPLE_PREAMBLE % values + body.strip() +
-                "\n\n\\bibliographystyle{plainnat}\n\\bibliography{references}\n\\end{document}\n")
+              "date": run_date(language, today),
+              "babel": "english" if language == "en" else "brazil",
+              "work_type": lat.get("tipo_trabalho") or "Dissertação de Mestrado"}
     text = body.strip()
-    if tpl in ("abnt-dissertacao", "abnt-tcc"):
-        # Se a IA usou só \section{...} sem \chapter{...}, promove para capítulos ABNT.
-        if "\\chapter" not in text:
-            text = re.sub(r"\\subsection(\*?\{)", r"\\section\1",
-                          re.sub(r"\\section(\*?\{)", r"\\chapter\1", text))
-        if "\\end{resumo}" in text:
-            text = text.replace("\\end{resumo}", "\\end{resumo}\n\\tableofcontents*\n\\textual", 1)
+    if fmt["estrutura"].get("usa_capitulos") and "\\chapter" not in text:
+        # Se a IA usou só \section{...} sem \chapter{...}, promove para capítulos.
+        text = re.sub(r"\\subsection(\*?\{)", r"\\section\1",
+                      re.sub(r"\\section(\*?\{)", r"\\chapter\1", text))
+    after = formatos.preencher(lat.get("apos_resumo") or "", values)
+    if after:
+        end_abstract = "\\end{" + fmt["estrutura"]["resumo"] + "}"
+        if end_abstract in text:
+            text = text.replace(end_abstract, end_abstract + "\n" + after, 1)
         else:
-            text = "\\tableofcontents*\n\\textual\n" + text
-        return ABNT_BOOK_PREAMBLE % values + text + "\n\n\\postextual\n\\bibliography{references}\n\\end{document}\n"
-    if "\\end{resumo}" in text:
-        text = text.replace("\\end{resumo}", "\\end{resumo}\n\\textual", 1)
-    else:
-        text = "\\textual\n" + text
-    return ABNT_PREAMBLE % values + text + "\n\n\\postextual\n\\bibliography{references}\n\\end{document}\n"
+            text = after + "\n" + text
+    return formatos.preambulo(fmt["id"], values) + text + "\n\n" + lat["fecho"] + "\n\\end{document}\n"
 
 
 def tex_env() -> dict:
@@ -245,10 +176,15 @@ def tex_env() -> dict:
     return env
 
 
+def bib_engine(tex: str) -> str:
+    """biber para as normas com biblatex (ex.: APA 7); bibtex para abnTeX2 e natbib."""
+    return "biber" if re.search(r"backend\s*=\s*biber", tex or "") else "bibtex"
+
+
 def compile_tex(workdir: Path, tex: str, name: str = "scriptorium", timeout: int = 120) -> tuple[Path | None, dict]:
     (workdir / f"{name}.tex").write_text(tex, encoding="utf-8")
     steps = [["pdflatex", "-no-shell-escape", "-interaction=nonstopmode", f"{name}.tex"],
-             ["bibtex", name],
+             [bib_engine(tex), name],
              ["pdflatex", "-no-shell-escape", "-interaction=nonstopmode", f"{name}.tex"],
              ["pdflatex", "-no-shell-escape", "-interaction=nonstopmode", f"{name}.tex"]]
     for command in steps:
@@ -259,7 +195,8 @@ def compile_tex(workdir: Path, tex: str, name: str = "scriptorium", timeout: int
             return None, {"status": "falhou", "motivo": f"{command[0]}: {type(exc).__name__}"}
     log_path = workdir / f"{name}.log"
     log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
-    report = {"citacoes_indefinidas": len(re.findall(r"Citation `[^']+' (?:on page \d+ )?undefined", log)),
+    # bibtex/natbib escrevem `chave'; o biblatex escreve 'chave'.
+    report = {"citacoes_indefinidas": len(re.findall(r"Citation [`'][^']+' (?:on page \d+ )?undefined", log)),
               "erros_latex": len(re.findall(r"^! ", log, flags=re.M)), "erros_detalhe": latex_errors(log),
               "log_final": log[-3000:]}
     pdf = workdir / f"{name}.pdf"
@@ -299,6 +236,7 @@ def text_quality_metrics(latex: str, bib_keys: list[str]) -> dict:
             short_sections.append(sec_name)
     counts = {k: 0 for k in bib_keys}
     for group in re.findall(r"\\(?:cite|citep|citet|citeonline|citealp|citealt|citeauthor|citeyear|"
+                            r"parencite|textcite|Parencite|Textcite|autocite|"
                             r"apud|citeyearpar)\*?(?:\[[^\]]*\]){0,2}\{([^}]*)\}", body):
         for k in group.split(","):
             k = k.strip()

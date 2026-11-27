@@ -1,0 +1,54 @@
+{
+  "id": "artigo-simples",
+  "nome": "Artigo simples (article)",
+  "familia": "Artigo simples",
+  "descricao": "Classe article do LaTeX com citação autor-data (natbib). Disponível só pela IA (MCP), sem norma específica.",
+  "status": "estavel",
+  "tipos": [
+    "artigo",
+    "dissertacao",
+    "tcc",
+    "revisao_sistematica"
+  ],
+  "no_site": false,
+  "areas": [],
+  "estrutura": {
+    "secoes": [
+      "Introdução",
+      "Trabalhos relacionados",
+      "Método",
+      "Resultados",
+      "Discussão",
+      "Conclusão"
+    ],
+    "resumo": "abstract",
+    "usa_capitulos": false
+  },
+  "citacao": {
+    "parentetica": "\\citep{chave}",
+    "narrativa": "\\citet{chave}",
+    "exemplos": {
+      "parentetica": "(Silva and Souza, 2020)",
+      "narrativa": "Silva and Souza (2020)"
+    }
+  },
+  "latex": {
+    "preambulo": "artigo-simples/preambulo.tex",
+    "bibliografia": "bibtex",
+    "apos_resumo": "",
+    "fecho": "\\bibliographystyle{plainnat}\n\\bibliography{references}"
+  },
+  "word": {
+    "referencias": "abnt",
+    "espacamento": 1.5,
+    "margens_cm": {
+      "superior": 2.5,
+      "esquerda": 2.5,
+      "inferior": 2.5,
+      "direita": 2.5
+    },
+    "recuo_cm": 1.25,
+    "fonte": "Times New Roman",
+    "tamanho_pt": 12
+  }
+}

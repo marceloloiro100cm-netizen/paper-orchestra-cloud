@@ -141,9 +141,14 @@ else
 fi
 
 echo 'Construindo imagem API...'
+# As imagens são construídas a partir de api/ e worker/: a pasta única formatos/ vai junto.
+rm -rf api/formatos worker/formatos
+cp -r formatos api/formatos
+cp -r formatos worker/formatos
 gcloud builds submit api --tag="$API_IMAGE" --project="$PROJECT_ID"
 echo 'Construindo motor PaperOrchestra (inclui LaTeX, pode ser um build pesado)...'
 gcloud builds submit worker --tag="$WORKER_IMAGE" --project="$PROJECT_ID" --timeout=1800
+rm -rf api/formatos worker/formatos  # cópias temporárias; a fonte é formatos/ na raiz
 
 # Jobs de longa duração sem request HTTP pendente.
 gcloud run jobs deploy paper-orchestra-worker \

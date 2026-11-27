@@ -285,6 +285,9 @@
     }
     p { line-height: 1.55; margin: 0 0 12px; }
     .subtle { color: var(--text-secondary); font-size: 0.88rem; }
+    .norma-row { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+    @media (max-width: 560px) { .norma-row { grid-template-columns: 1fr; } }
+    .norma-hint-link { background: none; border: 0; padding: 0; color: var(--mpie-blue-text); text-decoration: underline; cursor: pointer; font: inherit; }
     .library-note { font-size: 0.84rem; color: var(--mpie-blue-text); font-weight: 500; margin: 12px 0; }
 
     /* Formulários */
@@ -2200,13 +2203,29 @@
               <button class="btn alt" type="button" id="fill-from-guide">Trazer plano do Guia de Escrita</button>
               <span class="subtle" id="new-proj-guide-hint" role="status"></span>
             </div>
-            <label for="new-proj-type">Tipo de trabalho (padrão ABNT)</label>
+            <label for="new-proj-type">Tipo de trabalho</label>
             <select id="new-proj-type">
-              <option value="artigo|abnt-artigo">Artigo científico (ABNT)</option>
-              <option value="dissertacao|abnt-dissertacao">Dissertação de mestrado (ABNT — capítulos)</option>
-              <option value="tcc|abnt-tcc">TCC / Monografia de graduação (ABNT — capítulos)</option>
-              <option value="revisao_sistematica|abnt-artigo">Revisão sistemática (ABNT + PRISMA)</option>
+              <option value="artigo">Artigo científico</option>
+              <option value="dissertacao">Dissertação de mestrado (capítulos)</option>
+              <option value="tcc">TCC / Monografia de graduação (capítulos)</option>
+              <option value="revisao_sistematica">Revisão sistemática (com PRISMA)</option>
             </select>
+            <div class="norma-row">
+              <div>
+                <label for="new-proj-norma">Norma de formatação</label>
+                <select id="new-proj-norma">
+                  <option value="ABNT">ABNT</option>
+                </select>
+              </div>
+              <div>
+                <label for="new-proj-language">Idioma do texto</label>
+                <select id="new-proj-language">
+                  <option value="pt-BR" selected>Português</option>
+                  <option value="en">Inglês</option>
+                </select>
+              </div>
+            </div>
+            <p class="field-hint" id="new-proj-norma-hint" style="margin-top:4px">Normas brasileiras (NBR 6023, 10520 e 14724).</p>
             <label for="new-proj-pedagogical">Modo de mediação pedagógica da IA (salvaguarda)</label>
             <select id="new-proj-pedagogical">
               <option value="tutor_socratico">Apoio inicial · Tutor Socrático (perguntas e pistas antes de sugerir texto)</option>

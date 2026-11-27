@@ -3,7 +3,7 @@ ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git ca-certificates gcc g++ libgl1 libglib2.0-0 \
     texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-bibtex-extra texlive-fonts-recommended \
-    texlive-publishers texlive-lang-portuguese lmodern \
+    texlive-publishers texlive-lang-portuguese lmodern biber \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 # Revisão auditada do projeto original. Atualizar somente após testes.
@@ -28,6 +28,10 @@ RUN kpsewhich abntex2.cls && kpsewhich abntex2cite.sty && \
 
 # Todos os módulos do worker (tests/test_container_modules.py confere os imports).
 COPY *.py /app/
+# Normas de formatação (pasta formatos/ na raiz do repositório, copiada para cá pelo deploy).
+COPY formatos/ /app/formatos/
+# O build falha se alguma norma não compilar um exemplo com citações resolvidas (inclui APA 7 com biber).
+RUN cd /app && python format_smoke.py
 # Corpus de referência (gate G2): cópia de docs/corpus, conferida por tests/test_retrieval_eval.py.
 COPY corpus_ref/ /app/corpus_ref/
 CMD ["python", "/app/runner.py"]

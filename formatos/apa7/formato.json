@@ -1,0 +1,67 @@
+{
+  "id": "apa7",
+  "nome": "APA 7ª edição (artigo)",
+  "familia": "APA 7",
+  "descricao": "Normas da American Psychological Association, 7ª edição: citação autor-data, espaço duplo, títulos sem numeração e lista de referências com recuo deslocado.",
+  "status": "experimental",
+  "tipos": ["artigo", "revisao_sistematica"],
+  "no_site": true,
+  "areas": ["Psicologia", "Educação", "Ciências sociais", "Enfermagem e saúde", "Administração", "Revistas internacionais"],
+  "estrutura": {
+    "secoes": ["Introdução (sem título de seção: o texto começa logo após o título do trabalho)", "Método", "Resultados", "Discussão"],
+    "resumo": "abstract",
+    "usa_capitulos": false
+  },
+  "citacao": {
+    "parentetica": "\\parencite{chave}",
+    "narrativa": "\\textcite{chave}",
+    "exemplos": {"parentetica": "(Silva & Souza, 2020)", "narrativa": "Silva e Souza (2020)"}
+  },
+  "regras": "regras.md",
+  "csl": "apa.csl",
+  "latex": {
+    "preambulo": "apa7/preambulo.tex",
+    "bibliografia": "biber",
+    "apos_resumo": "\\begin{center}\\bfseries %(title)s\\end{center}",
+    "fecho": "\\clearpage\n\\printbibliography",
+    "textos": {
+      "pt-BR": {
+        "afiliacao": "Departamento e instituição a preencher",
+        "curso": "Disciplina ou programa a preencher",
+        "professor": "Professor(a) ou orientador(a) a preencher"
+      },
+      "en": {
+        "afiliacao": "Department and institution to be completed",
+        "curso": "Course or program to be completed",
+        "professor": "Instructor or advisor to be completed"
+      }
+    }
+  },
+  "word": {
+    "referencias": "apa7",
+    "espacamento": 2.0,
+    "margens_cm": {"superior": 2.54, "esquerda": 2.54, "inferior": 2.54, "direita": 2.54},
+    "recuo_cm": 1.27,
+    "fonte": "Times New Roman",
+    "tamanho_pt": 12
+  },
+  "origem": [
+    {
+      "upstream": "R24",
+      "arquivo": "apa.csl",
+      "repositorio": "https://github.com/citation-style-language/styles",
+      "commit": "e27b9b7e204b1a40998f774ff05c8a6ed6a5f7d8",
+      "sha256": "3917def5fc951b104d64216c3373096042368b9704ba269ca83c14ebaba889fc",
+      "licenca": "CC-BY-SA-3.0",
+      "baixado_em": "2026-11-27"
+    },
+    {
+      "upstream": "R49",
+      "arquivo": "preambulo.tex (style=apa)",
+      "repositorio": "https://github.com/plk/biblatex-apa",
+      "commit": "instalado pelo pacote Debian texlive-bibtex-extra, junto com biber",
+      "licenca": "LPPL-1.3c",
+      "baixado_em": "2026-11-27"
+    }
+  ]
+}
