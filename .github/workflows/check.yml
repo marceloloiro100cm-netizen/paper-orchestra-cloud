@@ -11,10 +11,35 @@ jobs:
       - uses: actions/checkout@v7
       - name: Validate Python files
         run: |
-          python -m pip install -q requests fastapi google-api-core "PyMuPDF>=2.1,<3" "numpy>=1.26,<3" "mcp>=2.3,<3"
+          python -m pip install -q requests fastapi google-api-core "PyMuPDF>=2.1,<3" "numpy>=1.26,<3" "mcp>=2.3,<3" "coverage==7.17.3"
           # Compila todos os módulos; a lista manual deixava arquivos novos de fora.
           python -m compileall -q api worker
-          python -m unittest discover -s tests -v
+          # Testes com medição de cobertura (Origem: R51). A cobertura é informativa: não reprova o PR.
+          python -m coverage run --source=api,worker -m unittest discover -s tests -v
+      - name: Lint (ruff, erros de sintaxe e nomes indefinidos)
+        run: |
+          # Origem: R50. Regras mínimas em ruff.toml; ampliar aos poucos.
+          python -m pip install -q "ruff==0.17.4"
+          python -m ruff check api worker scripts tests
+      - name: Relatório de cobertura
+        if: always()
+        run: |
+          python -m coverage report --skip-empty --sort=cover > cobertura.txt || true
+          FENCE='```'
+          {
+            echo "## Cobertura dos testes"
+            echo
+            echo "$FENCE"
+            tail -n 1 cobertura.txt
+            echo "$FENCE"
+            echo
+            echo "<details><summary>Por arquivo</summary>"
+            echo
+            echo "$FENCE"
+            cat cobertura.txt
+            echo "$FENCE"
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Validar registro de upstreams e documentos gerados
         run: python scripts/upstreams.py check
       - name: Validate JSON and JS
@@ -22,8 +47,10 @@ jobs:
           python -m json.tool firebase.json >/dev/null
           node --check public/app.js
           node --check public/config.js
+          for f in public/js/*.js public/guia/guia.js; do node --check "$f"; done
       - name: Check script syntax
-        run: bash -n scripts/deploy-cloud-shell.sh scripts/configure-guardrails.sh scripts/configure-budget.sh scripts/reduce-deployer-iam.sh scripts/setup-byok-iam.sh scripts/audit-byok-iam.sh
+        # "bash -n a b c" só confere o primeiro arquivo; por isso um laço.
+        run: for f in scripts/*.sh; do bash -n "$f"; done
       - name: Validate public Firebase config and no private credentials
         run: |
           test -f public/config.js

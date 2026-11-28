@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-24",
+  "updated_at": "2026-11-28",
   "source_document": "Scriptorium V2: Plano técnico de implantação e manutenção, 27 módulos P1/P2, revisão 1.0 de 24/11/2026",
   "notes": [
     "Fonte única de rastreabilidade. docs/UPSTREAMS.md e docs/V2-MODULOS.md são gerados a partir deste arquivo por scripts/upstreams.py render.",
@@ -1175,6 +1175,53 @@
       "latest_reviewed": "efb4437b2a58e47f3eb0729699e94b2b983a2291",
       "risk": "A versão do Debian pode ficar atrás da do GitHub; a lista de referências do PDF depende do biber instalado.",
       "migration_note": "Preâmbulo APA 7 em formatos/apa7 usa style=apa, backend=biber. Inclui brazilian-apa.lbx (conferido no repositório em 27/11/2026). Nenhum arquivo copiado: vem dos pacotes do TeX Live."
+    },
+    {
+      "id": "R50",
+      "name": "Ruff (lint de Python)",
+      "kind": "ferramenta",
+      "canonical_url": "https://github.com/astral-sh/ruff",
+      "github": "astral-sh/ruff",
+      "pypi": "ruff",
+      "license_spdx": "MIT",
+      "license_status": "confirmada no PyPI em 28/11/2026",
+      "pinned": "0.17.4",
+      "adopted": true,
+      "modules": [
+        "M15"
+      ],
+      "used_in": [
+        ".github/workflows/check.yml",
+        "ruff.toml"
+      ],
+      "update_policy": "Trimestral: trocar o pin no check.yml e corrigir o que as regras novas apontarem num PR próprio.",
+      "review_frequency": "trimestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-28",
+      "latest_reviewed": "0.17.6"
+    },
+    {
+      "id": "R51",
+      "name": "Coverage.py (cobertura de testes)",
+      "kind": "ferramenta",
+      "canonical_url": "https://github.com/nedbat/coveragepy",
+      "github": "nedbat/coveragepy",
+      "pypi": "coverage",
+      "license_spdx": "Apache-2.0",
+      "license_status": "confirmada no PyPI em 28/11/2026",
+      "pinned": "7.17.3",
+      "adopted": true,
+      "modules": [
+        "M15"
+      ],
+      "used_in": [
+        ".github/workflows/check.yml"
+      ],
+      "update_policy": "Trimestral: trocar o pin no check.yml. A cobertura é informativa e não reprova PRs.",
+      "review_frequency": "trimestral",
+      "owner": "marceloloiro100cm-netizen",
+      "last_checked": "2026-11-28",
+      "latest_reviewed": "7.17.5"
     }
   ],
   "modules": [
@@ -1510,6 +1557,8 @@
         "R28",
         "R29",
         "R40",
+        "R50",
+        "R51",
         "R01"
       ],
       "depends_on": [

@@ -146,6 +146,13 @@ def check_pins(registry: dict, root: Path) -> list[str]:
             refs = set(re.findall(r"osv-scanner-action/[^@\"]+@([^\"\s]+)", path.read_text(encoding="utf-8")))
             if refs != {osv_pin}:
                 errors.append(f"R40: {name} usa {sorted(refs)}, registro diz {osv_pin}")
+    for uid, package in (("R50", "ruff"), ("R51", "coverage")):
+        check_yml = root / ".github" / "workflows" / "check.yml"
+        if check_yml.exists():
+            pins = set(re.findall(rf'"{package}==([^"]+)"', check_yml.read_text(encoding="utf-8")))
+            expected = _entry(registry, uid).get("pinned")
+            if expected and pins != {expected}:
+                errors.append(f"{uid}: check.yml fixa {package} em {sorted(pins)}, registro diz {expected}")
     return errors
 
 

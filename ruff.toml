@@ -1,0 +1,8 @@
+# Configuração do ruff (lint de Python). Origem: R50 em docs/upstreams.json.
+# Começa só com erros que quebram o programa: sintaxe inválida e nomes indefinidos.
+# Para ampliar, acrescente regras em "select" num PR próprio e corrija o que aparecer.
+target-version = "py311"
+extend-exclude = ["docs", "formatos", "public", "hosting-redirect"]
+
+[lint]
+select = ["E9", "F63", "F7", "F82"]
