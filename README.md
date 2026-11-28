@@ -10,6 +10,7 @@ Produto técnico-tecnológico do Mestrado Profissional em Informática na Educa�
 - **Site:** https://scriptoriummpie.web.app
 - **Documentação:** [docs/](docs/README.md)
 - **Como citar:** [CITATION.cff](CITATION.cff) (botão *Cite this repository* do GitHub)
+- **In English:** [summary below](#in-english)
 
 O Scriptorium ajuda estudantes a construir um artigo, TCC ou dissertação a partir das fontes que eles mesmos reuniram. A IA ajuda a ler e a escrever, mas o sistema confere cada entrega: as citações precisam existir nas fontes, as referências precisam ser confirmadas e o PDF final só sai quando tudo foi conferido.
 
@@ -101,6 +102,17 @@ Para relatar uma falha, siga o [SECURITY.md](SECURITY.md).
 ## Contribuir
 
 Correções, normas novas e relatos de uso são bem-vindos: veja [CONTRIBUTING.md](CONTRIBUTING.md) e o [Código de Conduta](CODE_OF_CONDUCT.md). Para problemas e sugestões, abra uma [issue](https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/issues/new/choose).
+
+## In English
+
+**Scriptorium** is an open-source tool for guided academic writing, built as the technical-technological product of a professional master's degree in Computing in Education (MPIE) at the Federal Institute of Rio Grande do Sul (IFRS), Brazil.
+
+Students write articles, theses and dissertations from the sources they collected themselves. The researcher's own AI assistant (Claude, Gemini, ChatGPT…) connects through the **Model Context Protocol (MCP)** and does the reading and writing, while Scriptorium stores the sources, hands out page-level excerpts, checks every step (literal quotes must exist in the sources, references must be confirmed) and only releases the final PDF once everything has been checked. It also offers a writing guide in eight steps, a library with page-level reading notes, Brazilian ABNT and APA 7 formatting, an advisor review link and an AI-use statement.
+
+- **Stack:** Firebase Hosting and Authentication, Cloud Run (FastAPI API and a Python + LaTeX worker), Firestore and Cloud Storage.
+- **Docs:** in Portuguese, under [docs/](docs/README.md); start with [ARQUITETURA.md](docs/ARQUITETURA.md) (architecture) and [GLOSSARIO.md](docs/GLOSSARIO.md) (glossary).
+- **Run the tests:** `python -m unittest discover -s tests` (no network, no keys, no cost).
+- **License:** AGPL-3.0. **Cite:** see [CITATION.cff](CITATION.cff).
 
 ## Licença e créditos
 

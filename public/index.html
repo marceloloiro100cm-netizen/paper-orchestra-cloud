@@ -45,21 +45,25 @@
         <a class="theme-btn" id="guide-button" href="/#guia" data-go-step="4" style="text-decoration:none" aria-label="Guia de escrita" title="Passo a passo para construir um artigo, do tema à submissão">
           <span aria-hidden="true">📘</span>
           <span class="guide-label">Guia de escrita</span>
+          <span class="short-label" aria-hidden="true">Guia</span>
         </a>
         <button type="button" id="how-to-use-btn" class="theme-btn" aria-haspopup="dialog"
                 aria-controls="welcome-tour" aria-expanded="false" aria-label="Como usar o Scriptorium" title="Como usar o Scriptorium passo a passo">
           <span aria-hidden="true">❓</span>
           <span class="guide-label">Como usar</span>
+          <span class="short-label" aria-hidden="true">Ajuda</span>
         </button>
         <button type="button" id="account-button" class="theme-btn account-btn hidden" aria-haspopup="dialog"
-                aria-controls="account-panel" aria-expanded="false" title="Minha conta">
+                aria-controls="account-panel" aria-expanded="false" aria-label="Minha conta" title="Minha conta">
           <span class="account-dot" id="account-dot" aria-hidden="true"></span>
           <span aria-hidden="true">👤</span>
           <span class="account-label">Minha conta</span>
+          <span class="short-label" aria-hidden="true">Conta</span>
         </button>
         <button type="button" id="theme-toggle" class="theme-btn" aria-pressed="false" aria-label="Ativar modo escuro">
           <span id="theme-icon" aria-hidden="true">🌙</span>
           <span id="theme-label">Modo Escuro</span>
+          <span class="short-label" aria-hidden="true">Tema</span>
         </button>
         <button id="logout" class="btn alt hidden" style="padding:7px 12px;font-size:.8rem">Sair</button>
       </div>
@@ -552,7 +556,7 @@
         <!-- Toolbar de busca, filtro de formato e medidor de espaço de leitura (75.000 chars) -->
         <div class="lib-toolbar">
           <div class="lib-search-row">
-            <input id="library-filter" type="text" placeholder="Buscar por nome, coleção ou descrição..."/>
+            <input id="library-filter" type="text" placeholder="Buscar por nome, coleção ou descrição..." aria-label="Buscar na biblioteca"/>
             <select id="format-filter" aria-label="Filtrar por formato">
               <option value="todos">Formato: Todos</option>
               <option value="pdf">PDF</option>
@@ -909,7 +913,7 @@
           <strong id="cfg-title" style="font-family:var(--font-serif);font-size:1.15rem">Configurar Colunas do Kanban</strong>
           <div class="subtle" style="font-size:.76rem">Renomeie cada coluna conforme seus capítulos ou fluxo de leitura.</div>
         </div>
-        <button type="button" class="btn alt" id="cfg-close" style="padding:5px 10px">✕</button>
+        <button type="button" class="btn alt" id="cfg-close" style="padding:5px 10px" aria-label="Fechar">✕</button>
       </div>
       <div class="modal-body" id="cfg-body"></div>
       <div class="modal-foot">

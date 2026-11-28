@@ -43,6 +43,7 @@ Escolha pelo que você quer fazer.
 | [`corpus/`](corpus/) | seleção, consultas e resultados do corpus de referência |
 | [`normas/`](normas/) | cópias públicas da IN IFRS 16/2026 e do Anexo I |
 | [Como citar](../CITATION.cff) | metadados de citação do software |
+| [DOI pelo Zenodo](pesquisa/DOI-ZENODO.md) | como cada versão ganha um DOI citável |
 | [Histórico de versões](../CHANGELOG.md) | o que mudou em cada versão piloto |
 
 ## Histórico
