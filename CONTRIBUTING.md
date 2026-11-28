@@ -34,7 +34,7 @@ Os testes rodam sem rede, sem chaves e sem custo: Firestore, Storage e modelos s
    python scripts/upstreams.py check
    node --check public/app.js
    ```
-4. Abra o PR para `main` e preencha o modelo. O CI precisa passar.
+4. Abra o PR para `main` e preencha o modelo. A `main` é protegida: nada entra sem PR, e o check `static-checks` (CI · Verificações) precisa passar.
 5. Depois do merge, o deploy é automático (ver [docs/WORKFLOWS.md](docs/WORKFLOWS.md)).
 
 ## Onde mexer
