@@ -16,7 +16,7 @@ import advisor  # noqa: E402
 import reading_notes  # noqa: E402
 import reading_notes_api  # noqa: E402
 from ai_declaration import build_declaration  # noqa: E402
-from test_v2_onda6 import DB, Bucket, endpoint  # noqa: E402
+from test_biblioteca_exportacao import DB, Bucket, endpoint  # noqa: E402
 
 MANIFEST = {
     "title": "Agentes de IA na escrita", "run_id": "r1", "started_at": "2026-11-24T10:00:00",

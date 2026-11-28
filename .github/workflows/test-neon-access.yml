@@ -1,4 +1,4 @@
-name: Validar acesso do worker ao Gemini Neon
+name: Manual · Validar acesso ao Gemini Neon
 
 on:
   push:

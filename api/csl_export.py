@@ -4,7 +4,7 @@ Origem: R24 (CSL Styles; esquema CSL-JSON e estilo
 "associacao-brasileira-de-normas-tecnicas"), R23 (Citation.js, referência do
 mapeamento BibTeX -> CSL) e R38 (abnTeX2, que já gera ABNT no LaTeX). Nenhum
 código copiado: mapeamento próprio e testado por snapshot
-(tests/test_v2_onda6.py). Plano V2, módulo M27 "Exportação bibliográfica e
+(tests/test_biblioteca_exportacao.py). Plano V2, módulo M27 "Exportação bibliográfica e
 estilos": "exportação CSL e testes de estilo".
 
 CSL-JSON é o formato de troca que Zotero, Mendeley e processadores CSL

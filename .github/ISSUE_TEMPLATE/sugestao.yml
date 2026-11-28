@@ -1,0 +1,26 @@
+name: Sugerir uma melhoria
+description: Uma ideia de recurso, de texto mais claro ou de nova norma de formatação.
+title: "[Sugestão] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: necessidade
+    attributes:
+      label: Qual dificuldade isso resolve?
+      description: Conte a situação de uso (estudante, orientador, pesquisador).
+    validations:
+      required: true
+  - type: textarea
+    id: ideia
+    attributes:
+      label: Como você imagina a solução?
+  - type: dropdown
+    id: publico
+    attributes:
+      label: Para quem é?
+      multiple: true
+      options:
+        - Estudante
+        - Orientador(a)
+        - Pesquisador(a) / administrador(a)
+        - Quem desenvolve o Scriptorium

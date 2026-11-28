@@ -1,3 +1,5 @@
+> **Arquivo histórico** (novembro de 2026). Registra uma decisão ou um passo já concluído; pode citar nomes e caminhos antigos. Visão atual: [README](../../README.md).
+
 # Novo endereço Scriptorium — scriptoriummpie.web.app
 
 > **Atualização de 24/11/2026 (noite):** `https://scriptoriummpie.web.app/` passou a ser o endereço oficial, por decisão do responsável. O endereço antigo `paperorchestra-mestrado.web.app` não recebe mais a aplicação: responde só com redirecionamento permanente (301) para o novo (`hosting-redirect/` e `.github/workflows/deploy-hosting.yml`). O login Google continua funcionando porque o Firebase atende `/__/auth/*` antes de qualquer redirecionamento. As instruções abaixo, sobre manter o endereço antigo inalterado, ficaram só como histórico.

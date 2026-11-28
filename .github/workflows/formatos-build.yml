@@ -1,4 +1,4 @@
-name: Normas - build da imagem do worker
+name: CI · Build do worker com as normas
 
 # Constrói a imagem do worker como no deploy (com formatos/ copiada) e roda a
 # compilação de exemplo de cada norma (worker/format_smoke.py). Pega no PR o

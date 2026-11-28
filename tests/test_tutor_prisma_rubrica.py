@@ -15,7 +15,7 @@ import abnt_refs
 from library import make_library_router
 import mcp_server
 from mcp_site_api import make_advisor_public_router, make_mcp_site_router
-from test_fase1_zotero_abnt_guia import _FakeBucket, _FakeDB
+from test_zotero_abnt_fichamento import _FakeBucket, _FakeDB
 
 
 class Fase2BackendTests(unittest.TestCase):
@@ -203,7 +203,7 @@ class Fase2BackendTests(unittest.TestCase):
         self.assertIn("adicionarLeituraM4", app_js)
         self.assertIn("inserirResumoPrisma", app_js)
         self.assertNotIn("—", guia_js)
-        rep_doc = (ROOT / "docs" / "REPLICABILIDADE-PTT.md").read_text(encoding="utf-8")
+        rep_doc = (ROOT / "docs" / "pesquisa" / "REPLICABILIDADE-PTT.md").read_text(encoding="utf-8")
         self.assertIn("v1.1-piloto", rep_doc)
 
 

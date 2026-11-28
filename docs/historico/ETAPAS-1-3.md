@@ -1,3 +1,5 @@
+> **Arquivo histórico** (novembro de 2026). Registra uma decisão ou um passo já concluído; pode citar nomes e caminhos antigos. Visão atual: [README](../../README.md).
+
 # PaperOrchestra — etapas 1 a 3 (23/11/2026)
 
 ## 1. Auditoria científica

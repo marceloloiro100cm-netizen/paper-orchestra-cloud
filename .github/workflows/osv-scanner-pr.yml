@@ -1,7 +1,7 @@
 # M15: OSV-Scanner em cada PR; falha só se o PR introduzir vulnerabilidade nova.
 # Origem: R28/R40 em docs/upstreams.json. Exemplo oficial conferido em 24/11/2026:
 # https://google.github.io/osv-scanner/github-action
-name: OSV-Scanner PR Scan
+name: CI · OSV-Scanner no PR
 
 on:
   pull_request:

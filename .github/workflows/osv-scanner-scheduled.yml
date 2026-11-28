@@ -1,7 +1,7 @@
 # M15: varredura completa semanal e a cada push em main.
 # Origem: R28/R40 em docs/upstreams.json. Exemplo oficial conferido em 24/11/2026:
 # https://google.github.io/osv-scanner/github-action
-name: OSV-Scanner Scheduled Scan
+name: Segurança · OSV-Scanner semanal
 
 on:
   schedule:

@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "Se você usar o Scriptorium em pesquisa, cite-o com os dados abaixo."
+title: "Scriptorium MPIE: escrita acadêmica guiada com as fontes do pesquisador"
+type: software
+authors:
+  - given-names: Marcelo
+    family-names: Cruz
+    affiliation: "Instituto Federal do Rio Grande do Sul (IFRS), Campus Porto Alegre — Mestrado Profissional em Informática na Educação"
+repository-code: "https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud"
+url: "https://scriptoriummpie.web.app"
+license: AGPL-3.0-only
+version: "v1.1.2-piloto"
+date-released: "2026-11-26"
+keywords:
+  - escrita acadêmica
+  - academic writing
+  - inteligência artificial na educação
+  - integridade acadêmica
+  - Model Context Protocol
+  - ABNT
+  - produto técnico-tecnológico
+abstract: >-
+  Produto técnico-tecnológico do Mestrado Profissional em Informática na
+  Educação (IFRS). O Scriptorium guia estudantes na construção de artigos,
+  TCCs e dissertações a partir das fontes que eles mesmos reuniram: um guia de
+  escrita em oito etapas, uma biblioteca com fichamento por página e um fluxo
+  em etapas no qual a IA do próprio pesquisador lê e escreve, enquanto o
+  sistema entrega trechos das fontes, confere cada entrega e só libera o PDF
+  final depois que as referências são conferidas.
+references:
+  - type: software
+    title: "PaperOrchestra"
+    authors:
+      - name: "Google Research"
+    repository-code: "https://github.com/google-research/paper-orchestra"

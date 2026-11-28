@@ -124,7 +124,7 @@ class PilotRoutesAndEthicsTest(unittest.TestCase):
 
 class PttDocAndFrontendTest(unittest.TestCase):
     def test_doc_replicabilidade_e_ui_piloto_presentes(self):
-        doc = (ROOT / "docs" / "REPLICABILIDADE-PTT.md").read_text(encoding="utf-8")
+        doc = (ROOT / "docs" / "pesquisa" / "REPLICABILIDADE-PTT.md").read_text(encoding="utf-8")
         for kw in ("v1.0-piloto", "CAPES", "SUS", "TCLE", "MPIE"):
             self.assertIn(kw, doc)
         html = (ROOT / "public" / "index.html").read_text(encoding="utf-8")

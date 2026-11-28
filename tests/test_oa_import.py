@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "api"))
 sys.path.insert(0, str(ROOT / "tests"))
 import oa_import  # noqa: E402
-from test_v2_onda6 import DB, Bucket, endpoint  # noqa: E402
+from test_biblioteca_exportacao import DB, Bucket, endpoint  # noqa: E402
 
 
 def resolver_for(mapping):
