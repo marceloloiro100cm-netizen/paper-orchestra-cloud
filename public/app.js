@@ -9,7 +9,7 @@ const API_MODE = false;
 document.body.classList.toggle('sem-api', !API_MODE);
 // Com a API desligada, basta a conta estar liberada para usar a biblioteca e o MCP.
 const canWork = () => API_MODE ? !!accountAccess?.research_generation_enabled : !!accountAccess && !accountAccess.legacy_backend;
-const config = window.PAPER_FIREBASE_CONFIG;
+const config = window.SCRIPTORIUM_FIREBASE_CONFIG;
 if (!config || !config.apiKey || config.apiKey === 'SUBSTITUIR') {
   $('auth-status').textContent = 'Falta configurar public/config.js. Consulte README.md.';
   $('login').disabled = true;

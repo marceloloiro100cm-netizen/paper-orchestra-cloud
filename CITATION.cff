@@ -6,7 +6,7 @@ authors:
   - given-names: Marcelo
     family-names: Cruz
     affiliation: "Instituto Federal do Rio Grande do Sul (IFRS), Campus Porto Alegre — Mestrado Profissional em Informática na Educação"
-repository-code: "https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud"
+repository-code: "https://github.com/marceloloiro100cm-netizen/scriptorium"
 url: "https://scriptoriummpie.web.app"
 license: AGPL-3.0-only
 version: "v1.1.2-piloto"

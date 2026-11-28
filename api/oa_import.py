@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 from library import MAX_BYTES, exposed, save_library_item
 
 OPENALEX = "https://api.openalex.org/works/"
-UA = "Scriptorium/1 (https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud)"
+UA = "Scriptorium/1 (https://github.com/marceloloiro100cm-netizen/scriptorium)"
 MAX_ITEMS = 30
 TIMEOUT = 30
 DOI = re.compile(r"^(?:https?://(?:dx\.)?doi\.org/|doi:)?(10\.\d{4,9}/\S+)$", re.IGNORECASE)

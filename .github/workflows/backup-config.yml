@@ -30,7 +30,7 @@ env:
 
 jobs:
   backup:
-    if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud' && github.ref == 'refs/heads/main'
+    if: github.repository == 'marceloloiro100cm-netizen/scriptorium' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

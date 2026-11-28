@@ -2,7 +2,7 @@
 
 Origem: R37 (PyMuPDF, AGPL-3.0 ou licença comercial da Artifex). A API é um
 serviço de rede: o código-fonte completo do Scriptorium é público em
-https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud e o site
+https://github.com/marceloloiro100cm-netizen/scriptorium e o site
 mostra esse link (exigência da AGPL-3.0, seção 13). Ver docs/upstreams.json.
 """
 try:

@@ -20,7 +20,7 @@ Termos próprios do Scriptorium, em ordem alfabética.
 | **MCP** | *Model Context Protocol*: protocolo pelo qual a IA do pesquisador usa as ferramentas do Scriptorium. |
 | **Modo com API / sem API** | Com API: o servidor gera o texto com Gemini (oculto desde 25/11/2026). Sem API (MCP): a IA do pesquisador escreve e o Scriptorium confere. |
 | **Modo pedagógico** | Quanto a IA pode sugerir de texto pronto; no modo **tutor socrático** ela pergunta e dá pistas antes de sugerir. |
-| **PaperOrchestra** | Motor de redação da Google Research usado no modo com API. Também é o nome antigo deste projeto, que ainda aparece no nome do repositório, no projeto Google Cloud (`paperorchestra-mestrado`) e nos serviços do Cloud Run. |
+| **PaperOrchestra** | Motor de redação da Google Research usado no modo com API. Também foi o primeiro nome deste projeto (até 28/11/2026). O nome antigo continua só onde o Google não permite trocar ou onde trocar exigiria migrar dados: o ID do projeto Google Cloud (`paperorchestra-mestrado`), os buckets, os serviços e as contas de serviço do Cloud Run (`paper-orchestra-*`) e o nome do alerta de orçamento. |
 | **Passe** | Código que abre uma etapa de revisão ou verificação **numa conversa nova**, para que outra cabeça faça o trabalho. |
 | **Plano V2** | Plano técnico de 27 módulos (M01–M27) aplicado em novembro de 2026; ver [V2-MODULOS.md](V2-MODULOS.md). |
 | **PTT** | Produto técnico-tecnológico. O Scriptorium é o PTT do mestrado; ver [pesquisa/REPLICABILIDADE-PTT.md](pesquisa/REPLICABILIDADE-PTT.md). |

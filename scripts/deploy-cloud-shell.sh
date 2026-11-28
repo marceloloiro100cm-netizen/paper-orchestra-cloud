@@ -66,7 +66,7 @@ gcloud services enable \
 
 if ! gcloud artifacts repositories describe "$REPO" --location="$REGION" --project="$PROJECT_ID" >/dev/null 2>&1; then
   gcloud artifacts repositories create "$REPO" --repository-format=docker --location="$REGION" \
-    --description='PaperOrchestra - imagens do ambiente academico' --project="$PROJECT_ID"
+    --description='Scriptorium - imagens da API e do worker' --project="$PROJECT_ID"
 fi
 if ! gcloud storage buckets describe "gs://${BUCKET}" --project="$PROJECT_ID" >/dev/null 2>&1; then
   gcloud storage buckets create "gs://${BUCKET}" --location="$REGION" \

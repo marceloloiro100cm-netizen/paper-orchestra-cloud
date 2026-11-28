@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   watch:
-    if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud'
+    if: github.repository == 'marceloloiro100cm-netizen/scriptorium'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

@@ -8,7 +8,7 @@ Os metadados (título, autor, licença, palavras-chave, resumo) vêm do [`CITATI
 
 1. Entre em https://zenodo.org com **Log in → GitHub** e autorize o acesso.
 2. No menu da conta, abra **GitHub**.
-3. Na lista de repositórios, ative `marceloloiro100cm-netizen/paper-orchestra-cloud`.
+3. Na lista de repositórios, ative `marceloloiro100cm-netizen/scriptorium`.
 
 As Releases anteriores (v1.0 a v1.1.2-piloto) **não** ganham DOI sozinhas: o Zenodo só arquiva as publicadas depois de ativado.
 

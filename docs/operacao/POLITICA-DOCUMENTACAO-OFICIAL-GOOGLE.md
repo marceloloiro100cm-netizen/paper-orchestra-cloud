@@ -1,4 +1,4 @@
-# Política técnica — PaperOrchestra Mestrado
+# Política técnica — Scriptorium
 
 **Regra permanente do projeto:** para qualquer alteração da integração Google, consultar **primeiro a documentação oficial do Google**. Não escolher nomes de modelos, endpoints, parâmetros, preços, capacidades, permissões ou limites por lembrança, exemplo comunitário ou suposição. Registrar a fonte oficial em cada PR relevante e verificar o estado real no código e nos workflows.
 

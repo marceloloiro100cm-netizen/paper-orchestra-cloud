@@ -27,7 +27,7 @@ ENTRY_START = re.compile(r"@([A-Za-z]+)\s*[{(]\s*([^,\s{}()]+)\s*,", re.I)
 PROVIDERS = ("crossref", "openalex", "semantic_scholar")
 # 40: o modo ampliado (até 20 fontes) gera bibliografias maiores.
 MAX_REFERENCES = 40
-USER_AGENT = "PaperOrchestraAcademic/0.2 (https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud)"
+USER_AGENT = "ScriptoriumMPIE/1.0 (https://github.com/marceloloiro100cm-netizen/scriptorium)"
 
 
 def _balanced(text: str, pos: int, opening: str = "{", closing: str = "}") -> tuple[str, int]:

@@ -56,7 +56,7 @@ jobs:
           python3 - <<'PY'
           import hashlib, json, pathlib, urllib.request
           out = pathlib.Path("/tmp/corpus"); out.mkdir()
-          ua = "Scriptorium-corpus/1 (https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud)"
+          ua = "Scriptorium-corpus/1 (https://github.com/marceloloiro100cm-netizen/scriptorium)"
           ok = 0
           for item in json.load(open("docs/corpus/selecao.json"))["documentos"]:
               try:

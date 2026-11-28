@@ -3,7 +3,7 @@
 **Programa:** Mestrado Profissional em Informática na Educação (MPIE) — IFRS *Campus* Porto Alegre  
 **Versão congelada de referência para coleta empírica:** `v1.1-piloto` *(evolução da `v1.0-piloto` com Núcleo Zotero/ABNT, Fichamento, `/citar`, Tutor Socrático, Resumo PRISMA, Comentários da Orientação e Rubrica 0–15)*  
 **Endereço público:** https://scriptoriummpie.web.app/  
-**Código aberto:** https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud
+**Código aberto:** https://github.com/marceloloiro100cm-netizen/scriptorium
 
 ---
 

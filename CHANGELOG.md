@@ -1,6 +1,6 @@
 # Histórico de versões
 
-Formato inspirado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/). As versões `-piloto` são congeladas para a coleta empírica do produto técnico-tecnológico (ver [docs/pesquisa/REPLICABILIDADE-PTT.md](docs/pesquisa/REPLICABILIDADE-PTT.md)); cada uma tem uma [Release](https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/releases) no GitHub.
+Formato inspirado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/). As versões `-piloto` são congeladas para a coleta empírica do produto técnico-tecnológico (ver [docs/pesquisa/REPLICABILIDADE-PTT.md](docs/pesquisa/REPLICABILIDADE-PTT.md)); cada uma tem uma [Release](https://github.com/marceloloiro100cm-netizen/scriptorium/releases) no GitHub.
 
 ## [Não lançado]
 
@@ -20,6 +20,7 @@ Formato inspirado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
 - Testes renomeados pelo assunto, não pela fase em que foram escritos (#109).
 - CSS e dois scripts do `index.html` em arquivos próprios; nome Scriptorium na API e no cabeçalho (#110).
 - Scripts de implantação aceitam `SCRIPTORIUM_PROJECT` e `SCRIPTORIUM_SITE`, para replicar o Scriptorium em outro projeto.
+- Repositório renomeado de `paper-orchestra-cloud` para `scriptorium`; o nome antigo saiu de textos, código e workflows (continua só na infraestrutura que o Google não deixa renomear).
 
 ### Corrigido
 - Artigo ABNT compila com o abnTeX2 1.9.7; o build da imagem do worker passou a rodar nos PRs (#108).
@@ -66,8 +67,8 @@ Primeira versão congelada para o estudo piloto. Reúne o trabalho de 23 a 26/11
 
 O histórico detalhado da implantação está em [docs/historico/IMPLANTACAO-2026-11.md](docs/historico/IMPLANTACAO-2026-11.md).
 
-[Não lançado]: https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/compare/v1.1.2-piloto...main
-[v1.1.2-piloto]: https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/compare/v1.1.1-piloto...v1.1.2-piloto
-[v1.1.1-piloto]: https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/compare/v1.1-piloto...v1.1.1-piloto
-[v1.1-piloto]: https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/compare/v1.0-piloto...v1.1-piloto
-[v1.0-piloto]: https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/releases/tag/v1.0-piloto
+[Não lançado]: https://github.com/marceloloiro100cm-netizen/scriptorium/compare/v1.1.2-piloto...main
+[v1.1.2-piloto]: https://github.com/marceloloiro100cm-netizen/scriptorium/compare/v1.1.1-piloto...v1.1.2-piloto
+[v1.1.1-piloto]: https://github.com/marceloloiro100cm-netizen/scriptorium/compare/v1.1-piloto...v1.1.1-piloto
+[v1.1-piloto]: https://github.com/marceloloiro100cm-netizen/scriptorium/compare/v1.0-piloto...v1.1-piloto
+[v1.0-piloto]: https://github.com/marceloloiro100cm-netizen/scriptorium/releases/tag/v1.0-piloto
