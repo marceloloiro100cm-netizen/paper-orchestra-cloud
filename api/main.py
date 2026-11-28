@@ -1,4 +1,4 @@
-"""Backend autenticado do PaperOrchestra Cloud.
+"""Backend autenticado do Scriptorium (API FastAPI no Cloud Run).
 
 As chaves Gemini ficam somente no Cloud Run Job (Secret Manager); não entram aqui.
 """
@@ -66,7 +66,7 @@ db = firestore.Client(project=PROJECT)
 storage_client = storage.Client(project=PROJECT)
 run_client = run_v2.JobsClient()
 bucket = storage_client.bucket(BUCKET)
-app = FastAPI(title="PaperOrchestra Cloud", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="Scriptorium API", docs_url=None, redoc_url=None, openapi_url=None)
 
 # Onda 1 (observabilidade leve): mede latência por requisição sem tocar dados pessoais.
 @app.middleware("http")
