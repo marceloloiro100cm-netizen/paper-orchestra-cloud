@@ -1,4 +1,4 @@
-> **Arquivo histórico.** Este era o README do repositório até 28/11/2026: registra a implantação e as ondas do plano V2 na ordem em que aconteceram. A visão atual do sistema está no [README](../README.md).
+> **Arquivo histórico.** Este era o README do repositório até 28/11/2026: registra a implantação e as ondas do plano V2 na ordem em que aconteceram. A visão atual do sistema está no [README](../../README.md).
 
 # 🎻 PaperOrchestra Cloud — laboratório permanente de pesquisa
 

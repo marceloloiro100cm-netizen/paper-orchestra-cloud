@@ -1,3 +1,5 @@
+> **Arquivo histórico** (novembro de 2026). Registra uma decisão ou um passo já concluído; pode citar nomes e caminhos antigos. Visão atual: [README](../../README.md).
+
 # Gemini 4 Neon — integração controlada (23/11/2026)
 
 ## Documentação Google utilizada
