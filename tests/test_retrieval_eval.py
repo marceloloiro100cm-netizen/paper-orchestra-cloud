@@ -16,7 +16,7 @@ from fastapi import HTTPException  # noqa: E402
 
 import retrieval_eval as re_eval  # noqa: E402
 import retrieval_eval_api  # noqa: E402
-from test_v2_onda6 import DB, Bucket, endpoint  # noqa: E402
+from test_biblioteca_exportacao import DB, Bucket, endpoint  # noqa: E402
 
 
 class FakeEmbedder:

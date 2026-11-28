@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT / "worker"))
 sys.path.insert(0, str(ROOT / "tests"))
 import billing_alert  # noqa: E402
 import model_access  # noqa: E402
-from test_v2_onda6 import DB  # noqa: E402
+from test_biblioteca_exportacao import DB  # noqa: E402
 
 GOOGLE = ("402 RESOURCE_EXHAUSTED. {'error': {'code': 402, 'message': 'Your prepayment credits are "
           "depleted. Please go to AI Studio at https://ai.studio/projects to manage your project'}}")
