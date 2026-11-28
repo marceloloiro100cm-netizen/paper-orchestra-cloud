@@ -8,16 +8,26 @@ Formato inspirado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
 - Normas de formatação reunidas em `formatos/`, uma pasta por norma, com APA 7 configurável (#107).
 - Exclusão segura de textos escritos, com confirmação e limpeza dos arquivos gerados (#106).
 - Licença AGPL-3.0, `CITATION.cff`, guia de contribuição, código de conduta, política de segurança e modelos de issue e PR.
-- Documentação reorganizada por público em `docs/` (uso, arquitetura, desenvolvimento, pesquisa e histórico).
+- Documentação reorganizada por público em `docs/` (uso, arquitetura, desenvolvimento, pesquisa e histórico) (#109).
+- Cabeçalho de segurança CSP em modo só relatório (#110).
+- Chaves de conexão do MCP com validade de 1 ano; limite de 10 apontamentos a cada 10 minutos no link do orientador.
+- CI com lint (ruff) e relatório de cobertura dos testes.
+- Rótulos curtos nos ícones do cabeçalho no celular; resumo do README em inglês; guia do DOI pelo Zenodo.
 
 ### Alterado
 - "Como usar" virou botão ao lado de "Minha conta"; a faixa "Comece aqui" saiu (#104).
-- Workflows do GitHub Actions com nomes padronizados por prefixo; os de uso único foram removidos.
-- Testes renomeados pelo assunto, não pela fase em que foram escritos.
+- Workflows do GitHub Actions com nomes padronizados por prefixo; os de uso único foram removidos (#109).
+- Testes renomeados pelo assunto, não pela fase em que foram escritos (#109).
+- CSS e dois scripts do `index.html` em arquivos próprios; nome Scriptorium na API e no cabeçalho (#110).
+- Scripts de implantação aceitam `SCRIPTORIUM_PROJECT` e `SCRIPTORIUM_SITE`, para replicar o Scriptorium em outro projeto.
 
 ### Corrigido
 - Artigo ABNT compila com o abnTeX2 1.9.7; o build da imagem do worker passou a rodar nos PRs (#108).
 - Exportação .txt do Guia preserva as quebras de linha (#105).
+- No computador, sem login, "Guia de escrita" rola até o guia (#110).
+- Mudanças em `public/guia/` e `public/brand/` passam a disparar o deploy do site (#109).
+- A checagem de sintaxe do CI conferia só o primeiro script; agora confere todos.
+- Botões e campos sem nome acessível para leitores de tela.
 
 ## [v1.1.2-piloto] — 2026-11-26
 

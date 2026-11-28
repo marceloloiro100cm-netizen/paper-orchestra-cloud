@@ -22,7 +22,7 @@ O repositório traz os valores da instalação oficial (`paperorchestra-mestrado
 | `public/config.js` | configuração pública do Web App (modelo em `public/config.js.example`). **Nunca** ponha chaves privadas aqui. |
 | `.github/workflows/*.yml` | `workload_identity_provider`, `service_account` e `project_id` (só se for usar o deploy pelo GitHub) |
 | `api/main.py` | `PUBLIC_URL` padrão, ou defina a variável no Cloud Run |
-| `scripts/*.sh` | alguns scripts (`configure-guardrails.sh`, `configure-budget.sh` e outros) fixam `PROJECT="paperorchestra-mestrado"` no topo |
+| scripts | nada no arquivo: exporte `SCRIPTORIUM_PROJECT=<seu-projeto>` (e `SCRIPTORIUM_SITE=<seu-site>` para o Hosting) antes de rodar. Sem isso, os scripts recusam qualquer projeto que não seja o da instalação oficial, de propósito. |
 | `hosting-redirect/` e `deploy-hosting.yml` | só existem para o endereço antigo da instalação oficial; podem ser apagados numa cópia |
 
 ## 3. Primeira implantação (Cloud Shell)
@@ -30,7 +30,8 @@ O repositório traz os valores da instalação oficial (`paperorchestra-mestrado
 ```bash
 git clone https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud.git
 cd paper-orchestra-cloud
-PROJECT_ID=<seu-projeto> bash scripts/deploy-cloud-shell.sh
+export SCRIPTORIUM_PROJECT=<seu-projeto>
+bash scripts/deploy-cloud-shell.sh
 ```
 
 O script pede o e-mail Google do administrador e então:
@@ -45,7 +46,7 @@ Se o script parar por falta de permissão, **não** o repita às cegas: leia o e
 
 Depois:
 
-- **OpenAlex** (referências): `PROJECT_ID=<seu-projeto> bash scripts/setup-openalex-key.sh`.
+- **OpenAlex** (referências): `PROJECT_ID=$SCRIPTORIUM_PROJECT bash scripts/setup-openalex-key.sh`.
 - **Proteções:** `bash scripts/configure-guardrails.sh` (backups do Firestore) e `bash scripts/configure-budget.sh` (alerta de orçamento).
 - **Modo com API (opcional):** `bash scripts/setup-byok-iam.sh`; ver [operacao/BYOK-BOOTSTRAP-PRODUCAO.md](operacao/BYOK-BOOTSTRAP-PRODUCAO.md).
 

@@ -3,7 +3,9 @@ set -euo pipefail
 
 # EXECUTAR somente no Cloud Shell do NOVO projeto, a partir da raiz do repositório.
 # Projeto padrão: paperorchestra-mestrado. Pode confirmar com PROJECT_ID=paperorchestra-mestrado bash scripts/deploy-cloud-shell.sh
-PROJECT_ID="${PROJECT_ID:-paperorchestra-mestrado}"
+# Instalação oficial por padrão; numa cópia do Scriptorium, defina SCRIPTORIUM_PROJECT (ver docs/IMPLANTACAO.md).
+SCRIPTORIUM_PROJECT="${SCRIPTORIUM_PROJECT:-paperorchestra-mestrado}"
+PROJECT_ID="${PROJECT_ID:-$SCRIPTORIUM_PROJECT}"
 REGION="southamerica-east1"
 # Por padrão, o worker usa Vertex AI via identidade Cloud Run (sem chaves persistentes).
 # Alternativa: AI_PROVIDER=gemini_api para usar chave Gemini via Secret Manager.
@@ -18,8 +20,8 @@ WORKER_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/worker:initial"
 API_SA="paper-orchestra-api@${PROJECT_ID}.iam.gserviceaccount.com"
 WORKER_SA="paper-orchestra-worker@${PROJECT_ID}.iam.gserviceaccount.com"
 
-if [[ "$PROJECT_ID" != "paperorchestra-mestrado" ]]; then
-  echo "ERRO: projeto incorreto: $PROJECT_ID. Este script só pode implantar em paperorchestra-mestrado." >&2; exit 2
+if [[ "$PROJECT_ID" != "$SCRIPTORIUM_PROJECT" ]]; then
+  echo "ERRO: projeto incorreto: $PROJECT_ID. Este script só implanta em $SCRIPTORIUM_PROJECT (defina SCRIPTORIUM_PROJECT para outra instalação)." >&2; exit 2
 fi
 if [[ ! -f firebase.json || ! -f worker/runner.py ]]; then
   echo 'Execute da raiz do repositório.' >&2; exit 2
@@ -27,7 +29,7 @@ fi
 if [[ ! -f public/config.js ]] || grep -q SUBSTITUIR public/config.js; then
   echo 'O arquivo public/config.js precisa estar configurado com os dados públicos do Firebase.' >&2; exit 2
 fi
-if ! grep -q 'projectId: "paperorchestra-mestrado"' public/config.js; then
+if ! grep -q "projectId: \"$PROJECT_ID\"" public/config.js; then
   echo 'ERRO: app Web aponta para outro projeto Firebase. Não é seguro prosseguir.' >&2; exit 2
 fi
 if ! command -v gcloud >/dev/null || ! command -v firebase >/dev/null; then

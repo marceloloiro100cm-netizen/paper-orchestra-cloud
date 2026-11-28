@@ -110,7 +110,8 @@ Backups: ver [operacao/BACKUP.md](operacao/BACKUP.md).
 
 - **Login:** Firebase Authentication com Google. A API confere o ID token (inclusive `email_verified` e revogação) e o convite da conta em toda rota.
 - **Banco:** regras do Firestore negam acesso direto; proteção contra exclusão do banco ativada; backups diário (7 dias) e semanal (12 semanas).
-- **MCP:** a chave de conexão aparece uma vez; o Firestore guarda só o hash; no máximo 5 ativas por conta; revogável no site.
+- **MCP:** a chave de conexão aparece uma vez; o Firestore guarda só o hash; no máximo 5 ativas por conta; vale 1 ano; revogável no site.
+- **Link do orientador:** público e temporário (até 30 dias), com no máximo 50 apontamentos por projeto e 10 a cada 10 minutos.
 - **LaTeX:** o texto vem de uma IA e é compilado com `-no-shell-escape` e leitura e escrita restritas ao diretório de trabalho; a API recusa comandos perigosos antes.
 - **Documentos enviados:** inspeção estática, quarentena e remoção de instruções embutidas (`worker/document_guard.py`, `api/upload_guard.py`).
 - **Segredos:** chaves Gemini e OpenAlex no Secret Manager. `public/config.js` tem só a configuração pública do Firebase.

@@ -3,8 +3,10 @@
 # Uso após revisão: bash scripts/setup-byok-iam.sh
 # Não cria, lê ou imprime nenhuma chave Gemini.
 set -euo pipefail
-PROJECT_ID="${PROJECT_ID:-paperorchestra-mestrado}"
-EXPECTED_PROJECT="paperorchestra-mestrado"
+# Instalação oficial por padrão; numa cópia do Scriptorium, defina SCRIPTORIUM_PROJECT (ver docs/IMPLANTACAO.md).
+SCRIPTORIUM_PROJECT="${SCRIPTORIUM_PROJECT:-paperorchestra-mestrado}"
+PROJECT_ID="${PROJECT_ID:-$SCRIPTORIUM_PROJECT}"
+EXPECTED_PROJECT="$SCRIPTORIUM_PROJECT"
 if [[ "$PROJECT_ID" != "$EXPECTED_PROJECT" ]]; then
   echo "Projeto recusado: $PROJECT_ID" >&2; exit 2
 fi

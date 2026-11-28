@@ -46,6 +46,8 @@ ModeloId = Literal[flow.formatos.ids()]
 
 MCP_PATH = "/api/mcp"
 MAX_ACTIVE_TOKENS = 5
+# Validade das chaves de conexão novas. Ao vencer, a pessoa gera outra no site (Minha conta).
+TOKEN_VALID_DAYS = 365
 MAX_PROJECT_SOURCES = 20
 MAX_ACTIVE_JOBS = 2
 BUSY = ("preparando", "compilando", "refazendo_referencias")
@@ -87,7 +89,7 @@ class Store:
             return None
         snap = self.db.collection("mcp_tokens").document(flow.token_hash(token)).get()
         record = snap.to_dict() if snap.exists else None
-        if not record or record.get("revoked"):
+        if not record or record.get("revoked") or self.token_expired(record):
             return None
         identity = {"uid": record["owner_uid"], "email": record.get("email", ""),
                     "email_verified": True}
@@ -97,17 +99,27 @@ class Store:
 
     def create_token(self, uid: str, email: str, label: str) -> dict:
         active = [d.to_dict() for d in self.db.collection("mcp_tokens").where("owner_uid", "==", uid).stream()]
-        if sum(1 for t in active if not t.get("revoked")) >= MAX_ACTIVE_TOKENS:
+        if sum(1 for t in active if not t.get("revoked") and not self.token_expired(t)) >= MAX_ACTIVE_TOKENS:
             raise ValueError(f"Limite de {MAX_ACTIVE_TOKENS} tokens ativos. Revogue um antes de criar outro.")
         token, digest = flow.new_token()
+        expires = (datetime.now(timezone.utc) + timedelta(days=TOKEN_VALID_DAYS)).isoformat()
         record = {"id": digest[:16], "hash": digest, "owner_uid": uid, "email": email,
-                  "label": (label or "Minha IA").strip()[:60], "created_at": now(), "revoked": False}
+                  "label": (label or "Minha IA").strip()[:60], "created_at": now(),
+                  "expires_at": expires, "revoked": False}
         self.db.collection("mcp_tokens").document(digest).set(record)
         return {**self.public_token(record), "token": token}
 
     @staticmethod
-    def public_token(record: dict) -> dict:
-        return {k: record.get(k) for k in ("id", "label", "created_at", "revoked", "revoked_at")}
+    def token_expired(record: dict) -> bool:
+        # Chaves criadas antes de 28/11/2026 não têm validade e continuam valendo até serem revogadas.
+        expires = str(record.get("expires_at") or "")
+        return bool(expires) and expires < now()
+
+    @classmethod
+    def public_token(cls, record: dict) -> dict:
+        out = {k: record.get(k) for k in ("id", "label", "created_at", "expires_at", "revoked", "revoked_at")}
+        out["expired"] = cls.token_expired(record)
+        return out
 
     def list_tokens(self, uid: str) -> list[dict]:
         docs = [d.to_dict() for d in self.db.collection("mcp_tokens").where("owner_uid", "==", uid).stream()]
@@ -315,6 +327,12 @@ class Store:
         comments = list(project.get("advisor_comments") or [])
         if len(comments) >= MAX_ADVISOR_COMMENTS:
             raise Falha(f"Limite de {MAX_ADVISOR_COMMENTS} apontamentos da orientação atingido neste projeto.")
+        # O link é público: limita rajadas (por exemplo, um robô que achou o link). A contagem usa os
+        # próprios comentários gravados, então vale em todas as instâncias da API.
+        window_start = (datetime.now(timezone.utc) - timedelta(minutes=ADVISOR_COMMENT_WINDOW_MIN)).isoformat()
+        recent = sum(1 for c in comments if str(c.get("created_at") or "") >= window_start)
+        if recent >= ADVISOR_COMMENT_BURST:
+            raise Falha(f"Muitos apontamentos em pouco tempo. Aguarde {ADVISOR_COMMENT_WINDOW_MIN} minutos e tente de novo.")
         clean_author = str(author or "").strip()[:80] or "Orientador(a)"
         clean_stage = str(stage or "Geral").strip()[:80] or "Geral"
         clean_kind = kind if kind in ADVISOR_COMMENT_KINDS else "sugestao"
@@ -715,6 +733,8 @@ PEDAGOGICAL_MODES = {
 }
 ADVISOR_COMMENT_KINDS = {"elogio", "sugestao", "ajuste_obrigatorio"}
 MAX_ADVISOR_COMMENTS = 50
+ADVISOR_COMMENT_BURST = 10
+ADVISOR_COMMENT_WINDOW_MIN = 10
 
 
 def pedagogical_mode_of(project: dict) -> str:

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Execute APENAS após backup agendado e bucket secundário serem verificados.
 set -euo pipefail
-PROJECT="paperorchestra-mestrado"
+PROJECT="${SCRIPTORIUM_PROJECT:-paperorchestra-mestrado}"
 DEPLOYER="paper-orchestra-deployer@$PROJECT.iam.gserviceaccount.com"
 PRINCIPAL="serviceAccount:$DEPLOYER"
 BACKUP="$PROJECT-paper-backups"
@@ -41,7 +41,7 @@ role_assigned() {
 import json, sys
 policy=json.load(open('/tmp/paper-iam-before.json'))
 role=sys.argv[1]
-principal='serviceAccount:paper-orchestra-deployer@paperorchestra-mestrado.iam.gserviceaccount.com'
+principal="serviceAccount:paper-orchestra-deployer@${PROJECT}.iam.gserviceaccount.com"
 raise SystemExit(0 if any(
     b.get('role')==role and principal in b.get('members',[]) and 'condition' not in b
     for b in policy.get('bindings',[])
@@ -72,7 +72,7 @@ gcloud projects get-iam-policy "$PROJECT" --format=json >/tmp/paper-iam-after.js
 python - <<'PY'
 import json
 policy=json.load(open('/tmp/paper-iam-after.json'))
-principal='serviceAccount:paper-orchestra-deployer@paperorchestra-mestrado.iam.gserviceaccount.com'
+principal="serviceAccount:paper-orchestra-deployer@${PROJECT}.iam.gserviceaccount.com"
 danger=set(['roles/iam.serviceAccountAdmin','roles/serviceusage.serviceUsageAdmin',
 'roles/artifactregistry.admin','roles/storage.admin','roles/iam.serviceAccountUser',
 'roles/resourcemanager.projectIamAdmin','roles/datastore.backupSchedulesAdmin'])

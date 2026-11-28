@@ -8,8 +8,10 @@ echo "Scriptorium BYOK: bootstrap privilegiado e auditoria segura"
 # Uso após revisão: bash scripts/setup-byok-iam.sh
 # Não cria, lê ou imprime nenhuma chave Gemini.
 set -euo pipefail
-PROJECT_ID="${PROJECT_ID:-paperorchestra-mestrado}"
-EXPECTED_PROJECT="paperorchestra-mestrado"
+# Instalação oficial por padrão; numa cópia do Scriptorium, defina SCRIPTORIUM_PROJECT (ver docs/IMPLANTACAO.md).
+SCRIPTORIUM_PROJECT="${SCRIPTORIUM_PROJECT:-paperorchestra-mestrado}"
+PROJECT_ID="${PROJECT_ID:-$SCRIPTORIUM_PROJECT}"
+EXPECTED_PROJECT="$SCRIPTORIUM_PROJECT"
 if [[ "$PROJECT_ID" != "$EXPECTED_PROJECT" ]]; then
   echo "Projeto recusado: $PROJECT_ID" >&2; exit 2
 fi
@@ -79,8 +81,10 @@ echo "ATENÇÃO: uma concessão prévia de secretAccessor no nível de projeto d
 echo "Scriptorium BYOK: iniciando auditoria somente leitura"
 # Auditoria somente leitura; nunca imprime ou busca payload de segredos.
 set -euo pipefail
-PROJECT_ID="${PROJECT_ID:-paperorchestra-mestrado}"
-if [[ "$PROJECT_ID" != "paperorchestra-mestrado" ]]; then
+# Instalação oficial por padrão; numa cópia do Scriptorium, defina SCRIPTORIUM_PROJECT (ver docs/IMPLANTACAO.md).
+SCRIPTORIUM_PROJECT="${SCRIPTORIUM_PROJECT:-paperorchestra-mestrado}"
+PROJECT_ID="${PROJECT_ID:-$SCRIPTORIUM_PROJECT}"
+if [[ "$PROJECT_ID" != "$SCRIPTORIUM_PROJECT" ]]; then
   echo "Projeto não autorizado: $PROJECT_ID" >&2; exit 2
 fi
 command -v gcloud >/dev/null || { echo "gcloud ausente" >&2; exit 2; }

@@ -29,8 +29,12 @@ def block(text, kind="paragraph", page=None, size=11.0, bbox=None):
 
 def make_docx(paragraphs):
     ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    def style_xml(style):
+        # Sintaxe compatível com Python 3.11 (a do worker): sem aspas iguais dentro da f-string.
+        return f"<w:pPr><w:pStyle w:val='{style}'/></w:pPr>" if style else ""
+
     body = "".join(
-        f'<w:p>{f"<w:pPr><w:pStyle w:val=\'{style}\'/></w:pPr>" if style else ""}<w:r><w:t>{text}</w:t></w:r></w:p>'
+        f"<w:p>{style_xml(style)}<w:r><w:t>{text}</w:t></w:r></w:p>"
         for text, style in paragraphs)
     xml = f'<?xml version="1.0"?><w:document xmlns:w="{ns}"><w:body>{body}</w:body></w:document>'
     buffer = BytesIO()

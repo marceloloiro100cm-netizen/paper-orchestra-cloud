@@ -2,7 +2,7 @@
 
 <!-- Arquivo gerado por scripts/upstreams.py render a partir de docs/upstreams.json. Não edite à mão. -->
 
-Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de implantação e manutenção, 27 módulos P1/P2, revisão 1.0 de 24/11/2026.
+Atualizado em 2026-11-28. Documento de origem: Scriptorium V2: Plano técnico de implantação e manutenção, 27 módulos P1/P2, revisão 1.0 de 24/11/2026.
 
 - Fonte única de rastreabilidade. docs/UPSTREAMS.md e docs/V2-MODULOS.md são gerados a partir deste arquivo por scripts/upstreams.py render.
 - IDs R01 a R29 seguem o plano V2. R30 em diante são dependências que o projeto já usava antes do plano.
@@ -62,6 +62,8 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 | R47 | [Gemini API: termos adicionais de serviço (uso dos dados)](https://ai.google.dev/gemini-api/terms) | normativo | sim | termos do serviço | - | M11, M21 |
 | R48 | [IFRS: Guia para o uso de Inteligência Artificial Generativa no IFRS (2026)](https://ifrs.edu.br/documentos/instrucao-normativa-ifrs-n-16-2026/) | normativo | sim | não se aplica | - | M11 |
 | R49 | [biblatex-apa (estilo APA 7 do biblatex) e biber](https://github.com/plk/biblatex-apa) | biblioteca | sim | LPPL-1.3c | versão dos pacotes Debian texlive-bibtex-extra e biber da imagem python:3.11-slim | M27 |
+| R50 | [Ruff (lint de Python)](https://github.com/astral-sh/ruff) | ferramenta | sim | MIT | 0.17.4 | M15 |
+| R51 | [Coverage.py (cobertura de testes)](https://github.com/nedbat/coveragepy) | ferramenta | sim | Apache-2.0 | 7.17.3 | M15 |
 
 ## Fichas
 
@@ -1191,3 +1193,49 @@ Atualizado em 2026-11-24. Documento de origem: Scriptorium V2: Plano técnico de
 - **Rollback:** -
 - **Responsável:** marceloloiro100cm-netizen
 - **Última checagem:** 2026-11-27
+
+### R50 · Ruff (lint de Python)
+
+- **Fonte canônica:** https://github.com/astral-sh/ruff
+- **Versões:** https://github.com/astral-sh/ruff/releases
+- **Erros e correções:** https://github.com/astral-sh/ruff/issues
+- **Avisos de segurança:** https://github.com/astral-sh/ruff/security/advisories
+- **Histórico de mudanças:** -
+- **Licença (SPDX):** MIT
+- **Situação da licença:** confirmada no PyPI em 28/11/2026
+- **Licença dos pesos:** -
+- **Versão fixada:** 0.17.4
+- **Versão instalada:** -
+- **Última versão revisada:** 0.17.6
+- **Onde é usado:** .github/workflows/check.yml, ruff.toml
+- **Política de atualização:** Trimestral: trocar o pin no check.yml e corrigir o que as regras novas apontarem num PR próprio.
+- **Frequência de revisão:** trimestral
+- **Risco:** -
+- **Nota de migração:** -
+- **Resultado de benchmark:** -
+- **Rollback:** -
+- **Responsável:** marceloloiro100cm-netizen
+- **Última checagem:** 2026-11-28
+
+### R51 · Coverage.py (cobertura de testes)
+
+- **Fonte canônica:** https://github.com/nedbat/coveragepy
+- **Versões:** https://github.com/nedbat/coveragepy/releases
+- **Erros e correções:** https://github.com/nedbat/coveragepy/issues
+- **Avisos de segurança:** https://github.com/nedbat/coveragepy/security/advisories
+- **Histórico de mudanças:** -
+- **Licença (SPDX):** Apache-2.0
+- **Situação da licença:** confirmada no PyPI em 28/11/2026
+- **Licença dos pesos:** -
+- **Versão fixada:** 7.17.3
+- **Versão instalada:** -
+- **Última versão revisada:** 7.17.5
+- **Onde é usado:** .github/workflows/check.yml
+- **Política de atualização:** Trimestral: trocar o pin no check.yml. A cobertura é informativa e não reprova PRs.
+- **Frequência de revisão:** trimestral
+- **Risco:** -
+- **Nota de migração:** -
+- **Resultado de benchmark:** -
+- **Rollback:** -
+- **Responsável:** marceloloiro100cm-netizen
+- **Última checagem:** 2026-11-28

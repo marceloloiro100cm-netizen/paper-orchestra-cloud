@@ -1420,3 +1420,13 @@ html[data-theme="black"] .btn-danger, html[data-theme="black"] .btn-danger:hover
 
 /* O cabeçalho é fixo (sticky): ao rolar até o guia, deixa espaço para ele não cobrir o título. */
 #guide-panel { scroll-margin-top: 84px; }
+
+/* Celular: o cabeçalho mostra só ícones; um rótulo curto embaixo de cada um diz o que o botão faz. */
+.short-label { display: none; }
+@media (max-width: 640px) {
+  .header-controls { gap: 4px; }
+  .header-controls .theme-btn { flex-direction: column; gap: 1px; line-height: 1.1; padding: 4px 5px !important; min-width: 38px; }
+  .header-controls #logout { padding: 6px 8px !important; }
+  .header-controls .short-label { display: block; font-size: 0.62rem; font-weight: 600; }
+  .header-controls .theme-btn #theme-label { display: none; }
+}
