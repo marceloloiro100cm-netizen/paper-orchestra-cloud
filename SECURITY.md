@@ -5,7 +5,7 @@ O Scriptorium guarda fontes e textos de pesquisa de estudantes. Relatos de falha
 ## Como relatar
 
 **Não abra uma issue pública.** Use o relato privado do GitHub:
-[Security → Report a vulnerability](https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/security/advisories/new).
+[Security → Report a vulnerability](https://github.com/marceloloiro100cm-netizen/scriptorium/security/advisories/new).
 
 Inclua, se puder: o que encontrou, como reproduzir, o impacto esperado e uma sugestão de correção. Não acesse, altere nem baixe dados de outras pessoas para demonstrar a falha.
 

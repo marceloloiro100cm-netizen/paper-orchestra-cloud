@@ -1,4 +1,4 @@
-# PaperOrchestra Mestrado — biblioteca, backups e acesso mínimo
+# Scriptorium — biblioteca, backups e acesso mínimo
 
 ## Biblioteca acadêmica (versão 1)
 
@@ -46,6 +46,6 @@ O script de primeira implantação (`deploy-cloud-shell.sh`) pode exigir reautor
 ## Verificação obrigatória
 
 Consulte o resultado do workflow GitHub:
-https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/actions/workflows/guardrails.yml
+https://github.com/marceloloiro100cm-netizen/scriptorium/actions/workflows/guardrails.yml
 
 Confirme o orçamento diretamente no console se houver aviso de permissão, e teste um novo envio de documento pelo celular. Nunca envie documentos pessoais ou credenciais para o repositório público.

@@ -1,8 +1,8 @@
 # Scriptorium MPIE
 
-[![CI](https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/actions/workflows/check.yml/badge.svg)](https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/actions/workflows/check.yml)
+[![CI](https://github.com/marceloloiro100cm-netizen/scriptorium/actions/workflows/check.yml/badge.svg)](https://github.com/marceloloiro100cm-netizen/scriptorium/actions/workflows/check.yml)
 [![Licença: AGPL-3.0](https://img.shields.io/badge/licen%C3%A7a-AGPL--3.0-blue)](LICENSE)
-[![Versão](https://img.shields.io/github/v/tag/marceloloiro100cm-netizen/paper-orchestra-cloud?label=vers%C3%A3o)](CHANGELOG.md)
+[![Versão](https://img.shields.io/github/v/tag/marceloloiro100cm-netizen/scriptorium?label=vers%C3%A3o)](CHANGELOG.md)
 
 **Escrita acadêmica guiada, com as fontes do próprio pesquisador.**
 Produto técnico-tecnológico do Mestrado Profissional em Informática na Educação (MPIE), IFRS *Campus* Porto Alegre.
@@ -101,7 +101,7 @@ Para relatar uma falha, siga o [SECURITY.md](SECURITY.md).
 
 ## Contribuir
 
-Correções, normas novas e relatos de uso são bem-vindos: veja [CONTRIBUTING.md](CONTRIBUTING.md) e o [Código de Conduta](CODE_OF_CONDUCT.md). Para problemas e sugestões, abra uma [issue](https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/issues/new/choose).
+Correções, normas novas e relatos de uso são bem-vindos: veja [CONTRIBUTING.md](CONTRIBUTING.md) e o [Código de Conduta](CODE_OF_CONDUCT.md). Para problemas e sugestões, abra uma [issue](https://github.com/marceloloiro100cm-netizen/scriptorium/issues/new/choose).
 
 ## In English
 

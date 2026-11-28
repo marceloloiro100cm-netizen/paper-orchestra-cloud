@@ -32,7 +32,7 @@ from structured_extract import extract_document
 FORMATS = {".pdf": "pdf", ".docx": "docx", ".txt": "txt", ".bib": "bib", ".ris": "ris"}
 EVAL_VERSION = "retrieval-eval-2"
 MAX_PDF_BYTES = 40 * 1024 * 1024
-USER_AGENT = "Scriptorium-corpus/1 (https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud)"
+USER_AGENT = "Scriptorium-corpus/1 (https://github.com/marceloloiro100cm-netizen/scriptorium)"
 
 
 def load_corpus(folder: Path) -> tuple[list[dict], dict]:

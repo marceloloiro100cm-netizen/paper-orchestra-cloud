@@ -1,6 +1,6 @@
 // Configuração pública do aplicativo web Firebase (NÃO é uma chave privada de IA).
 // Copie para config.js e substitua pelos valores do Firebase Console > Configurações do projeto > Seu app Web.
-window.PAPER_FIREBASE_CONFIG = {
+window.SCRIPTORIUM_FIREBASE_CONFIG = {
   apiKey: "SUBSTITUIR",
   authDomain: "paperorchestra-mestrado.firebaseapp.com",
   projectId: "paperorchestra-mestrado",

@@ -13,8 +13,8 @@ Obrigado pelo interesse! O Scriptorium é um produto técnico-tecnológico de me
 Requisitos: Python 3.11+, Node.js 20+ (só para checar a sintaxe do site) e Git.
 
 ```bash
-git clone https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud.git
-cd paper-orchestra-cloud
+git clone https://github.com/marceloloiro100cm-netizen/scriptorium.git
+cd scriptorium
 python -m pip install requests fastapi google-api-core "PyMuPDF>=2.1,<3" "numpy>=1.26,<3" "mcp>=2.3,<3"
 python -m unittest discover -s tests -v
 ```

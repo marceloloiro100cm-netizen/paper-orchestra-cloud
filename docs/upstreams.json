@@ -11,10 +11,10 @@
   "upstreams": [
     {
       "id": "R01",
-      "name": "Projeto Scriptorium (paper-orchestra-cloud)",
+      "name": "Projeto Scriptorium",
       "kind": "codigo_proprio",
-      "canonical_url": "https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud",
-      "github": "marceloloiro100cm-netizen/paper-orchestra-cloud",
+      "canonical_url": "https://github.com/marceloloiro100cm-netizen/scriptorium",
+      "github": "marceloloiro100cm-netizen/scriptorium",
       "license_spdx": "a definir",
       "license_status": "código próprio; o repositório ainda não tem arquivo LICENSE",
       "adopted": true,

@@ -3,6 +3,7 @@
 set -euo pipefail
 PROJECT="${SCRIPTORIUM_PROJECT:-paperorchestra-mestrado}"
 BUDGET_AMOUNT="50"
+# Nome antigo mantido de propósito: é por ele que o script encontra o alerta que já existe.
 BUDGET_NAME="PaperOrchestra Mestrado - alerta mensal"
 ACCOUNT="$(gcloud beta billing projects describe "$PROJECT" --format='value(billingAccountName)' 2>/dev/null || true)"
 if [[ -z "$ACCOUNT" || "$ACCOUNT" == "None" ]]; then

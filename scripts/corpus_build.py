@@ -29,7 +29,7 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "worker"))
 API = "https://api.openalex.org/works"
-UA = "Scriptorium-corpus/1 (https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud; mailto:scriptorium@users.noreply.github.com)"
+UA = "Scriptorium-corpus/1 (https://github.com/marceloloiro100cm-netizen/scriptorium; mailto:scriptorium@users.noreply.github.com)"
 MAX_BYTES = 15 * 1024 * 1024
 
 

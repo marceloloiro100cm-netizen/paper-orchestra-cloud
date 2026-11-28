@@ -28,8 +28,8 @@ O repositório traz os valores da instalação oficial (`paperorchestra-mestrado
 ## 3. Primeira implantação (Cloud Shell)
 
 ```bash
-git clone https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud.git
-cd paper-orchestra-cloud
+git clone https://github.com/marceloloiro100cm-netizen/scriptorium.git
+cd scriptorium
 export SCRIPTORIUM_PROJECT=<seu-projeto>
 bash scripts/deploy-cloud-shell.sh
 ```

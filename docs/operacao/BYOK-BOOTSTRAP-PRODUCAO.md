@@ -23,7 +23,7 @@ O bootstrap é uma operação **única e privilegiada**:
 
 1. Entre em https://console.cloud.google.com/?project=paperorchestra-mestrado
    com uma conta que administra o projeto, e abra **Cloud Shell**.
-2. No repositório GitHub `marceloloiro100cm-netizen/paper-orchestra-cloud`,
+2. No repositório GitHub `marceloloiro100cm-netizen/scriptorium`,
    abra **`scripts/bootstrap-cloudshell-unico.sh`** e baixe o arquivo pela
    opção **Download raw file**. No Cloud Shell, use **Upload file** para
    enviar esse único arquivo. Ele inclui o bootstrap e a auditoria.
@@ -42,7 +42,7 @@ O bootstrap é uma operação **única e privilegiada**:
 4. O resultado esperado da segunda etapa é:
    `AUDITORIA BYOK: permissões condicionais esperadas presentes.`
 
-5. Volte ao GitHub > **Actions** > **Atualizar API e agentes PaperOrchestra**
+5. Volte ao GitHub > **Actions** > **Deploy · API e worker (Cloud Run)**
    e clique em **Run workflow** na branch `main` (ou solicite a reexecução
    do deploy que falhou). O workflow agora **somente audita** o IAM,
    sem tentar criar novos papéis.

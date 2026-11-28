@@ -18,13 +18,13 @@ permissions:
 
 # Mesmo grupo da hospedagem atual: publicar os dois sites sem concorrência.
 concurrency:
-  group: paper-orchestra-hosting
+  group: scriptorium-hosting
   cancel-in-progress: false
 
 jobs:
   scriptorium:
     name: Criar domínio secundário e preservar hospedagem principal
-    if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud' && github.ref == 'refs/heads/main'
+    if: github.repository == 'marceloloiro100cm-netizen/scriptorium' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

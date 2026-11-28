@@ -54,7 +54,7 @@ class ZoteroKey(BaseModel):
 
 MAX_ATTACHMENTS = 20
 SYNC = "zotero_sync"
-USER_AGENT = "Scriptorium/1 (paper-orchestra-cloud)"
+USER_AGENT = "Scriptorium/1 (https://github.com/marceloloiro100cm-netizen/scriptorium)"
 
 
 class ZoteroImport(ZoteroKey):

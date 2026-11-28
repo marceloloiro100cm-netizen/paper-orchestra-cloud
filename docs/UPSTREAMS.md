@@ -13,7 +13,7 @@ Atualizado em 2026-11-28. Documento de origem: Scriptorium V2: Plano técnico de
 
 | ID | Componente | Tipo | Em uso | Licença | Versão fixada | Módulos |
 |---|---|---|---|---|---|---|
-| R01 | [Projeto Scriptorium (paper-orchestra-cloud)](https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud) | codigo_proprio | sim | a definir | - | V1, M01-M27 |
+| R01 | [Projeto Scriptorium](https://github.com/marceloloiro100cm-netizen/scriptorium) | codigo_proprio | sim | a definir | - | V1, M01-M27 |
 | R02 | [PaperOrchestra original (Google Research)](https://github.com/google-research/paper-orchestra) | biblioteca | sim | Apache-2.0 | d9bae997e793a015ed38bb1605be9eb58c00284f | V1, M25 |
 | R03 | [Docling](https://github.com/docling-project/docling) | biblioteca | não | MIT | - | M01, M19, M23 |
 | R04 | [Docling-Parse](https://github.com/docling-project/docling-parse) | biblioteca | não | MIT | - | M01, M02, M19 |
@@ -67,12 +67,12 @@ Atualizado em 2026-11-28. Documento de origem: Scriptorium V2: Plano técnico de
 
 ## Fichas
 
-### R01 · Projeto Scriptorium (paper-orchestra-cloud)
+### R01 · Projeto Scriptorium
 
-- **Fonte canônica:** https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud
-- **Versões:** https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/releases
-- **Erros e correções:** https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/issues
-- **Avisos de segurança:** https://github.com/marceloloiro100cm-netizen/paper-orchestra-cloud/security/advisories
+- **Fonte canônica:** https://github.com/marceloloiro100cm-netizen/scriptorium
+- **Versões:** https://github.com/marceloloiro100cm-netizen/scriptorium/releases
+- **Erros e correções:** https://github.com/marceloloiro100cm-netizen/scriptorium/issues
+- **Avisos de segurança:** https://github.com/marceloloiro100cm-netizen/scriptorium/security/advisories
 - **Histórico de mudanças:** -
 - **Licença (SPDX):** a definir
 - **Situação da licença:** código próprio; o repositório ainda não tem arquivo LICENSE

@@ -10,13 +10,13 @@ permissions:
   id-token: write
 
 concurrency:
-  group: paper-orchestra-storage-backup
+  group: scriptorium-storage-backup
   cancel-in-progress: false
 
 jobs:
   copiar:
     name: Copiar arquivos sem remover originais
-    if: github.repository == 'marceloloiro100cm-netizen/paper-orchestra-cloud' && github.ref == 'refs/heads/main'
+    if: github.repository == 'marceloloiro100cm-netizen/scriptorium' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -32,7 +32,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v3
         with:
           project_id: paperorchestra-mestrado
-      - name: Sincronizar somente o projeto PaperOrchestra
+      - name: Sincronizar somente o projeto Scriptorium
         shell: bash
         run: |
           set -euo pipefail
