@@ -10,11 +10,12 @@ Exige IAM próprio no projeto. Se não houver, falha de modo explícito.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from urllib import error, parse, request
 
 
-PROJECT = "paperorchestra-mestrado"
+PROJECT = os.environ.get("SCRIPTORIUM_PROJECT", "paperorchestra-mestrado")
 NEW_DOMAIN = "scriptoriummpie.web.app"
 CONFIG_URL = f"https://identitytoolkit.googleapis.com/admin/v2/projects/{PROJECT}/config"
 

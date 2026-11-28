@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Alertas de orçamento, não bloqueio automático de gastos.
 set -euo pipefail
-PROJECT="paperorchestra-mestrado"
+PROJECT="${SCRIPTORIUM_PROJECT:-paperorchestra-mestrado}"
 BUDGET_AMOUNT="50"
 BUDGET_NAME="PaperOrchestra Mestrado - alerta mensal"
 ACCOUNT="$(gcloud beta billing projects describe "$PROJECT" --format='value(billingAccountName)' 2>/dev/null || true)"

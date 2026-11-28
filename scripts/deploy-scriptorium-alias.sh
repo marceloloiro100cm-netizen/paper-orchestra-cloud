@@ -3,8 +3,8 @@
 # Nunca renomeia, desativa ou publica no site padrão paperorchestra-mestrado.
 set -euo pipefail
 
-PROJECT="paperorchestra-mestrado"
-SITE_ID="scriptoriummpie"
+PROJECT="${SCRIPTORIUM_PROJECT:-paperorchestra-mestrado}"
+SITE_ID="${SCRIPTORIUM_SITE:-scriptoriummpie}"
 TARGET="scriptoriummpie-alias"
 
 if [[ "${GOOGLE_CLOUD_PROJECT:-$PROJECT}" != "$PROJECT" ]]; then

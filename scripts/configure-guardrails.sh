@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-PROJECT="paperorchestra-mestrado"
+PROJECT="${SCRIPTORIUM_PROJECT:-paperorchestra-mestrado}"
 REGION="southamerica-east1"
 SOURCE="$PROJECT-paper-storage"
 DEST="$PROJECT-paper-backups"
