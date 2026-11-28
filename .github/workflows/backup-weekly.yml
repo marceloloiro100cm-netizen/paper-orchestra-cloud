@@ -1,4 +1,4 @@
-name: Backup semanal da biblioteca
+name: Operação · Backup semanal da biblioteca
 
 on:
   schedule:

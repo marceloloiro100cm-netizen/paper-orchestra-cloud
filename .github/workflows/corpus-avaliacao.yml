@@ -1,4 +1,4 @@
-name: Corpus de referência e avaliação (gate G2)
+name: Manual · Corpus e avaliação da busca (G2)
 
 # coletar: busca no OpenAlex PDFs de acesso aberto por tema (docs/corpus/temas.json)
 #          e guarda PDFs, textos e metadados como artefato temporário (1 dia).

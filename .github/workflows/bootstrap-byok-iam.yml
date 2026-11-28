@@ -15,7 +15,7 @@
 # precisa (Service Usage Consumer e Storage Admin restrito ao bucket de fontes
 # do Cloud Build) e Artifact Registry Reader. Exige Project IAM Admin temporário concedido no Console e
 # remove esse papel ao final.
-name: Bootstrap BYOK (sem Cloud Shell)
+name: Manual · Bootstrap IAM do BYOK
 
 on:
   workflow_dispatch:

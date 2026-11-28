@@ -1,4 +1,4 @@
-name: Check
+name: CI · Verificações (testes, upstreams, sintaxe)
 on:
   push:
   pull_request:

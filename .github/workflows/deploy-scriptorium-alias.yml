@@ -1,4 +1,4 @@
-name: Scriptorium — publicar endereço scriptoriummpie.web.app
+name: Deploy · Site scriptoriummpie.web.app
 
 # O nome exato scriptorium.web.app foi rejeitado (globalmente reservado).
 # A tentativa agora usa o novo nome indicado pelo usuário: scriptoriummpie.web.app.
@@ -8,9 +8,7 @@ on:
     paths:
       - .github/workflows/deploy-scriptorium-alias.yml
       - scripts/deploy-scriptorium-alias.sh
-      - public/config.js
-      - public/app.js
-      - public/index.html
+      - public/**
       - firebase.json
   workflow_dispatch:
 

@@ -1,4 +1,4 @@
-name: Testar acesso multiusuário e BYOK
+name: CI · Acesso multiusuário e BYOK
 
 on:
   pull_request:
@@ -19,9 +19,6 @@ on:
       - "scripts/audit-byok-iam.sh"
       - "scripts/bootstrap-cloudshell-unico.sh"
       - ".github/workflows/test-multiuser.yml"
-  push:
-    branches:
-      - feat/scriptorium-multiuser-byok-foundation
 
 permissions:
   contents: read

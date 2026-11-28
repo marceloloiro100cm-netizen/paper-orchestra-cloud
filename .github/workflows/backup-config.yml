@@ -1,4 +1,4 @@
-name: Backup — diagnóstico e configuração (Firestore e retenção)
+name: "Manual · Backup: diagnóstico e configuração"
 
 # Item 4 da finalização da V1 (25/11/2026).
 # diagnosticar: só lê. Mostra versionamento e ciclo de vida do bucket de backup

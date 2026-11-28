@@ -1,4 +1,4 @@
-name: Atualizar API e agentes PaperOrchestra
+name: Deploy · API e worker (Cloud Run)
 
 on:
   push:
