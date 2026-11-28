@@ -565,6 +565,32 @@ class SiteRoutesTest(unittest.TestCase):
         self.route("/tokens/{token_id}", "DELETE")(created["id"], self.user)
         self.assertIsNone(self.store.token_owner(created["token"]))
 
+    def test_token_expires_and_legacy_token_stays_valid(self):
+        created = self.store.create_token(UID, "p@example.org", "Claude")
+        self.assertTrue(created["expires_at"] > created["created_at"])
+        self.assertFalse(created["expired"])
+        self.assertIsNotNone(self.store.token_owner(created["token"]))
+        doc = self.db.collection("mcp_tokens").document(flow.token_hash(created["token"]))
+        doc.update({"expires_at": "2000-01-01T00:00:00+00:00"})
+        self.assertIsNone(self.store.token_owner(created["token"]))
+        self.assertTrue(self.store.list_tokens(UID)[0]["expired"])
+        # Chave vencida não conta no limite de chaves ativas.
+        for n in range(mcp_server.MAX_ACTIVE_TOKENS):
+            self.store.create_token(UID, "p@example.org", f"Nova {n}")
+        # Chave antiga, sem validade gravada, continua valendo.
+        legacy = self.store.create_token("l" * 28, "l@example.org", "Antiga")
+        self.db.collection("mcp_tokens").document(flow.token_hash(legacy["token"])).update({"expires_at": None})
+        self.assertIsNotNone(self.store.token_owner(legacy["token"]))
+
+    def test_advisor_comments_have_burst_limit(self):
+        pid, _, _ = seed_project(self.db, self.bucket)
+        share = self.store.create_advisor_share(UID, pid, 14, "")
+        for n in range(mcp_server.ADVISOR_COMMENT_BURST):
+            self.assertIsNotNone(self.store.add_advisor_comment(
+                share["token"], "Prof.", "Geral", "sugestao", f"Apontamento número {n}"))
+        with self.assertRaises(mcp_server.Falha):
+            self.store.add_advisor_comment(share["token"], "Prof.", "Geral", "sugestao", "Mais um apontamento")
+
     def test_rebuild_references_route_starts_job_once(self):
         jobs = []
         self.store.start_job = lambda *a: jobs.append(a)

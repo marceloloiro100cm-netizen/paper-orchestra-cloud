@@ -1521,12 +1521,13 @@ async function loadMcp() {
     const data = await (await request('/mcp-conta/tokens')).json();
     $('mcp-details').classList.remove('hidden');
     const list = $('mcp-token-list'); list.replaceChildren();
-    const active = (data.tokens || []).filter(t => !t.revoked);
+    const active = (data.tokens || []).filter(t => !t.revoked && !t.expired);
     $('mcp-token-count').textContent = active.length;
     if (!active.length) list.append(el('p', 'Nenhuma chave ativa.'));
     for (const t of active) {
       const row = document.createElement('div'); row.className = 'actions';
-      row.append(el('span', `${t.label} · criada em ${new Date(t.created_at).toLocaleDateString('pt-BR')}`));
+      const validade = t.expires_at ? ` · vale até ${new Date(t.expires_at).toLocaleDateString('pt-BR')}` : '';
+      row.append(el('span', `${t.label} · criada em ${new Date(t.created_at).toLocaleDateString('pt-BR')}${validade}`));
       const revoke = el('button', 'Desativar', 'btn btn-danger'); revoke.type = 'button';
       revoke.addEventListener('click', async () => {
         const ok = await confirmAction('Desativar esta chave?', [

@@ -19,7 +19,7 @@ O modo com chave Gemini continua disponível para quem tiver créditos.
 - Endereço: `https://scriptoriummpie.web.app/api/mcp` (Streamable HTTP, sem estado,
   respostas JSON; aceita as revisões 2025-03-26, 2025-06-18, 2025-11-25 e 2026-07-28 via SDK oficial).
 - Token pessoal gerado no site (Minha conta > Conectar sua IA). Só o hash SHA-256 fica no
-  Firestore (`mcp_tokens`); o token aparece uma vez. No máximo 5 ativos por conta.
+  Firestore (`mcp_tokens`); o token aparece uma vez. No máximo 5 ativos por conta. Chaves criadas a partir de 28/11/2026 valem 1 ano (`TOKEN_VALID_DAYS`); as anteriores valem até serem revogadas.
 - Envio: `Authorization: Bearer scr_...` ou, para clientes que só aceitam um endereço,
   `/api/mcp/t/<token>`. Nesse caso o token aparece no log de acesso do Cloud Run: por isso
   é revogável e só abre as ferramentas abaixo.
